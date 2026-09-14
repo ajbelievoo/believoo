@@ -1,0 +1,30 @@
+BelieVoo Live SDK for Android v2.0.0
+=====================================
+
+This is the Android SDK for BelieVoo Live Streaming Engine.
+
+GRADLE SETUP:
+-------------
+Add to project-level build.gradle:
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://maven.believoo.com/repository/releases' }
+    }
+}
+
+Add to app-level build.gradle:
+
+dependencies {
+    implementation 'com.believoo:live-sdk:2.0.0'
+    implementation 'com.believoo:live-sdk-webrtc:2.0.0'
+}
+
+CONTACT:
+--------
+For the actual AAR file, contact: support@believoo.com
+Documentation: https://believoo.com/docs/streaming
+
+App ID: bel_06ad61f458468c57b1d48a29

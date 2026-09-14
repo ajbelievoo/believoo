@@ -42,6 +42,14 @@ return [
             'synchronous' => null,
         ],
 
+        'mail' => [
+            'driver' => 'sqlite',
+            'database' => env('MAIL_DB_PATH', '/www/vmail/postfixadmin.db'),
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+            'busy_timeout' => 5000,
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
@@ -110,6 +118,14 @@ return [
             'prefix_indexes' => true,
             // 'encrypt' => env('DB_ENCRYPT', 'yes'),
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+        ],
+
+        'ghc' => [
+            'driver' => 'sqlite',
+            'url' => env('GHC_DATABASE_URL'),
+            'database' => env('GHC_DB_DATABASE', database_path('ghc.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('GHC_DB_FOREIGN_KEYS', true),
         ],
 
     ],

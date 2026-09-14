@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: believoo-mediamtx
+    restart: unless-stopped
+    ports:
+      - "1935:1935/tcp"    # RTMP ingest
+      - "8554:8554/tcp"    # RTSP
+      - "8888:8888/tcp"    # HLS / WebRTC HTTP
+      - "8889:8889/tcp"    # WebRTC (WS)
+      - "40000:40000/tcp"  # Metrics API
+      - "40001:40001/tcp"  # Control API
+      - "10000-10010:10000-10010/udp"  # WebRTC UDP
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml
+      - ./recordings:/recordings
+    networks:
+      - streaming-net
+
+networks:
+  streaming-net:
+    driver: bridge

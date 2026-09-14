@@ -1,0 +1,32 @@
+BelieVoo Live SDK for Flutter v2.0.0
+=====================================
+
+Cross-platform streaming SDK for iOS and Android.
+
+INSTALLATION:
+-------------
+Add to pubspec.yaml:
+
+dependencies:
+  believoo_live: ^2.0.0
+
+Or download from:
+https://cdn.believoo.com/sdk/flutter/believoo_live-2.0.0.zip
+
+USAGE:
+------
+import 'package:believoo_live/believoo_live.dart';
+
+void main() async {
+  await BelieVooLive.initialize(
+    appId: 'bel_your_app_id',
+    appCertificate: 'your_certificate',
+  );
+}
+
+CONTACT:
+--------
+For the actual SDK file, contact: support@believoo.com
+Documentation: https://believoo.com/docs/streaming
+
+App ID: bel_06ad61f458468c57b1d48a29

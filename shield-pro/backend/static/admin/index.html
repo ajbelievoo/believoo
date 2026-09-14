@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Believoo Shield Pro - Admin Panel</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <div class="login-logo">
+                <i class="fas fa-shield-halved"></i>
+                <h1>BELIEVOO</h1>
+                <span>SHIELD PRO ADMIN</span>
+            </div>
+            <div class="login-form">
+                <label>Admin API Key</label>
+                <input type="password" id="api-key-input" placeholder="Enter your admin API key">
+                <button id="login-btn" onclick="doLogin()">
+                    <i class="fas fa-lock"></i> AUTHENTICATE
+                </button>
+                <p id="login-error" class="login-error"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-shield-halved"></i>
+                <div>
+                    <h2>SHIELD PRO</h2>
+                    <span>B-Host Control</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-page="licenses" onclick="showPage('licenses')">
+                    <i class="fas fa-key"></i> Licenses
+                </a>
+                <a href="#" class="nav-item" data-page="clients" onclick="showPage('clients')">
+                    <i class="fas fa-desktop"></i> Clients
+                </a>
+                <a href="#" class="nav-item" data-page="threats" onclick="showPage('threats')">
+                    <i class="fas fa-bug"></i> Threats
+                </a>
+                <a href="#" class="nav-item" data-page="commands" onclick="showPage('commands')">
+                    <i class="fas fa-terminal"></i> Remote Commands
+                </a>
+                <a href="#" class="nav-item" data-page="api-docs" onclick="showPage('api-docs')">
+                    <i class="fas fa-book"></i> API Docs
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="doLogout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+                <span class="version">v1.0.0</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <h2 id="page-title">Dashboard Overview</h2>
+                <div class="top-actions">
+                    <span class="status-badge online"><i class="fas fa-circle"></i> Online</span>
+                    <button class="refresh-btn" onclick="refreshCurrentPage()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Page -->
+            <div id="page-dashboard" class="page active">
+                <div class="stats-grid">
+                    <div class="stat-card licenses">
+                        <div class="stat-icon"><i class="fas fa-key"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="dash-licenses-total">--</span>
+                            <span class="stat-label">Total Licenses</span>
+                        </div>
+                        <div class="stat-breakdown">
+                            <span class="badge green" id="dash-licenses-active">Active: --</span>
+                            <span class="badge red" id="dash-licenses-expired">Expired: --</span>
+                        </div>
+                    </div>
+                    <div class="stat-card clients">
+                        <div class="stat-icon"><i class="fas fa-desktop"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="dash-clients-total">--</span>
+                            <span class="stat-label">Total Clients</span>
+                        </div>
+                        <div class="stat-breakdown">
+                            <span class="badge green" id="dash-clients-online">Online: --</span>
+                            <span class="badge gray" id="dash-clients-offline">Offline: --</span>
+                        </div>
+                    </div>
+                    <div class="stat-card threats">
+                        <div class="stat-icon"><i class="fas fa-bug"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="dash-threats-total">--</span>
+                            <span class="stat-label">Total Threats</span>
+                        </div>
+                        <div class="stat-breakdown">
+                            <span class="badge orange" id="dash-threats-today">Today: --</span>
+                            <span class="badge red" id="dash-threats-critical">Critical: --</span>
+                        </div>
+                    </div>
+                    <div class="stat-card health">
+                        <div class="stat-icon"><i class="fas fa-heart-pulse"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="dash-health-score">--</span>
+                            <span class="stat-label">Avg Health Score</span>
+                        </div>
+                        <div class="stat-breakdown">
+                            <span class="badge blue" id="dash-pending-cmds">Pending Cmds: --</span>
+                            <span class="badge purple" id="dash-sig-version">Sig: --</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-row">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                        </div>
+                        <div class="quick-actions">
+                            <button class="action-btn primary" onclick="openCreateLicense()">
+                                <i class="fas fa-plus"></i> Create License
+                            </button>
+                            <button class="action-btn danger" onclick="openBroadcastCommand()">
+                                <i class="fas fa-broadcast-tower"></i> Broadcast Command
+                            </button>
+                            <button class="action-btn warning" onclick="showPage('threats')">
+                                <i class="fas fa-shield-virus"></i> View Threats
+                            </button>
+                            <button class="action-btn success" onclick="showPage('clients')">
+                                <i class="fas fa-satellite-dish"></i> Manage Clients
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-row two-col">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-clock"></i> Recent Threats</h3>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="recent-threats-table">
+                                <thead>
+                                    <tr><th>Time</th><th>Threat</th><th>Device</th><th>Severity</th><th>Action</th></tr>
+                                </thead>
+                                <tbody><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3><i class="fas fa-list"></i> Pending Commands</h3>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="pending-commands-table">
+                                <thead>
+                                    <tr><th>Time</th><th>Command</th><th>Client</th><th>Priority</th><th>Status</th></tr>
+                                </thead>
+                                <tbody><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Licenses Page -->
+            <div id="page-licenses" class="page">
+                <div class="panel">
+                    <div class="panel-header space-between">
+                        <h3><i class="fas fa-key"></i> License Management</h3>
+                        <button class="btn-primary" onclick="openCreateLicense()">
+                            <i class="fas fa-plus"></i> Create New License
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="licenses-table">
+                            <thead>
+                                <tr>
+                                    <th>License Key</th>
+                                    <th>HWID</th>
+                                    <th>Device</th>
+                                    <th>Status</th>
+                                    <th>Expiry</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="7" class="empty">Loading licenses...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clients Page -->
+            <div id="page-clients" class="page">
+                <div class="panel">
+                    <div class="panel-header space-between">
+                        <h3><i class="fas fa-desktop"></i> Managed Devices</h3>
+                        <div class="filter-bar">
+                            <input type="text" id="client-filter" placeholder="Search by device name or HWID..." oninput="filterClients()">
+                            <select id="client-status-filter" onchange="filterClients()">
+                                <option value="all">All</option>
+                                <option value="online">Online</option>
+                                <option value="offline">Offline</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="clients-table">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>HWID</th>
+                                    <th>IP</th>
+                                    <th>Health</th>
+                                    <th>Guard</th>
+                                    <th>Last Online</th>
+                                    <th>Threats</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="8" class="empty">Loading clients...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Threats Page -->
+            <div id="page-threats" class="page">
+                <div class="panel">
+                    <div class="panel-header space-between">
+                        <h3><i class="fas fa-bug"></i> Global Threat Intelligence</h3>
+                        <div class="filter-bar">
+                            <select id="threat-severity-filter" onchange="filterThreats()">
+                                <option value="all">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="threats-table">
+                            <thead>
+                                <tr>
+                                    <th>Detected</th>
+                                    <th>Threat Name</th>
+                                    <th>Type</th>
+                                    <th>Severity</th>
+                                    <th>File Path</th>
+                                    <th>Hash (SHA-256)</th>
+                                    <th>Action</th>
+                                    <th>Cloud</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="8" class="empty">Loading threats...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Commands Page -->
+            <div id="page-commands" class="page">
+                <div class="panel">
+                    <div class="panel-header space-between">
+                        <h3><i class="fas fa-terminal"></i> Remote Command Center</h3>
+                        <button class="btn-primary" onclick="openSendCommand()">
+                            <i class="fas fa-paper-plane"></i> Send Command
+                        </button>
+                    </div>
+                    <div class="command-tabs">
+                        <button class="tab-btn active" onclick="switchCmdTab('pending')">Pending</button>
+                        <button class="tab-btn" onclick="switchCmdTab('sent')">Sent</button>
+                        <button class="tab-btn" onclick="switchCmdTab('completed')">Completed</button>
+                        <button class="tab-btn" onclick="switchCmdTab('failed')">Failed</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Command</th>
+                                    <th>Target</th>
+                                    <th>Client</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Result</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr><td colspan="7" class="empty">Loading commands...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Docs Page -->
+            <div id="page-api-docs" class="page">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-book"></i> API Documentation for Software Team</h3>
+                    </div>
+                    <div class="api-docs-content" id="api-docs-content">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Create License -->
+    <div id="modal-create-license" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Create New License</h3>
+                <button class="modal-close" onclick="closeModal('modal-create-license')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Expiry (days from now)</label>
+                <input type="number" id="license-expiry" value="365" min="1">
+                <label>Max Devices</label>
+                <input type="number" id="license-max-devices" value="1" min="1">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('modal-create-license')">Cancel</button>
+                <button class="btn-primary" onclick="submitCreateLicense()">Create License</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Broadcast Command -->
+    <div id="modal-broadcast" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-broadcast-tower"></i> Broadcast Command</h3>
+                <button class="modal-close" onclick="closeModal('modal-broadcast')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Command</label>
+                <select id="broadcast-cmd">
+                    <option value="full_scan">Full Scan</option>
+                    <option value="quick_scan">Quick Scan</option>
+                    <option value="update_signatures">Update Signatures</option>
+                    <option value="shutdown_guard">Disable Real-Time Guard</option>
+                    <option value="enable_guard">Enable Real-Time Guard</option>
+                    <option value="reboot">Reboot System</option>
+                    <option value="isolate">Network Isolate</option>
+                </select>
+                <label>Target Path (optional)</label>
+                <input type="text" id="broadcast-target" placeholder="e.g., C:/Users/Name/Downloads">
+                <p class="modal-warning"><i class="fas fa-exclamation-triangle"></i> This will execute on ALL online clients.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('modal-broadcast')">Cancel</button>
+                <button class="btn-danger" onclick="submitBroadcast()">Broadcast</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Send Command to Client -->
+    <div id="modal-send-cmd" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-paper-plane"></i> Send Command to Client</h3>
+                <button class="modal-close" onclick="closeModal('modal-send-cmd')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Client ID</label>
+                <input type="text" id="cmd-client-id" placeholder="Paste client ID here">
+                <label>Command</label>
+                <select id="cmd-type">
+                    <option value="force_delete">Force Delete File/Folder</option>
+                    <option value="full_scan">Full Scan</option>
+                    <option value="quick_scan">Quick Scan</option>
+                    <option value="update_signatures">Update Signatures</option>
+                    <option value="shutdown_guard">Disable Guard</option>
+                    <option value="enable_guard">Enable Guard</option>
+                    <option value="reboot">Reboot</option>
+                    <option value="isolate">Network Isolate</option>
+                </select>
+                <label>Target Path (for force_delete)</label>
+                <input type="text" id="cmd-target" placeholder="e.g., C:/malware.exe">
+                <label>Priority (1=Highest, 10=Lowest)</label>
+                <input type="number" id="cmd-priority" value="5" min="1" max="10">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('modal-send-cmd')">Cancel</button>
+                <button class="btn-primary" onclick="submitSendCommand()">Send Command</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>

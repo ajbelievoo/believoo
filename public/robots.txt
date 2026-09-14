@@ -1,2 +1,5 @@
 User-agent: *
 Disallow:
+
+Sitemap: https://believoo.com/sitemap.xml
+Sitemap: https://bc.believoo.com/sitemap.xml

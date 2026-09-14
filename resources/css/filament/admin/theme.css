@@ -1,0 +1,433 @@
+@import '/vendor/filament/filament/resources/css/theme.css';
+
+@config '../../../../tailwind.config.js';
+
+/* ─── Dark Mode Styles - Only apply when .dark class is present ─────────────────────────────────────── */
+
+/* ─── Panel backgrounds ─────────────────────────────────────── */
+.dark .fi-body {
+    background-color: #050505 !important;
+}
+
+.dark .fi-sidebar {
+    background-color: #0a0a0a !important;
+    border-right: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+.dark .fi-topbar {
+    background-color: rgba(10,10,10,0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+.dark .fi-main {
+    background-color: #050505 !important;
+}
+
+/* ─── Main Content Text Colors ────────────────────────────── */
+.dark .fi-main,
+.dark .fi-main h1,
+.dark .fi-main h2,
+.dark .fi-main h3,
+.dark .fi-main h4,
+.dark .fi-main p,
+.dark .fi-main span,
+.dark .fi-main div {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+.dark .fi-main .fi-header-heading {
+    color: #ffffff !important;
+    font-weight: 900 !important;
+}
+
+/* Widget backgrounds */
+.dark .fi-wi-widget {
+    background-color: #111111 !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 1rem !important;
+}
+
+.dark .fi-wi-widget h3,
+.dark .fi-wi-widget .fi-wi-stats-overview-stat-label {
+    color: rgba(255,255,255,0.6) !important;
+}
+
+.dark .fi-wi-widget .fi-wi-stats-overview-stat-value {
+    color: #00b7ff !important;
+}
+
+/* Ensure content is visible */
+.dark .fi-content {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* ─── Sidebar nav items ─────────────────────────────────────── */
+.dark .fi-sidebar-nav-item-button {
+    border-radius: 0.75rem !important;
+    transition: all 0.2s ease !important;
+}
+
+.dark .fi-sidebar-nav-item-button.fi-active,
+.dark .fi-sidebar-nav-item-button[aria-current="page"] {
+    background-color: rgba(0,183,255,0.08) !important;
+    border-left: 3px solid #00b7ff !important;
+    color: #00b7ff !important;
+}
+
+.dark .fi-sidebar-nav-item-button:hover {
+    background-color: rgba(255,255,255,0.05) !important;
+}
+
+/* ─── Cards / sections ──────────────────────────────────────── */
+.dark .fi-section,
+.dark .fi-wi-stats-overview-stat,
+.dark .fi-ta-ctn,
+.dark .fi-card,
+.dark .fi-infolist-section,
+.dark .fi-infolist-section-content,
+.dark .fi-infolist-entry,
+.dark .fi-infolist-entry-content,
+.dark .fi-infolist-entry-value,
+.dark .fi-infolist-entry-label {
+    background-color: #111111 !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 1rem !important;
+}
+
+/* ─── Infolist / Detail View ───────────────────────────────── */
+.dark .fi-infolist {
+    background-color: transparent !important;
+}
+
+.dark .fi-infolist-section {
+    background: linear-gradient(135deg, rgba(17, 17, 17, 0.95) 0%, rgba(13, 13, 13, 0.98) 100%) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 1.25rem !important;
+    overflow: hidden !important;
+}
+
+.dark .fi-infolist-section-header {
+    background-color: rgba(0,0,0,0.3) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    padding: 1rem 1.5rem !important;
+}
+
+.dark .fi-infolist-section-header h3 {
+    color: #00b7ff !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.dark .fi-infolist-entry {
+    background-color: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    border-radius: 0.75rem !important;
+    padding: 1rem 1.25rem !important;
+}
+
+.dark .fi-infolist-entry-label {
+    color: rgba(255,255,255,0.5) !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.dark .fi-infolist-entry-value {
+    color: #ffffff !important;
+    font-weight: 500 !important;
+    font-size: 0.95rem !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Key value grid */
+.dark .fi-infolist-key-value {
+    background-color: rgba(255,255,255,0.02) !important;
+    border-radius: 0.75rem !important;
+}
+
+/* Text entries */
+.dark .fi-infolist-text-entry {
+    color: rgba(255,255,255,0.9) !important;
+    line-height: 1.6 !important;
+}
+
+/* Icon entries */
+.dark .fi-infolist-icon-entry {
+    color: #00b7ff !important;
+}
+
+/* Color entries */
+.dark .fi-infolist-color-entry {
+    border-radius: 0.5rem !important;
+    border: 2px solid rgba(255,255,255,0.1) !important;
+}
+
+/* ─── Table ─────────────────────────────────────────────────── */
+.dark .fi-ta-row:hover td {
+    background-color: rgba(0,183,255,0.04) !important;
+}
+
+.dark .fi-ta-header-cell {
+    background-color: #0a0a0a !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* ─── Buttons ───────────────────────────────────────────────── */
+.dark .fi-btn-primary,
+.dark .fi-btn[data-color="primary"] {
+    background-color: #00b7ff !important;
+    color: #050505 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 0 20px rgba(0,183,255,0.3) !important;
+}
+
+.dark .fi-btn-primary:hover,
+.dark .fi-btn[data-color="primary"]:hover {
+    box-shadow: 0 0 35px rgba(0,183,255,0.5) !important;
+    transform: scale(1.02) !important;
+}
+
+/* ─── Badges ────────────────────────────────────────────────── */
+.dark .fi-badge {
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    font-size: 0.65rem !important;
+    border-radius: 9999px !important;
+}
+
+/* ─── Form inputs ───────────────────────────────────────────── */
+.dark .fi-input,
+.dark .fi-select-input,
+.dark .fi-textarea {
+    background-color: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    color: #e5e7eb !important;
+}
+
+.dark .fi-input:focus,
+.dark .fi-select-input:focus,
+.dark .fi-textarea:focus {
+    border-color: rgba(0,183,255,0.5) !important;
+    box-shadow: 0 0 0 1px rgba(0,183,255,0.3) !important;
+}
+
+/* ─── Modals ────────────────────────────────────────────────── */
+.dark .fi-modal-window {
+    background-color: #111111 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 1.5rem !important;
+}
+
+/* ─── Notifications ─────────────────────────────────────────── */
+.dark .fi-no-notification {
+    background-color: #111111 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 1rem !important;
+}
+
+/* ─── Dropdown menus ────────────────────────────────────────── */
+.dark .fi-dropdown-panel {
+    background-color: #111111 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 1rem !important;
+}
+
+/* ─── Stats overview widget ─────────────────────────────────── */
+.dark .fi-wi-stats-overview-stat-value {
+    color: #00b7ff !important;
+    font-weight: 900 !important;
+}
+
+/* ─── Pagination ────────────────────────────────────────────── */
+.dark .fi-pagination-item-btn.fi-active {
+    background-color: #00b7ff !important;
+    color: #050505 !important;
+    font-weight: 900 !important;
+}
+
+/* ─── Premium Login Page ──────────────────────────────────── */
+.dark .fi-login-page {
+    background-color: #050505 !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+/* Animated gradient orbs for login */
+.dark .fi-login-page::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(0, 183, 255, 0.3) 0%, transparent 70%);
+    filter: blur(80px);
+    animation: loginOrb1 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dark .fi-login-page::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    left: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(112, 0, 255, 0.25) 0%, transparent 70%);
+    filter: blur(80px);
+    animation: loginOrb2 25s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Third orb */
+.dark .fi-login-page .fi-body::before {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255, 0, 160, 0.2) 0%, transparent 70%);
+    filter: blur(60px);
+    animation: loginOrb3 18s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Grid pattern overlay */
+.dark .fi-login-page .fi-body {
+    background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px) !important;
+    background-size: 60px 60px !important;
+    position: relative;
+}
+
+/* Login card - Glass morphism */
+.dark .fi-login-page form {
+    background: linear-gradient(135deg, rgba(17, 17, 17, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%) !important;
+    backdrop-filter: blur(40px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 2rem !important;
+    box-shadow:
+        0 32px 64px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(0, 183, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    position: relative;
+    z-index: 10;
+}
+
+/* Gradient accent line on top of card */
+.dark .fi-login-page form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00b7ff, transparent);
+    border-radius: 2px;
+}
+
+/* Login heading */
+.dark .fi-login-page h2 {
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.dark .fi-login-page p {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Form inputs on login */
+.dark .fi-login-page .fi-input {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 0.75rem !important;
+    color: #ffffff !important;
+}
+
+.dark .fi-login-page .fi-input:focus {
+    border-color: rgba(0, 183, 255, 0.5) !important;
+    box-shadow: 0 0 20px rgba(0, 183, 255, 0.2) !important;
+}
+
+.dark .fi-login-page .fi-input-wrapper {
+    position: relative;
+}
+
+/* Labels */
+.dark .fi-login-page label {
+    color: rgba(255, 255, 255, 0.6) !important;
+    font-weight: 600 !important;
+}
+
+/* Remember me checkbox */
+.dark .fi-login-page input[type="checkbox"] {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark .fi-login-page input[type="checkbox"]:checked {
+    background-color: #00b7ff !important;
+    border-color: #00b7ff !important;
+}
+
+/* Submit button - Premium */
+.dark .fi-login-page button[type="submit"] {
+    background: linear-gradient(135deg, #00b7ff 0%, #0099ff 100%) !important;
+    color: #050505 !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 4px 20px rgba(0, 183, 255, 0.4) !important;
+    transition: all 0.3s ease !important;
+}
+
+.dark .fi-login-page button[type="submit"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 30px rgba(0, 183, 255, 0.6) !important;
+}
+
+/* Forgot password link */
+.dark .fi-login-page a[href*="password"] {
+    color: #00b7ff !important;
+    font-weight: 600 !important;
+}
+
+.dark .fi-login-page a[href*="password"]:hover {
+    color: #ffffff !important;
+}
+
+/* Animations */
+@keyframes loginOrb1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(50px, -30px) scale(1.1); }
+    50% { transform: translate(-30px, 50px) scale(1); }
+    75% { transform: translate(-50px, -20px) scale(0.95); }
+}
+
+@keyframes loginOrb2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-40px, 40px) scale(1.15); }
+    66% { transform: translate(60px, -30px) scale(0.9); }
+}
+
+@keyframes loginOrb3 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.2); }
+}

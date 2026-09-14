@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "believoo",
+			"path": "../../.."
+		},
+		{
+			"path": "../../../../ghc"
+		}
+	],
+	"settings": {},
+	"workbenchMode": "windsurf-agent-window"
+}

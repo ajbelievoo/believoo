@@ -1,0 +1,84 @@
+/* ============================================================
+   BelieVoo Dashboard — Theme Engine
+   Three themes: midnight-onyx (default), frost-white, believoo-signature
+   Applied via data-theme attribute on <html>
+   ============================================================ */
+
+/* ── Midnight Onyx (default) ─────────────────────────────── */
+:root,
+[data-theme="midnight-onyx"] {
+    --bg-base:           #05070A;
+    --bg-secondary:      #0a0f1a;
+    --card-bg:           rgba(15, 23, 42, 0.7);
+    --card-bg-solid:     #0f172a;
+    --accent-primary:    #00c6ff;
+    --accent-secondary:  #7c3aed;
+    --accent-glow:       rgba(0, 198, 255, 0.4);
+    --text-primary:      #ffffff;
+    --text-secondary:    #e2e8f0;
+    --text-muted:        #94a3b8;
+    --border-color:      rgba(255, 255, 255, 0.1);
+    --border-hover:      rgba(0, 198, 255, 0.4);
+    --sidebar-bg:        rgba(5, 7, 10, 0.85);
+    --nav-active-bg:     rgba(0, 198, 255, 0.15);
+    --nav-active-text:   #00c6ff;
+    --input-bg:          rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb:   rgba(0, 198, 255, 0.3);
+}
+
+/* ── Frost White ─────────────────────────────────────────── */
+[data-theme="frost-white"] {
+    --bg-base:           #f0f4f8;
+    --bg-secondary:      #e8edf5;
+    --card-bg:           rgba(255, 255, 255, 0.6);
+    --card-bg-solid:     rgba(255, 255, 255, 0.9);
+    --accent-primary:    #0072ff;
+    --accent-secondary:  #7c3aed;
+    --accent-glow:       rgba(0, 114, 255, 0.3);
+    --text-primary:      #0f172a;
+    --text-secondary:    #1e293b;
+    --text-muted:        #475569;
+    --border-color:      rgba(0, 0, 0, 0.08);
+    --border-hover:      rgba(0, 114, 255, 0.4);
+    --sidebar-bg:        rgba(255, 255, 255, 0.7);
+    --nav-active-bg:     rgba(0, 114, 255, 0.1);
+    --nav-active-text:   #0072ff;
+    --input-bg:          rgba(0, 0, 0, 0.04);
+    --scrollbar-thumb:   rgba(0, 114, 255, 0.3);
+}
+
+/* ── BelieVoo Signature ──────────────────────────────────── */
+[data-theme="believoo-signature"] {
+    --bg-base:           #001a3a;
+    --bg-secondary:      #002050;
+    --card-bg:           rgba(0, 114, 255, 0.15);
+    --card-bg-solid:     rgba(0, 50, 120, 0.8);
+    --accent-primary:    #ffffff;
+    --accent-secondary:  #00c6ff;
+    --accent-glow:       rgba(255, 255, 255, 0.3);
+    --text-primary:      #ffffff;
+    --text-secondary:    rgba(255, 255, 255, 0.9);
+    --text-muted:        rgba(255, 255, 255, 0.6);
+    --border-color:      rgba(255, 255, 255, 0.2);
+    --border-hover:      rgba(255, 255, 255, 0.5);
+    --sidebar-bg:        rgba(0, 20, 60, 0.85);
+    --nav-active-bg:     rgba(255, 255, 255, 0.15);
+    --nav-active-text:   #ffffff;
+    --input-bg:          rgba(255, 255, 255, 0.1);
+    --scrollbar-thumb:   rgba(255, 255, 255, 0.3);
+}
+
+/* ── Global base styles using CSS vars ───────────────────── */
+body {
+    background-color: var(--bg-base);
+    color:            var(--text-primary);
+    transition:       background-color 100ms ease, color 100ms ease;
+}
+
+/* ── Scrollbar theming ───────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background:    var(--scrollbar-thumb);
+    border-radius: 3px;
+}

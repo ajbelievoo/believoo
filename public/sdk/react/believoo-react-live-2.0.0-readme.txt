@@ -1,0 +1,35 @@
+BelieVoo Live SDK for React v2.0.0
+=====================================
+
+React hooks-based streaming SDK for web applications.
+
+INSTALLATION:
+-------------
+npm install @believoo/react-live
+
+Or download from:
+https://cdn.believoo.com/sdk/react/believoo-react-live-2.0.0.tgz
+
+USAGE:
+------
+import { useBelieVooLive } from '@believoo/react-live';
+
+function StreamComponent() {
+  const { joinChannel, publish } = useBelieVooLive({
+    appId: 'bel_your_app_id',
+    appCertificate: 'your_certificate',
+  });
+  
+  return (
+    <button onClick={() => joinChannel('my-channel')}>
+      Start Streaming
+    </button>
+  );
+}
+
+CONTACT:
+--------
+For the actual SDK file, contact: support@believoo.com
+Documentation: https://believoo.com/docs/streaming
+
+App ID: bel_06ad61f458468c57b1d48a29

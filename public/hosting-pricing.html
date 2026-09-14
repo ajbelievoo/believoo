@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hosting & VPS - Believoo</title>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --color-bg: #0a0a0a;
+            --color-card: #111111;
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-text: #ffffff;
+            --color-text-muted: #9ca3af;
+            --color-electric: #00B7FF;
+            --color-electric-glow: rgba(0, 183, 255, 0.3);
+            --glass-bg: rgba(17, 17, 17, 0.8);
+        }
+        
+        body {
+            font-family: 'Figtree', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .main-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 1rem 0;
+        }
+        
+        .header-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--color-text);
+            text-decoration: none;
+            letter-spacing: -0.02em;
+        }
+        
+        .logo span {
+            color: var(--color-electric);
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: var(--color-electric);
+        }
+        
+        .nav-links a.active {
+            color: var(--color-electric);
+        }
+        
+        .btn-primary {
+            background: var(--color-electric);
+            color: #000;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px var(--color-electric-glow);
+        }
+        
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px var(--color-electric);
+        }
+        
+        /* Hero Section */
+        .hero {
+            padding: 10rem 1.5rem 4rem;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(0, 183, 255, 0.1) 0%, transparent 50%);
+        }
+        
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff 0%, var(--color-electric) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 1.125rem;
+            color: var(--color-text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* Main Content */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 1.5rem 4rem;
+        }
+        
+        /* Section Title */
+        .section-header {
+            margin: 4rem 0 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .section-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--color-electric) 0%, rgba(0, 183, 255, 0.3) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .section-subtitle {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+        
+        /* Pricing Grid */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .pricing-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        /* Plan Card */
+        .plan-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .plan-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-electric), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .plan-card:hover {
+            border-color: var(--color-electric);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 40px var(--color-electric-glow);
+        }
+        
+        .plan-card:hover::before {
+            opacity: 1;
+        }
+        
+        .plan-card.featured {
+            border-color: var(--color-electric);
+            box-shadow: 0 0 40px var(--color-electric-glow);
+        }
+        
+        .plan-card.featured::before {
+            opacity: 1;
+        }
+        
+        .featured-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--color-electric);
+            color: #000;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.625rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .plan-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .plan-desc {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .plan-price {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+        }
+        
+        .plan-price span {
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+            font-weight: 500;
+        }
+        
+        .plan-price .period {
+            font-size: 1rem;
+            color: var(--color-text-muted);
+        }
+        
+        .features-list {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+        
+        .features-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+        }
+        
+        .features-list li i {
+            color: var(--color-electric);
+            font-size: 0.875rem;
+        }
+        
+        .features-list li strong {
+            color: var(--color-text);
+            font-weight: 600;
+        }
+        
+        .btn-plan {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            background: transparent;
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            border-radius: 12px;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .btn-plan:hover {
+            background: var(--color-electric);
+            border-color: var(--color-electric);
+            color: #000;
+        }
+        
+        .btn-plan.featured-btn {
+            background: var(--color-electric);
+            border-color: var(--color-electric);
+            color: #000;
+        }
+        
+        .btn-plan.featured-btn:hover {
+            box-shadow: 0 0 20px var(--color-electric-glow);
+        }
+        
+        /* Add-ons Section */
+        .addons-section {
+            margin-top: 4rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+        }
+        
+        .addons-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .addons-subtitle {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+        }
+        
+        .addon-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .addon-item:hover {
+            border-color: var(--color-electric);
+            background: rgba(0, 183, 255, 0.05);
+        }
+        
+        .addon-info h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .addon-info p {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+        }
+        
+        .addon-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--color-electric);
+        }
+        
+        /* Footer Note */
+        .footer-note {
+            text-align: center;
+            margin-top: 4rem;
+            padding: 2rem;
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--color-border);
+        }
+        
+        .footer-note i {
+            color: var(--color-electric);
+            margin-right: 0.5rem;
+        }
+        
+        /* Footer */
+        footer {
+            background: #000;
+            border-top: 1px solid var(--color-border);
+            padding: 3rem 1.5rem;
+        }
+        
+        .footer-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+        }
+        
+        .footer-brand p {
+            color: var(--color-text-muted);
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .footer-social {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .footer-social a {
+            width: 40px;
+            height: 40px;
+            background: var(--glass-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text);
+            transition: all 0.3s;
+        }
+        
+        .footer-social a:hover {
+            background: var(--color-electric);
+            color: #000;
+        }
+        
+        .footer-links h4 {
+            font-size: 0.875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1.5rem;
+        }
+        
+        .footer-links ul {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 0.75rem;
+        }
+        
+        .footer-links a {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.3s;
+        }
+        
+        .footer-links a:hover {
+            color: var(--color-electric);
+        }
+        
+        .footer-bottom {
+            max-width: 1280px;
+            margin: 3rem auto 0;
+            padding-top: 2rem;
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--color-text);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .footer-content {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .pricing-grid,
+            .pricing-grid-2 {
+                grid-template-columns: 1fr;
+            }
+            
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            
+            .footer-bottom {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .addon-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo">Believ<span>oo</span></a>
+            <nav class="nav-links">
+                <a href="/">Home</a>
+                <a href="/services">Services</a>
+                <a href="/portfolio">Portfolio</a>
+                <a href="/hosting" class="active">Hosting</a>
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+                <a href="/#inquiry" class="btn-primary">Start Project</a>
+            </nav>
+            <button class="mobile-menu-btn" onclick="alert('Mobile menu - Please use desktop for full navigation')">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Cloud Infrastructure & Managed Services</h1>
+        <p>High-Performance VPS, Web Hosting & Dedicated Server Solutions powered by OVHCloud infrastructure</p>
+    </section>
+
+    <main class="container">
+        <!-- Web Hosting -->
+        <section id="web-hosting">
+            <div class="section-header">
+                <div class="section-icon">
+                    <i class="fas fa-globe"></i>
+                </div>
+                <div>
+                    <h2 class="section-title">Web Hosting Plans</h2>
+                    <p class="section-subtitle">Shared hosting for small to medium websites</p>
+                </div>
+            </div>
+
+            <div class="pricing-grid">
+                <div class="plan-card">
+                    <h3 class="plan-name">Starter</h3>
+                    <p class="plan-desc">Perfect for personal websites</p>
+                    <div class="plan-price">$3<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>1</strong> Website</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>10 GB</strong> SSD Storage</li>
+                        <li><i class="fas fa-check-circle"></i> Unmetered Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> Free SSL Certificate</li>
+                        <li><i class="fas fa-check-circle"></i> cPanel Control Panel</li>
+                        <li><i class="fas fa-check-circle"></i> 24/7 Support</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card featured">
+                    <span class="featured-badge">Popular</span>
+                    <h3 class="plan-name">Business</h3>
+                    <p class="plan-desc">Best for growing businesses</p>
+                    <div class="plan-price">$6<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>10</strong> Websites</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>50 GB</strong> SSD Storage</li>
+                        <li><i class="fas fa-check-circle"></i> Unmetered Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> Free SSL Certificate</li>
+                        <li><i class="fas fa-check-circle"></i> cPanel Control Panel</li>
+                        <li><i class="fas fa-check-circle"></i> Free Daily Backup</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan featured-btn">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">Pro</h3>
+                    <p class="plan-desc">For high-traffic websites</p>
+                    <div class="plan-price">$12<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>Unlimited</strong> Websites</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>100 GB</strong> NVMe Storage</li>
+                        <li><i class="fas fa-check-circle"></i> Unmetered Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> Free SSL + CDN</li>
+                        <li><i class="fas fa-check-circle"></i> cPanel + Softaculous</li>
+                        <li><i class="fas fa-check-circle"></i> Priority Support</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- VPS Hosting -->
+        <section id="vps">
+            <div class="section-header">
+                <div class="section-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div>
+                    <h2 class="section-title">VPS Hosting Plans</h2>
+                    <p class="section-subtitle">Virtual Private Servers with dedicated resources</p>
+                </div>
+            </div>
+
+            <div class="pricing-grid">
+                <div class="plan-card">
+                    <h3 class="plan-name">VPS-1</h3>
+                    <p class="plan-desc">Entry level VPS</p>
+                    <div class="plan-price">$14.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>4</strong> vCores</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>8 GB</strong> RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>75 GB</strong> SSD</li>
+                        <li><i class="fas fa-check-circle"></i> Daily Backup (24h)</li>
+                        <li><i class="fas fa-check-circle"></i> Unlimited Traffic</li>
+                        <li><i class="fas fa-check-circle"></i> 400 Mbps Bandwidth</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card featured">
+                    <span class="featured-badge">Best Value</span>
+                    <h3 class="plan-name">VPS-2</h3>
+                    <p class="plan-desc">Best for applications</p>
+                    <div class="plan-price">$21.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>6</strong> vCores</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>12 GB</strong> RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>100 GB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> Daily Backup (24h)</li>
+                        <li><i class="fas fa-check-circle"></i> Unlimited Traffic</li>
+                        <li><i class="fas fa-check-circle"></i> 1 Gbps Bandwidth</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan featured-btn">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">VPS-3</h3>
+                    <p class="plan-desc">High performance VPS</p>
+                    <div class="plan-price">$41.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>8</strong> vCores</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>24 GB</strong> RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>200 GB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> Daily Backup (24h)</li>
+                        <li><i class="fas fa-check-circle"></i> Unlimited Traffic</li>
+                        <li><i class="fas fa-check-circle"></i> 1.5 Gbps Bandwidth</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+            </div>
+
+            <div class="pricing-grid" style="margin-top: 1.5rem;">
+                <div class="plan-card">
+                    <h3 class="plan-name">VPS-4</h3>
+                    <p class="plan-desc">Powerful VPS</p>
+                    <div class="plan-price">$71.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>12</strong> vCores</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>48 GB</strong> RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>300 GB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> Daily Backup (24h)</li>
+                        <li><i class="fas fa-check-circle"></i> Unlimited Traffic</li>
+                        <li><i class="fas fa-check-circle"></i> 2 Gbps Bandwidth</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">VPS-5</h3>
+                    <p class="plan-desc">Enterprise VPS</p>
+                    <div class="plan-price">$101.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>16</strong> vCores</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>64 GB</strong> RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>350 GB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> Daily Backup (24h)</li>
+                        <li><i class="fas fa-check-circle"></i> Unlimited Traffic</li>
+                        <li><i class="fas fa-check-circle"></i> 2.5 Gbps Bandwidth</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">VPS-6</h3>
+                    <p class="plan-desc">Ultimate VPS</p>
+                    <div class="plan-price">$131.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>24</strong> vCores</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>96 GB</strong> RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>400 GB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> Daily Backup (24h)</li>
+                        <li><i class="fas fa-check-circle"></i> Unlimited Traffic</li>
+                        <li><i class="fas fa-check-circle"></i> 3 Gbps Bandwidth</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dedicated Servers -->
+        <section id="dedicated">
+            <div class="section-header">
+                <div class="section-icon">
+                    <i class="fas fa-server"></i>
+                </div>
+                <div>
+                    <h2 class="section-title">Dedicated Server Plans</h2>
+                    <p class="section-subtitle">Bare metal servers with full control</p>
+                </div>
+            </div>
+
+            <div class="pricing-grid-2">
+                <div class="plan-card">
+                    <h3 class="plan-name">DS-1</h3>
+                    <p class="plan-desc">Entry level dedicated server</p>
+                    <div class="plan-price">$149.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>Intel Xeon E3-1230</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>4 Cores</strong> / 8 Threads</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>32 GB</strong> DDR4 RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>2x 500 GB</strong> SSD</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>10 TB</strong> Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>1 Gbps</strong> Port</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card featured">
+                    <span class="featured-badge">Popular</span>
+                    <h3 class="plan-name">DS-2</h3>
+                    <p class="plan-desc">Best value dedicated server</p>
+                    <div class="plan-price">$249.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>Intel Xeon E-2288G</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>8 Cores</strong> / 16 Threads</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>64 GB</strong> DDR4 RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>2x 1 TB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Unmetered</strong> Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>1 Gbps</strong> Port</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan featured-btn">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">DS-3</h3>
+                    <p class="plan-desc">High performance server</p>
+                    <div class="plan-price">$399.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>AMD EPYC 7302</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>16 Cores</strong> / 32 Threads</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>128 GB</strong> DDR4 RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>2x 2 TB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Unmetered</strong> Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>10 Gbps</strong> Port</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">DS-4</h3>
+                    <p class="plan-desc">Enterprise grade server</p>
+                    <div class="plan-price">$599.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>AMD EPYC 7402</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>24 Cores</strong> / 48 Threads</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>256 GB</strong> DDR4 RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>2x 4 TB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Unmetered</strong> Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>10 Gbps</strong> Port</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">DS-5</h3>
+                    <p class="plan-desc">Ultimate dedicated server</p>
+                    <div class="plan-price">$899.99<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>AMD EPYC 7502</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>32 Cores</strong> / 64 Threads</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>512 GB</strong> DDR4 RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>4x 4 TB</strong> NVMe</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Unmetered</strong> Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>25 Gbps</strong> Port</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Get Started</a>
+                </div>
+
+                <div class="plan-card">
+                    <h3 class="plan-name">DS-Enterprise</h3>
+                    <p class="plan-desc">Custom configuration</p>
+                    <div class="plan-price">Custom<span class="period">/mo</span></div>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check-circle"></i> <strong>Dual AMD EPYC</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>64+ Cores</strong></li>
+                        <li><i class="fas fa-check-circle"></i> <strong>1 TB+</strong> DDR4 RAM</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Custom</strong> Storage</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Unmetered</strong> Bandwidth</li>
+                        <li><i class="fas fa-check-circle"></i> <strong>Dedicated</strong> Support</li>
+                    </ul>
+                    <a href="/contact" class="btn-plan">Contact Us</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add-ons -->
+        <div class="addons-section">
+            <h2 class="addons-title">Professional Managed Services</h2>
+            <p class="addons-subtitle">Optional add-ons to enhance your hosting experience</p>
+            
+            <div class="addon-item">
+                <div class="addon-info">
+                    <h4>Unlimited Live Streaming Engine</h4>
+                    <p>High-concurrency Voice & Video RTC setup. Replaces Agora with 0 usage bills.</p>
+                </div>
+                <div class="addon-price">+$72/mo</div>
+            </div>
+
+            <div class="addon-item">
+                <div class="addon-info">
+                    <h4>24/7 Expert Managed Support</h4>
+                    <p>Security hardening, OS updates, and priority technical assistance.</p>
+                </div>
+                <div class="addon-price">+$48/mo</div>
+            </div>
+
+            <div class="addon-item">
+                <div class="addon-info">
+                    <h4>Advanced Off-site Data Backup</h4>
+                    <p>Automatic off-site replication to ensure maximum data safety.</p>
+                </div>
+                <div class="addon-price">+$18/mo</div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <i class="fas fa-info-circle"></i>
+            All prices are in USD ($). Infrastructure powered by OVHCloud. Managed by Believoo.
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <a href="/" class="logo">Believ<span>oo</span></a>
+                <p>Architecting next-generation digital experiences through advanced software engineering and high-performance infrastructure.</p>
+                <div class="footer-social">
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="#"><i class="fab fa-github"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+            
+            <div class="footer-links">
+                <h4>Services</h4>
+                <ul>
+                    <li><a href="/services">Web Development</a></li>
+                    <li><a href="/services">Mobile Apps</a></li>
+                    <li><a href="/services">UI/UX Design</a></li>
+                    <li><a href="/services">Cloud Solutions</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Company</h4>
+                <ul>
+                    <li><a href="/portfolio">Portfolio</a></li>
+                    <li><a href="/hosting">Hosting & VPS</a></li>
+                    <li><a href="/about">About Us</a></li>
+                    <li><a href="/contact">Contact</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Support</h4>
+                <ul>
+                    <li><a href="/client/dashboard">Client Dashboard</a></li>
+                    <li><a href="/terms">Terms of Service</a></li>
+                    <li><a href="/policy">Privacy Policy</a></li>
+                    <li><a href="/admin">Admin Access</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <div>&copy; 2026 Believoo Systems. All Rights Reserved.</div>
+            <div>Infrastructure powered by OVHCloud</div>
+        </div>
+    </footer>
+</body>
+</html>

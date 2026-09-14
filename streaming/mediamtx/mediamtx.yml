@@ -1,0 +1,71 @@
+###############################################
+# BelieVoo MediaMTX Configuration
+###############################################
+
+# Global settings
+logLevel: info
+logDestinations: [stdout]
+logFile: mediamtx.log
+
+# Authentication - allow API and metrics from any IP
+authInternalUsers:
+  - user: any
+    pass: ""
+    ips: []
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+      - action: api
+      - action: metrics
+
+# Metrics API (port 40000)
+metrics: yes
+metricsAddress: :40000
+
+# API for controlling streams (port 40001)
+api: yes
+apiAddress: :40001
+
+# RTMP server (port 1935)
+rtmp: yes
+rtmpAddress: :1935
+rtmpDisable: no
+
+# HLS server (port 8888)
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: no
+hlsVariant: fmp4
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsAllowOrigin: '*'
+
+# WebRTC server (port 8889)
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :10000
+webrtcLocalTCPAddress: :10001
+webrtcIPsFromInterfaces: yes
+webrtcSTUNGatherTimeout: 5s
+webrtcICEServers: []
+webrtcAllowOrigin: '*'
+
+# RTSP server (port 8554)
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp, udp]
+
+# Recording
+record: yes
+recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S
+recordFormat: fmp4
+recordPartDuration: 100ms
+
+# Paths configuration
+paths:
+  all:
+    source: publisher
+    record: yes

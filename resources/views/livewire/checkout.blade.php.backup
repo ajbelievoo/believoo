@@ -1,0 +1,448 @@
+<div class="min-h-screen bg-[#0a0a0a] pt-28 pb-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <span class="text-[#00B7FF] font-black uppercase tracking-[0.3em] text-sm mb-3 block">Secure Checkout</span>
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter uppercase text-white">Complete Your <span class="text-[#00B7FF]">Purchase</span></h1>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <!-- Order Summary -->
+            <div class="xl:col-span-7 glass rounded-3xl p-6 lg:p-8 border border-white/10 h-fit">
+                <h2 class="text-2xl font-black uppercase mb-6 text-white flex items-center gap-3">
+                    <i class="fas fa-shopping-cart text-[#00B7FF]"></i>
+                    Order Summary
+                </h2>
+                
+                <div class="border-b border-white/10 pb-6 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="font-bold text-xl text-white">{{ $service->title }}</h3>
+                            @if($tierName)
+                                <p class="text-[#00B7FF] text-sm mt-1">{{ $tierName }} Plan</p>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Price Breakdown with GST -->
+                    <div class="space-y-3 bg-white/5 rounded-xl p-4">
+                        <!-- INR Pricing for all gateways -->
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-400">Subtotal</span>
+                                <div class="text-right">
+                                    <span class="text-white font-semibold">₹{{ number_format($subtotalInINR, 2) }}</span>
+                                    <span class="text-xs text-gray-500 ml-1">(${{ number_format($subtotal, 2) }})</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-400">GST (18%)</span>
+                                <div class="text-right">
+                                    <span class="text-[#00B7FF] font-semibold">₹{{ number_format($gstAmountInINR, 2) }}</span>
+                                    <span class="text-xs text-gray-500 ml-1">(${{ number_format($gstAmount, 2) }})</span>
+                                </div>
+                            </div>
+                            <div class="border-t border-white/10 pt-3 flex items-center justify-between">
+                                <span class="text-white font-bold uppercase">Total</span>
+                                <div class="text-right">
+                                    <span class="text-2xl font-black text-[#00B7FF]">₹{{ number_format($totalWithGstInINR, 2) }}</span>
+                                    <p class="text-xs text-gray-500">(${{ number_format($totalWithGst, 2) }} USD)</p>
+                                </div>
+                            </div>
+                        @else
+                            <!-- USD Pricing for International -->
+                            <div class="flex items-eentar justy-between">
+                                <span class="text-gray-400">Subtotal</span>
+                                <span class="text-white font-semibold">${{>
+                                <span class= text-white font-semibold"n${{ number_format($subtotal, 2) }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-400">umber_format($subtotal, 2) }}</span>
+                            </di<spav>{{ number_format($gstAmount, 2) }}</span>
+                             /   >
+<                           <div div class="flex items-center justify-between">
+                                 span<class="text-white font-bold uppercase">Total</span>span class="text-gray-400">GST (18%)</span>
+                                 span class="text-2xl font-black text-[#00B7FF]">${{ number_format($totalWithGst, 2) }}< span>
+                            </              <span class="text-[#00B7FF] font-semibold">${{ number_format($gstAmount, 2) }}</span>
+                        @endif
+                     /   >
+                </div>
+
+                <!-- Billing Cy  e Selection -->
+                <div cl     </dier-b borv>
+                    <h4 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">Select Billing Cycle:</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        @foreach(billingCycles s $cycle)
+                                <div class="border-t border-white/10 pt-3 flex items-center justify-between">
+                                 ire:click="updateBillingCycle({{<$cycse['months'] }})"
+                                clpan class="text-white font-bold uppercase">Total</span>
+                                <span class="text-2xl font-black text-[#00B7FF]">${{ number_format($totalWithGst, 2) }}</span>
+                            </div>  <dont-bod tt-whitetext-lg">{{ $cycle['label'] }}</div>
+                                    <div class=" flex
+                                       @if($cycle['discount_ercent'] > 0
+                                     
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Billing Cycle Selection -->
+                <div class="border-b border-white/10 pb-6 mb-6">
+                    <h4 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">Select Billing Cycle:</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        @foreach($billingCycles as $cycle)
+                            <button 
+                                wire:click="updateBillingCycle({{ $cycle['months'] }})"
+                                class="relative p-5 rounded-xl border text-left transition-all {{ $billingMonths == $cycle['months'] ? 'border-[#00B7FF] bg-[#00B7FF]/10' : 'border-white/10 hover:border-white/30' }}">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="font-bold text-white text-lg">{{ $cycle['label'] }}</div>
+                                    <div class="flex flex-col items-end gap-1">
+                                        @if($cycle['discount_percent'] > 0)
+                                            <span class="bg-green-500 text-white te$t-[10px] font-bold px-2 py-0rounded-full">SAVE {{ $cycle['discount_percent'] }}%</span>
+                                        @endif$
+                                        @if($cycle['recommended'] ?? false)
+                                            <span class="bg-[#00B7FF] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">RECOMMENDED</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                @php
+                                    $cyclePrice = $service->getPriceForCycle($cycle['months'], $tierName);
+                                    $cycleGst = round($cyclePrice * 0.18, 2);
+                                    $cycleTotal = round($cyclePrice + $cycleGst, 2);
+                                    $cycleTotalINR = $cycleTotal * 83;
+                                @endphp
+                                @if($paymentGateway === 'cashfree' || $paymentGateway === 'razorpay')
+                                    <div class="text-xl font-black text-[#00B7FF]">₹{{ number_format($cycleTotalINR, 2) }}</div>
+                                    <div class="text-xs text-gray-500">₹{{ number_format($service->price * 83 * (1 - ($cycle['discount_percent'] / 100)), 2) }}/mo</div>
+                                @else
+                                    <div class="text-xl font-black text-[#00B7FF]">${{ number_format($cycleTotal, 2) }}</div>
+                                    <div class="text-xs text-gray-500">${{ number_format($service->price * (1 - ($cycle['discount_percent'] / 100)), 2) }}/mo</div>
+                                @endif
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- GST Summary -->
+                <div class="bg-[#00B7FF]/10 border border-[#00B7FF]/30 rounded-xl p-4 mb-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i class="fas fa-receipt text-[#00B7FF]"></i>
+                        <span class="text-white font-bold uppercase text-sm">Bill Summary</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        @if($paymentGateway === 'cashfree' || $paymentGateway === 'razorpay')
+                            <div class="flex justify-between text-gray-400">
+                                <span>Subtotal ({{ $billingMonths }} months)</span>
+                                <span>₹{{ number_format($subtotalInINR, 2) }}</span>
+                            </div>
+                            <div class="flex justify-between text-[#00B7FF]">
+                                <span>GST 18%</span>
+                                <span>+₹{{ number_format($gstAmountInINR, 2) }}</span>
+                            </div>
+                            <div class="border-t border-white/10 pt-2 flex justify-between text-white font-bold text-lg">
+                                <span>Total Payable</span>
+                                <dss="text-right">
+                                    <span>₹{{ number_format($totalWithGstInINR, 2) }}</span>
+                                    <p class="text-xs text-gray-400 font-normal">(${{ number_format($totalWithGst, 2) }} USD)</p>
+                                </div>
+                      </div>
+                        @else
+                            <div class="flex justify-between text-gray-400">
+                                <span>Subtotal ({{ $billb($subtotal, 2) }}</span>
+                            </di=ee B3>
+                            <span>GST 18%</span>pan>+${{ number_format($gstAmount, 2) }}</span>
+                            </div>
+                            <div class="border-t border-white/10 pt-2 flex justify-between text-white font-bold text-lg">
+                                <span>Total Payable</span>
+                                <span>${{ number_format($totalWithGst, 2) }}</span>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                @if(!empty($service->features))
+                    <div class="pt-6 border-t border-white/10">
+                        <h4 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4">What's included:</h4>
+                        <ul class="space-y-3">
+                            @foreach($service->features as $feature)
+                                <li class="flex items-center text-gray-300">
+                                    <i class="fas fa-check text-[#00B7FF] mr-3"></i>
+                                    {{ $feature['feature'] ?? $feature }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+
+            <!-- Payment Section -->
+            <div class="xl:col-span-5 glass rounded-3xl p-6 lg:p-8 border border-white/10 h-fit">
+                <h2 class="text-2xl font-black uppercase mb-6 text-white flex items-center gap-3">
+                    <i class="fas fa-credit-card text-[#00B7FF]"></i>
+                    Payment Method
+                </h2>
+
+                @if($amount <= 0)
+                    <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 mb-4">
+                        <p class="text-red-400"><i class="fas fa-exclamation-circle mr-2"></i> This service is not available for purchase. Please contact support.</p>
+                    </div>
+                @else
+                    @php
+                        $razorpayEnabled = ($settings['razorpay_enabled'] ?? '0') === '1';
+                        $cashfreeEnabled = ($settings['cashfree_enabled'] ?? '0') === '1';
+                    @endphp
+
+                    <!-- Payment Gateway Selection -->
+                    <div class="space-y-4 mb-8">
+                        @if($razorpayEnabled && !empty($settings['razorpay_key_id']) && !empty($settings['razorpay_key_secret']))
+                            <label class="flex items-center p-5 rounded-2xl cursor-pointer transition-all border-2 {{ $paymentGateway === 'razorpay' ? 'border-[#00B7FF] bg-[#00B7FF]/10' : 'border-white/10 bg-white/5 hover:bg-white/10' }}">
+                                <input type="radio" wire:model.live="paymentGateway" value="razorpay" class="sr-only">
+                                <div class="flex items-center flex-1">
+                                    <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mr-4">
+                                        <i class="fas fa-wallet text-2xl text-blue-400"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-white text-lg">Razorpay</p>
+                                        <p class="text-sm text-gray-400">Credit/Debit Card, UPI, NetBanking</p>
+                                    </div>
+                                </div>
+                                @if($paymentGateway === 'razorpay')
+                                    <i class="fas fa-check-circle text-2xl text-[#00B7FF]"></i>
+                                @endif
+                            </label>
+                        @endif
+
+                        @if($cashfreeEnabled && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key']))
+                            <label class="flex items-center p-5 rounded-2xl cursor-pointer transition-all border-2 {{ $paymentGateway === 'cashfree' ? 'border-[#00B7FF] bg-[#00B7FF]/10' : 'border-white/10 bg-white/5 hover:bg-white/10' }}">
+                                <input type="radio" wire:model.live="paymentGateway" value="cashfree" class="sr-only">
+                                <div class="flex items-center flex-1">
+                                    <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center mr-4">
+                                        <i class="fas fa-money-bill-wave text-2xl text-purple-400"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-white text-lg">Cashfree</p>
+                                        <p class="text-sm text-gray-400">Card, UPI, Wallet, EMI</p>
+                                    </div>
+                                </div>
+                                @if($paymentGateway === 'cashfree')
+                                    <i class="fas fa-check-circle text-2xl text-[#00B7FF]"></i>
+                                @endif
+                            </label>
+                        @endif
+                        
+                        @if(!$razorpayEnabled && !$cashfreeEnabled)
+                            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-6">
+                                <p class="text-yellow-400">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                                    No payment gateway is currently enabled. Please contact support to complete your purchase.
+                                </p>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Pay Button -->
+                    <button
+                        id="payBtn"
+                        onclick="initiatePayment()"
+                        class="w-full bg-[#00B7FF] text-black font-black py-5 px-8 rounded-2xl hover:scale-105 transition-all uppercase tracking-widest text-lg shadow-[0_0_30px_rgba(0,183,255,0.3)] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        {{ (!$razorpayEnabled && !$cashfreeEnabled) ? 'disabled' : '' }}
+                    >
+                        <span id="btnText">
+                            @if($paymentGateway === 'cashfree' || $paymentGateway === 'razorpay')
+                       >
+                @endif
+            </div>
+        </div         Pay ₹{{ number_format($totalWithGstInINR, 2) }}
+          
+                    @else
+                                Pay ${{ number_format($totalWithGst, 2) }}
+                            @endif
+                        </span>
+                        <svg id="btnSpinner" class="animate-spin ml-3 h-6 w-6 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+
+                    <p class="mt-6 text-center text-sm text-gray-500">
+                        <i class="fas fa-lock mr-2"></i>
+                        Secure payment powered by <span class="text-[#00B7FF]">{{ ucfirst($paymentGateway) }}</span>
+                    </p>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Scripts -->
+    @if($paymentGateway === 'razorpay' && !empty($settings['razorpay_key_id']))
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    @elseif($paymentGateway === 'cashfree' && !empty($settings['cashfree_app_id']))
+        <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+    @endif
+
+    <script>
+        const serviceId = {{ $service->id }};
+        const tierName = '{{ $tierName }}';
+        let amount = {{ $totalWithGst }};
+        let billingMonths = {{ $billingMonths }};
+        let paymentGateway = '{{ $paymentGateway }}';
+        const csrfToken = '{{ csrf_token() }}';
+
+        // Sync with Livewire updates
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.hook('element.updated', (el, component) => {
+                if (component.component.name === 'checkout') {
+                    billingMonths = component.$wire.billingMonths;
+                    amount = component.$wire.totalWithGst;
+                }            });
+
+ btnSpinner = document.getElementById('btnSpinner');
+            const payBtn = document.getElementById('payBtn');
+
+            if (loading) {
+                btnText.textContent = 'Processing...';
+                btnSpinner.classList.remove('hidden');
+                payBtn.disabled = true;
+            } else {
+                // Get fresh values
+                const livewireComponent = @this;
+                const currentAmount = livewireComponent.totalWithGst;
+                const currentGateway = livewireComponent.paymentGateway;
+                const amountInINR = livewireComponent.totalWithGst * 83;
+
+                if (currentGateway === 'cashfree' || currentGateway === 'razorpay') {
+                    btnText.textContent = 'Pay ₹' + amountInINR.toFixed(2);
+                } else {
+                    btnText.textContent = 'Pay $' + currentAmount.toFixed(2);
+                }
+                btnSpinner.classList.add('hidden');
+                payBtn.disabled = false;
+            }
+        }
+
+        function initiatePayment() {
+            setLoading(true);
+
+            // Get fresh values from Livewire
+            const livewireComponent = @this;
+            billingMonths = livewireComponent.billingMonths;
+            amount = livewireComponent.totalWithGst;
+            paymentGateway = livewireComponent.paymentGateway;
+
+            if (paymentGateway === 'razorpay') {
+                createRazorpayOrder();
+            } else if (paymentGateway === 'cashfree') {
+                createCashfreeOrder();
+            }
+        }
+
+        function createRazorpayOrder() {
+            fetch('{{ route('payment.razorpay.create') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    service_id: serviceId,
+                    tier_name: tierName,
+                    amount: amount,
+                    billing_months: billingMonths,
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                setLoading(false);
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                const options = {
+                    key: data.key_id,
+                    amount: data.amount,
+                    currency: data.currency,
+                    order_id: data.order_id,
+                    name: data.name,
+                    description: data.description,
+                    prefill: data.prefill,
+                    notes: data.notes,
+                    handler: function(response) {
+                        // Submit form with payment details
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = '{{ route('payment.razorpay.callback') }}';
+                        
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = '_token';
+                        csrfInput.value = csrfToken;
+                        form.appendChild(csrfInput);
+
+                        const razorpayOrderId = document.createElement('input');
+                        razorpayOrderId.type = 'hidden';
+                        razorpayOrderId.name = 'razorpay_order_id';
+                        razorpayOrderId.value = response.razorpay_order_id;
+                        form.appendChild(razorpayOrderId);
+
+                        const razorpayPaymentId = document.createElement('input');
+                        razorpayPaymentId.type = 'hidden';
+                        razorpayPaymentId.name = 'razorpay_payment_id';
+                        razorpayPaymentId.value = response.razorpay_payment_id;
+                        form.appendChild(razorpayPaymentId);
+
+                        const razorpaySignature = document.createElement('input');
+                        razorpaySignature.type = 'hidden';
+                        razorpaySignature.name = 'razorpay_signature';
+                        razorpaySignature.value = response.razorpay_signature;
+                        form.appendChild(razorpaySignature);
+
+                        document.body.appendChild(form);
+                        form.submit();
+                    },
+                    theme: {
+                        color: '#4F46E5',
+                    },
+                };
+
+                const rzp = new Razorpay(options);
+                rzp.open();
+                
+                rzp.on('payment.failed', function(response) {
+                    alert('Payment failed: ' + response.error.description);
+                });
+            })
+            .catch(error => {
+                setLoading(false);
+                console.error('Error:', error);
+                alert('Failed to initiate payment. Please try again.');
+            });
+        }
+
+        function createCashfreeOrder() {
+            fetch('{{ route('payment.cashfree.create') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    service_id: serviceId,
+                    tier_name: tierName,
+                    amount: amount,
+                    billing_months: billingMonths,
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                setLoading(false);
+                
+                console.log('Cashfree response:', data);
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                if (!data.payment_session_ir=  

@@ -1,0 +1,75 @@
+/* ============================================================
+   BelieVoo Dashboard — Glassmorphism Utilities
+   ============================================================ */
+
+/* ── Base glass card ─────────────────────────────────────── */
+.glass-card {
+    background:    var(--card-bg);
+    border:        1px solid var(--border-color);
+    box-shadow:    0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* ── Frost White: add backdrop blur ─────────────────────── */
+[data-theme="frost-white"] .glass-card {
+    backdrop-filter:         blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+}
+
+/* ── Fallback for browsers without backdrop-filter ──────── */
+@supports not (backdrop-filter: blur(1px)) {
+    [data-theme="frost-white"] .glass-card {
+        background: var(--card-bg-solid);
+    }
+}
+
+/* ── Hover lift — CSS only, 60fps, no JS ────────────────── */
+.glass-card-hover {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+    cursor:     pointer;
+}
+
+.glass-card-hover:hover {
+    transform:  translateY(-5px);
+    box-shadow: 0px 0px 20px rgba(0, 198, 255, 0.5),
+                0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+[data-theme="frost-white"] .glass-card-hover:hover {
+    box-shadow: 0px 0px 20px rgba(0, 114, 255, 0.4),
+                0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+
+.glass-card-hover:focus-visible {
+    outline:       2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+/* ── Neon button glow ────────────────────────────────────── */
+.btn-neon {
+    background:  linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border:      none;
+    box-shadow:  0 0 15px var(--accent-glow);
+    color:       #ffffff;
+    transition:  box-shadow 200ms ease, transform 150ms ease;
+}
+
+.btn-neon:hover {
+    box-shadow: 0 0 25px var(--accent-glow), 0 0 50px var(--accent-glow);
+    transform:  translateY(-1px);
+}
+
+/* ── Input field ─────────────────────────────────────────── */
+.glass-input {
+    background:    var(--input-bg);
+    border:        1px solid var(--border-color);
+    color:         var(--text-primary);
+    transition:    border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.glass-input:focus {
+    outline:       none;
+    border-color:  var(--accent-primary);
+    box-shadow:    0 0 0 3px var(--accent-glow);
+}
+
+.glass-input::placeholder { color: var(--text-muted); }

@@ -1,0 +1,124 @@
+// ============================================================================
+// BelieVoo SDK v2.0.0 - build.gradle Dependencies
+// Add these to your app-level build.gradle
+// ============================================================================
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdk 34
+    
+    defaultConfig {
+        applicationId "com.yourapp.live"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "2.0.0"
+    }
+    
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    // ============================================================================
+    // REMOVE THESE OLD DEPENDENCIES (Custom PCM WebSocket)
+    // ============================================================================
+    // implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+    // implementation 'androidx.media:media:1.6.0'  // Only if used for PCM playback
+    
+    // ============================================================================
+    // BELIEVOO LIVE SDK v2.0.0 (Required)
+    // ============================================================================
+    
+    // Option A: Local AAR file
+    implementation files('libs/believoo-live-sdk-2.0.0.aar')
+    
+    // Option B: Maven repository (when published)
+    // implementation 'com.believoo:live-sdk:2.0.0'
+    
+    // ============================================================================
+    // WEBRTC (Required by SDK for audio transport)
+    // ============================================================================
+    implementation 'org.webrtc:google-webrtc:1.0.32006'
+    
+    // ============================================================================
+    // OPUS CODEC (Required by SDK for audio encoding)
+    // ============================================================================
+    // Option A: Using libopus from WebRTC
+    // (Already included in WebRTC dependency)
+    
+    // Option B: Standalone Opus if needed
+    // implementation 'com.github.izacus:android-opus:1.0.0'
+    
+    // ============================================================================
+    // MUSIC PLAYBACK (For local music preview - Optional)
+    // ============================================================================
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.18.1'
+    implementation 'com.google.android.exoplayer:exoplayer-ui:2.18.1'
+    
+    // ============================================================================
+    // WEBSOCKET SIGNALING (For control messages - NOT PCM!)
+    // ============================================================================
+    implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+    // NOTE: Only for signaling, NOT for audio transport anymore
+    
+    // ============================================================================
+    // NETWORKING
+    // ============================================================================
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.10.0'
+    
+    // ============================================================================
+    // ANDROID UI
+    // ============================================================================
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime:2.6.1'
+    
+    // ============================================================================
+    // LOGGING
+    // ============================================================================
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    
+    // ============================================================================
+    // TESTING
+    // ============================================================================
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+// ============================================================================
+// PROGUARD RULES (Add to proguard-rules.pro)
+// ============================================================================
+/*
+# BelieVoo SDK
+-keep class com.believoo.live.** { *; }
+-keepclassmembers class com.believoo.live.** { *; }
+
+# WebRTC
+-keep class org.webrtc.** { *; }
+-dontwarn org.webrtc.**
+
+# Opus
+-keep class com.sun.jna.** { *; }
+-dontwarn com.sun.jna.**
+
+# ExoPlayer
+-keep class com.google.android.exoplayer2.** { *; }
+*/

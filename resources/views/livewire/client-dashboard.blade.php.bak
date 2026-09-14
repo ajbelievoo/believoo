@@ -1,0 +1,1746 @@
+<div class="min-h-screen bg-dark pt-32 pb-20 px-6 relative overflow-hidden"
+     x-data="{ lastUnreadCount: {{ Auth::user()->unreadNotifications->count() }}, activeTab: $wire.$entangle('activeTab') }"
+     x-on:clear-server-message.window="setTimeout(() => $wire.clearServerMessage(), 5000)"
+     @if(isset($hasProvisioning) && $hasProvisioning) wire:poll.30000ms @endif>
+    {{-- Animated Background Effects --}}
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+        {{-- Floating gradient orbs --}}
+        <div class="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full opacity-20"
+             style="background: radial-gradient(circle, rgba(0, 183, 255, 0.4) 0%, transparent 70%); filter: blur(100px); animation: floatOrb1 20s ease-in-out infinite;">
+        </div>
+        <div class="absolute top-1/3 -left-40 w-[500px] h-[500px] rounded-full opacity-15"
+             style="background: radial-gradient(circle, rgba(112, 0, 255, 0.4) 0%, transparent 70%); filter: blur(80px); animation: floatOrb2 25s ease-in-out infinite;">
+        </div>
+        <div class="absolute bottom-20 right-1/4 w-[400px] h-[400px] rounded-full opacity-10"
+             style="background: radial-gradient(circle, rgba(255, 0, 160, 0.3) 0%, transparent 70%); filter: blur(60px); animation: floatOrb3 18s ease-in-out infinite;">
+        </div>
+
+        {{-- Grid pattern --}}
+        <div class="absolute inset-0 opacity-30"
+             style="background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 64px 64px;">
+        </div>
+    </div>
+
+    <style>
+        /* Fix missing cursor images */
+        .gm-style * { cursor: default !important; }
+        .gm-style { cursor: default !important; }
+
+        /* Floating orb animations */
+        @keyframes floatOrb1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(50px, 30px) scale(1.1); }
+            50% { transform: translate(-30px, 60px) scale(1); }
+            75% { transform: translate(-50px, -20px) scale(0.9); }
+        }
+
+        @keyframes floatOrb2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(40px, -40px) scale(1.15); }
+            66% { transform: translate(-60px, 20px) scale(0.95); }
+        }
+
+        @keyframes floatOrb3 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-40px, -60px) scale(1.2); }
+        }
+
+        /* Pulse glow animation for stats */
+        @keyframes statPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 183, 255, 0.1); }
+            50% { box-shadow: 0 0 20px 5px rgba(0, 183, 255, 0.2); }
+        }
+
+        /* Shimmer animation for cards */
+        @keyframes cardShimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* Enhanced glass card with gradient border */
+        .glass-premium {
+            background: linear-gradient(135deg, rgba(26, 26, 26, 0.8) 0%, rgba(17, 17, 17, 0.9) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .glass-premium:hover {
+            border-color: rgba(0, 183, 255, 0.3);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 183, 255, 0.1);
+        }
+
+        /* Animated gradient text */
+        .text-gradient-animated {
+            background: linear-gradient(90deg, #00b7ff, #7000ff, #ff00a0, #00b7ff);
+            background-size: 300% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: gradientMove 5s ease infinite;
+        }
+
+        @keyframes gradientMove {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        /* Status indicator pulse */
+        .status-pulse {
+            animation: statusPulse 2s infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Button hover lift */
+        .btn-lift {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-lift:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 183, 255, 0.3);
+        }
+
+        /* Tab glow effect */
+        .tab-glow.active {
+            background: linear-gradient(135deg, #00b7ff 0%, #0099ff 100%);
+            box-shadow: 0 4px 20px rgba(0, 183, 255, 0.4);
+        }
+
+        /* Scroll reveal animation */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Stagger delays */
+        .stagger-1 { transition-delay: 0.1s; }
+        .stagger-2 { transition-delay: 0.2s; }
+        .stagger-3 { transition-delay: 0.3s; }
+        .stagger-4 { transition-delay: 0.4s; }
+    </style>
+
+    <div class="max-w-7xl mx-auto relative z-10">
+        <!-- Session Messages -->
+        @if(session('error'))
+            <div class="mb-6 p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 flex items-center">
+                <i class="fas fa-exclamation-circle mr-3"></i>
+                {{ session('error') }}
+            </div>
+        @endif
+        @if(session('success'))
+            <div class="mb-6 p-4 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 flex items-center">
+                <i class="fas fa-check-circle mr-3"></i>
+                {{ session('success') }}
+            </div>
+        @endif
+
+        <!-- Dashboard Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
+            <div>
+                <h1 class="text-5xl font-black text-white uppercase tracking-tighter mb-2">
+                    Client <span class="text-electric-blue">Portal</span>
+                </h1>
+                <p class="text-gray-400 font-medium">Welcome back, {{ Auth::user()->name }}. Track your projects and support tickets.</p>
+            </div>
+            <div class="flex items-center space-x-4">
+
+                {{-- ── Module 3: Activity Trigger Button ── --}}
+                <div x-data="{ open: false }" @keydown.escape.window="open = false" @open-activity-drawer.window="open = true" class="relative z-[100]">
+                    <button
+                        @click="open = true"
+                        aria-label="Activity History"
+                        class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        style="color: var(--text-muted, #94a3b8); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);"
+                    >
+                        <i class="fas fa-history text-xs" aria-hidden="true"></i>
+                        <span class="hidden sm:inline text-xs font-black uppercase tracking-widest">Activity</span>
+                        <span
+                            x-show="$store.eventLog && $store.eventLog.entries.length > 0"
+                            x-text="$store.eventLog ? $store.eventLog.entries.length : ''"
+                            class="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-black"
+                            style="background: #00c6ff; color: #05070A;"
+                            x-cloak
+                        ></span>
+                    </button>
+
+                    {{-- Backdrop --}}
+                    <div
+                        x-show="open"
+                        @click="open = false"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0"
+                        x-transition:enter-end="opacity-100"
+                        x-transition:leave="transition ease-in duration-200"
+                        x-transition:leave-start="opacity-100"
+                        x-transition:leave-end="opacity-0"
+                        class="fixed inset-0 z-40"
+                        style="background: rgba(0,0,0,0.35);"
+                        aria-hidden="true"
+                        x-cloak
+                    ></div>
+
+                    {{-- Drawer Panel --}}
+                    <div
+                        x-show="open"
+                        x-transition:enter="transition ease-in-out duration-300 transform"
+                        x-transition:enter-start="translate-x-full"
+                        x-transition:enter-end="translate-x-0"
+                        x-transition:leave="transition ease-in-out duration-300 transform"
+                        x-transition:leave-start="translate-x-0"
+                        x-transition:leave-end="translate-x-full"
+                        class="glass-card fixed right-0 top-0 h-full w-80 z-50 overflow-y-auto flex flex-col"
+                        role="dialog"
+                        aria-label="Activity History"
+                        aria-modal="true"
+                        x-cloak
+                    >
+                        {{-- Header --}}
+                        <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-color, rgba(255,255,255,0.1));">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-history text-sm" style="color: var(--accent-primary, #00c6ff);" aria-hidden="true"></i>
+                                <h2 class="text-sm font-black uppercase tracking-widest" style="color: var(--text-primary, #f1f5f9);">Activity History</h2>
+                            </div>
+                            <button
+                                @click="open = false"
+                                aria-label="Close Activity Drawer"
+                                class="w-8 h-8 rounded-lg flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2"
+                                style="color: var(--text-muted, #94a3b8);"
+                            >
+                                <i class="fas fa-times text-sm" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        {{-- Entry List --}}
+                        <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                            {{-- Empty state --}}
+                            <div
+                                x-show="!$store.eventLog || $store.eventLog.entries.length === 0"
+                                class="flex flex-col items-center justify-center py-16 text-center"
+                            >
+                                <i class="fas fa-clipboard-list text-3xl mb-3 opacity-20" style="color: var(--text-muted, #94a3b8);" aria-hidden="true"></i>
+                                <p class="text-sm font-semibold" style="color: var(--text-muted, #94a3b8);">No activity yet</p>
+                                <p class="text-xs mt-1 opacity-60" style="color: var(--text-muted, #94a3b8);">Actions like DNS updates and server reboots will appear here.</p>
+                            </div>
+
+                            {{-- Entries --}}
+                            <template x-if="$store.eventLog && $store.eventLog.entries.length > 0">
+                                <div class="space-y-2">
+                                    <template x-for="(entry, index) in $store.eventLog.entries" :key="index">
+                                        <div class="glass-card rounded-xl px-3 py-2.5 flex items-start gap-3">
+                                            <span
+                                                class="mt-1 w-2 h-2 rounded-full flex-shrink-0"
+                                                :class="entry.outcome === 'success' ? 'bg-green-400' : 'bg-red-400'"
+                                                :style="entry.outcome === 'success'
+                                                    ? 'box-shadow: 0 0 6px rgba(34,197,94,0.7);'
+                                                    : 'box-shadow: 0 0 6px rgba(239,68,68,0.7);'"
+                                            ></span>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-xs font-black uppercase tracking-wider truncate" style="color: var(--text-primary, #f1f5f9);" x-text="entry.action.replace(/_/g, ' ')"></p>
+                                                <p class="text-xs mt-0.5 leading-snug" style="color: var(--text-muted, #94a3b8);" x-text="entry.description"></p>
+                                                <p class="text-[10px] mt-1 opacity-50" style="color: var(--text-muted, #94a3b8);" x-text="new Date(entry.ts).toLocaleTimeString()"></p>
+                                            </div>
+                                            <span
+                                                class="flex-shrink-0 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-full"
+                                                :class="entry.outcome === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'"
+                                                x-text="entry.outcome"
+                                            ></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+
+                        {{-- Footer --}}
+                        <div class="px-4 py-3 border-t" style="border-color: var(--border-color, rgba(255,255,255,0.1));">
+                            <button
+                                @click="$store.eventLog && $store.eventLog.clear()"
+                                class="w-full py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all focus-visible:outline-none focus-visible:ring-2"
+                                style="background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3);"
+                                aria-label="Clear activity history"
+                            >
+                                <i class="fas fa-trash-alt mr-1" aria-hidden="true"></i> Clear History
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Menu -->
+                <div x-data="{ open: false }" class="relative z-[100]" @click.away="open = false">
+                    <button @click="open = !open" class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white hover:bg-electric-blue hover:text-dark transition-all relative">
+                        <i class="fas fa-user"></i>
+                    </button>
+
+                    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 mt-4 w-64 glass rounded-2xl border border-white/10 shadow-2xl z-[9999] overflow-hidden" x-cloak>
+                        <div class="p-2">
+                            <div class="px-4 py-3 border-b border-white/5 mb-2">
+                                <p class="text-xs font-bold text-white truncate">{{ Auth::user()->name }}</p>
+                                <p class="text-[10px] text-gray-400 truncate">{{ Auth::user()->email }}</p>
+                                @if(Auth::user()->phone)
+                                    <p class="text-[10px] text-electric-blue truncate mt-1"><i class="fas fa-phone mr-1"></i>{{ Auth::user()->phone }}</p>
+                                @else
+                                    <p class="text-[10px] text-red-400 truncate mt-1"><i class="fas fa-exclamation-circle mr-1"></i>Phone not added</p>
+                                @endif
+                            </div>
+
+                            {{-- Active VPS Quick Info --}}
+                            @php
+                                $activeVps = \App\Models\UserHosting::where('user_id', Auth::id())
+                                    ->whereIn('hosting_type', ['vps','cloud','kvm'])
+                                    ->where('status', 'active')
+                                    ->latest()->first();
+                            @endphp
+                            @if($activeVps && $activeVps->server_ip)
+                            <div class="px-3 py-2 mb-2 bg-electric-blue/10 rounded-xl border border-electric-blue/20 mx-1">
+                                <p class="text-[9px] text-electric-blue font-bold uppercase tracking-widest mb-1">
+                                    <i class="fas fa-server mr-1"></i>{{ $activeVps->plan_name }}
+                                </p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] text-white font-mono">{{ $activeVps->server_ip }}</span>
+                                    <button onclick="navigator.clipboard.writeText('{{ $activeVps->server_ip }}')" class="text-electric-blue hover:text-white ml-1" title="Copy IP">
+                                        <i class="fas fa-copy text-[10px]"></i>
+                                    </button>
+                                </div>
+                                @if($activeVps->root_password)
+                                <div class="flex items-center justify-between mt-1" x-data="{ showPwd: false }">
+                                    <span class="text-[10px] text-gray-400 font-mono" x-text="showPwd ? '{{ $activeVps->root_password }}' : '••••••••'"></span>
+                                    <div class="flex gap-1">
+                                        <button @click="showPwd = !showPwd" class="text-gray-400 hover:text-white" title="Show/Hide">
+                                            <i class="fas text-[10px]" :class="showPwd ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                        </button>
+                                        <button onclick="navigator.clipboard.writeText('{{ $activeVps->root_password }}')" class="text-electric-blue hover:text-white" title="Copy Password">
+                                            <i class="fas fa-copy text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-[9px] text-gray-500 mt-1 font-mono">ssh root@{{ $activeVps->server_ip }}</p>
+                                @endif
+                            </div>
+                            @endif
+
+                            <a href="{{ route('profile.edit') }}" class="flex items-center px-4 py-3 text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all cursor-pointer">
+                                <i class="fas fa-user-circle mr-3 text-electric-blue"></i> My Profile
+                            </a>
+                            <a href="{{ route('client.dashboard') }}?tab=hosting" class="flex items-center px-4 py-3 text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all cursor-pointer">
+                                <i class="fas fa-server mr-3 text-green-400"></i> My Servers
+                            </a>
+                            <a href="{{ route('client.orders') }}" class="flex items-center px-4 py-3 text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all cursor-pointer">
+                                <i class="fas fa-file-invoice mr-3 text-yellow-400"></i> My Orders
+                            </a>
+                            <div class="border-t border-white/5 mt-1 pt-1">
+                                <form method="POST" action="{{ route('logout') }}" class="block">
+                                    @csrf
+                                    <button type="submit" class="w-full flex items-center px-4 py-3 text-xs font-bold text-gray-300 hover:text-red-400 hover:bg-white/5 rounded-xl transition-all text-left">
+                                        <i class="fas fa-sign-out-alt mr-3 text-red-400"></i> Log Out
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-data="{ open: false }" class="relative z-[100]" @click.away="open = false">
+                    <button @click="open = !open" class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white hover:bg-electric-blue hover:text-dark transition-all relative">
+                        <i class="fas fa-bell"></i>
+                        @if(Auth::user()->unreadNotifications->count() > 0)
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-dark">
+                                {{ Auth::user()->unreadNotifications->count() }}
+                            </span>
+                        @endif
+                    </button>
+
+                    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 mt-4 w-80 glass rounded-[2rem] border border-white/10 shadow-2xl z-[9999] overflow-hidden" x-cloak>
+                        <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                            <h3 class="text-xs font-black text-white uppercase tracking-widest">Notifications</h3>
+                            @if(Auth::user()->unreadNotifications->count() > 0)
+                                <button type="button" x-on:click="$wire.markNotificationsAsRead(); open = false" class="text-[10px] font-bold text-electric-blue hover:underline uppercase relative z-[11000010] cursor-pointer">Mark all read</button>
+                            @endif
+                        </div>
+                        <div class="max-h-96 overflow-y-auto custom-scrollbar">
+                            @forelse(Auth::user()->notifications()->latest()->take(5)->get() as $notification)
+                                @php
+                                    $title = $notification->data['title'] ?? 'Notification';
+                                    $body = $notification->data['body'] ?? ($notification->data['message'] ?? '');
+                                    $url = null;
+                                    
+                                    if (isset($notification->data['actions'])) {
+                                        foreach ($notification->data['actions'] as $action) {
+                                            if (isset($action['url'])) {
+                                                $url = $action['url'];
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!$url && isset($notification->data['ticket_id'])) {
+                                        $url = route('client.dashboard', ['ticket' => $notification->data['ticket_id']]);
+                                    }
+                                    
+                                    if (!$url && isset($notification->data['agreement_id'])) {
+                                        $url = $notification->data['action_url'] ?? route('client.agreement.view', $notification->data['agreement_id']);
+                                    }
+                                @endphp
+                                <a href="{{ $url ?? '#' }}" class="block p-6 border-b border-white/5 hover:bg-white/[0.05] transition-all {{ $notification->read_at ? 'opacity-50' : '' }} relative z-[11000008]">
+                                    <p class="text-xs text-white font-bold mb-1">{{ $title }}</p>
+                                    <p class="text-[10px] text-gray-400 line-clamp-2 mb-2">{{ $body }}</p>
+                                    <span class="text-[8px] font-black text-gray-600 uppercase">{{ $notification->created_at->diffForHumans() }}</span>
+                                </a>
+                            @empty
+                                <div class="p-10 text-center">
+                                    <i class="fas fa-bell-slash text-2xl text-gray-800 mb-4"></i>
+                                    <p class="text-[10px] font-black text-gray-600 uppercase tracking-widest">No notifications</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" wire:click="openAgreementRequestModal()" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-electric-blue to-electric-violet text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all cursor-pointer">
+                    <i class="fas fa-plus mr-2"></i>New Project Request
+                </button>
+
+                <button type="button" wire:click="openTicketModal()" class="px-8 py-4 rounded-2xl bg-white text-dark font-black uppercase tracking-widest text-xs hover:bg-electric-blue hover:scale-105 transition-all cursor-pointer">
+                    New Ticket
+                </button>
+                
+                <a href="{{ route('teams.index') }}" class="px-8 py-4 rounded-2xl bg-electric-blue text-white font-black uppercase tracking-widest text-xs hover:bg-white hover:text-dark hover:scale-105 transition-all">
+                    Team Management
+                </a>
+            </div>
+        </div>
+
+        {{-- Stats Row --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass rounded-2xl p-5 border border-white/5">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">Active Projects</span>
+                    <i class="fas fa-rocket text-electric-blue text-sm"></i>
+                </div>
+                <div class="text-3xl font-black text-white">{{ $projects->where('status', '!=', 'Delivered')->count() }}</div>
+            </div>
+            <div class="glass rounded-2xl p-5 border border-white/5">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">Open Tickets</span>
+                    <i class="fas fa-headset text-electric-violet text-sm"></i>
+                </div>
+                <div class="text-3xl font-black text-white">{{ $tickets->where('status', 'open')->count() }}</div>
+            </div>
+            <div class="glass rounded-2xl p-5 border border-white/5">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">Active Hostings</span>
+                    <i class="fas fa-server text-green-400 text-sm"></i>
+                </div>
+                <div class="text-3xl font-black text-white">{{ $hostings->whereIn('status', ['active','pending'])->count() }}</div>
+            </div>
+            <div class="glass rounded-2xl p-5 border border-white/5">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">Agreements</span>
+                    <i class="fas fa-file-signature text-yellow-400 text-sm"></i>
+                </div>
+                <div class="text-3xl font-black text-white">{{ $agreements->count() }}</div>
+            </div>
+        </div>
+
+        {{-- Tab Bar with Alpine.js --}}
+        <div class="flex overflow-x-auto gap-1 glass rounded-2xl p-1 mb-8 relative" role="tablist">
+            @foreach([
+                ['key' => 'projects',    'label' => 'Projects',    'icon' => 'fa-rocket'],
+                ['key' => 'tickets',     'label' => 'Support',     'icon' => 'fa-headset'],
+                ['key' => 'vault',       'label' => 'File Vault',  'icon' => 'fa-vault'],
+                ['key' => 'hosting',     'label' => 'Hosting',     'icon' => 'fa-server'],
+                ['key' => 'streaming',   'label' => 'Live Stream', 'icon' => 'fa-broadcast-tower'],
+                ['key' => 'teams',       'label' => 'Teams',       'icon' => 'fa-users'],
+                ['key' => 'agreements',  'label' => 'Agreements',  'icon' => 'fa-file-signature'],
+            ] as $tab)
+                <button type="button"
+                        @click="activeTab = '{{ $tab['key'] }}'; $wire.switchTab('{{ $tab['key'] }}')"
+                        :class="activeTab === '{{ $tab['key'] }}' ? 'bg-electric-blue text-dark' : 'text-gray-400 hover:text-white hover:bg-white/5'"
+                        class="cursor-pointer flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-200 min-h-[44px]"
+                        role="tab"
+                        :aria-selected="activeTab === '{{ $tab['key'] }}' ? 'true' : 'false'">
+                    <i class="fas {{ $tab['icon'] }} text-sm"></i>
+                    <span class="hidden sm:inline">{{ $tab['label'] }}</span>
+                </button>
+            @endforeach
+        </div>
+
+        <!-- Projects Tab -->
+        <div x-show="activeTab === 'projects'" x-cloak>
+            @include('livewire.partials.dashboard-kanban')
+        </div>
+
+        <!-- Tickets/Support Tab -->
+        <div x-show="activeTab === 'tickets'" x-cloak>
+            @include('livewire.partials.dashboard-tickets')
+        </div>
+
+        <!-- File Vault Tab -->
+        <div x-show="activeTab === 'vault'" x-cloak>
+            @include('livewire.partials.dashboard-files')
+        </div>
+
+        <!-- Hosting Tab -->
+        <div x-show="activeTab === 'hosting'" x-cloak x-transition.opacity>
+            @include('livewire.partials.dashboard-hosting')
+        </div>
+
+        <!-- Streaming Tab -->
+        <div x-show="activeTab === 'streaming'" x-cloak x-transition.opacity>
+            @include('livewire.partials.dashboard-streaming')
+        </div>
+
+        <!-- Teams Tab -->
+        <div x-show="activeTab === 'teams'" x-cloak>
+            <div class="space-y-8">
+                <!-- Teams Header -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-black text-white uppercase tracking-tight">My Teams</h2>
+                        <p class="text-gray-400 text-sm mt-1">Manage your teams and collaborate with members.</p>
+                    </div>
+                    <a href="{{ route('teams.create') }}" class="px-6 py-3 rounded-xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all text-center">
+                        <i class="fas fa-plus mr-2"></i>Create New Team
+                    </a>
+                </div>
+
+                <!-- Owned Teams -->
+                @php
+                    $ownedTeams = Auth::user()->ownedTeams()->with('users')->get();
+                    $joinedTeams = Auth::user()->teams()->with('owner')->get();
+                @endphp
+
+                @if($ownedTeams->count() > 0)
+                    <div>
+                        <h3 class="text-sm font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Teams I Own</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            @foreach($ownedTeams as $team)
+                                <div class="p-6 glass rounded-3xl border border-white/10 hover:border-electric-blue/30 transition-all">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <h4 class="font-black text-white uppercase tracking-tight">{{ $team->name }}</h4>
+                                        @if($team->is_active)
+                                            <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-widest">Active</span>
+                                        @else
+                                            <span class="px-2 py-1 rounded-full bg-gray-500/20 text-gray-400 text-[10px] font-black uppercase tracking-widest">Inactive</span>
+                                        @endif
+                                    </div>
+                                    
+                                    @if($team->description)
+                                        <p class="text-gray-400 text-xs mb-4 line-clamp-2">{{ $team->description }}</p>
+                                    @endif
+                                    
+                                    <div class="flex items-center text-xs text-gray-400 mb-4">
+                                        <i class="fas fa-users w-5 text-electric-blue"></i>
+                                        <span>{{ $team->users->count() }} members</span>
+                                    </div>
+                                    
+                                    <div class="flex space-x-2">
+                                        <a href="{{ route('teams.show', $team) }}" class="flex-1 py-2 rounded-xl bg-electric-blue/10 text-electric-blue font-black uppercase tracking-widest text-[10px] hover:bg-electric-blue hover:text-dark transition-all text-center">
+                                            View
+                                        </a>
+                                        <a href="{{ route('teams.members', $team) }}" class="flex-1 py-2 rounded-xl bg-white/5 text-gray-300 font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all text-center">
+                                            Members
+                                        </a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Joined Teams -->
+                @if($joinedTeams->count() > 0)
+                    <div>
+                        <h3 class="text-sm font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Teams I've Joined</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            @foreach($joinedTeams as $team)
+                                <div class="p-6 glass rounded-3xl border border-white/10 hover:border-electric-blue/30 transition-all">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <h4 class="font-black text-white uppercase tracking-tight">{{ $team->name }}</h4>
+                                        @if($team->is_active)
+                                            <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-widest">Active</span>
+                                        @else
+                                            <span class="px-2 py-1 rounded-full bg-gray-500/20 text-gray-400 text-[10px] font-black uppercase tracking-widest">Inactive</span>
+                                        @endif
+                                    </div>
+                                    
+                                    @if($team->description)
+                                        <p class="text-gray-400 text-xs mb-4 line-clamp-2">{{ $team->description }}</p>
+                                    @endif
+                                    
+                                    <div class="flex items-center text-xs text-gray-400 mb-2">
+                                        <i class="fas fa-crown w-5 text-electric-blue"></i>
+                                        <span>Owner: {{ $team->owner->name }}</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center text-xs text-gray-400 mb-4">
+                                        <i class="fas fa-users w-5 text-electric-blue"></i>
+                                        <span>{{ $team->users->count() }} members</span>
+                                    </div>
+                                    
+                                    <div class="flex space-x-2">
+                                        <a href="{{ route('teams.show', $team) }}" class="flex-1 py-2 rounded-xl bg-electric-blue/10 text-electric-blue font-black uppercase tracking-widest text-[10px] hover:bg-electric-blue hover:text-dark transition-all text-center">
+                                            View
+                                        </a>
+                                        <a href="{{ route('teams.members', $team) }}" class="flex-1 py-2 rounded-xl bg-white/5 text-gray-300 font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all text-center">
+                                            Members
+                                        </a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <!-- No Teams -->
+                @if($ownedTeams->count() === 0 && $joinedTeams->count() === 0)
+                    <div class="text-center py-16 glass rounded-[3rem]">
+                        <div class="w-20 h-20 rounded-full bg-gradient-to-br from-electric-blue/20 to-electric-violet/20 flex items-center justify-center mx-auto mb-6">
+                            <i class="fas fa-users text-4xl text-electric-blue"></i>
+                        </div>
+                        <h3 class="text-3xl font-black text-white uppercase mb-4">No Teams Yet</h3>
+                        <p class="text-gray-400 mb-8 max-w-md mx-auto">Create a team to collaborate with others and manage access to your resources.</p>
+                        <a href="{{ route('teams.create') }}" class="inline-flex items-center px-8 py-4 rounded-2xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+                            <i class="fas fa-plus mr-2"></i>Create Your First Team
+                        </a>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+    <!-- Add Domain Modal -->
+    @if($showDomainModal)
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-6">
+            <div class="absolute inset-0 bg-dark/90 backdrop-blur-xl" wire:click="closeDomainModal()"></div>
+            <div class="relative w-full max-w-md glass rounded-[3rem] overflow-hidden animate-in zoom-in duration-300">
+                <div class="p-8 bg-gradient-to-r from-electric-blue/20 to-electric-violet/20 border-b border-white/10">
+                    <h3 class="text-xl font-black text-white uppercase tracking-tight">Add Domain Name</h3>
+                    <p class="text-gray-400 text-xs mt-1">Point your domain to this VPS using our nameservers</p>
+                </div>
+                <div class="p-8">
+                    {{-- Nameservers info --}}
+                    <div class="mb-6 p-4 bg-electric-blue/10 rounded-2xl border border-electric-blue/20">
+                        <p class="text-xs font-black text-electric-blue uppercase tracking-widest mb-3">Step 1: Update Nameservers</p>
+                        <p class="text-[11px] text-gray-400 mb-3">Set these nameservers at your domain registrar:</p>
+                        <div class="space-y-2">
+                            @foreach(['ns1.believoo.com', 'ns2.believoo.com'] as $ns)
+                                <div class="flex items-center justify-between p-2 bg-white/5 rounded-xl">
+                                    <span class="text-sm font-mono text-white">{{ $ns }}</span>
+                                    <button onclick="navigator.clipboard.writeText('{{ $ns }}')" class="text-electric-blue hover:text-white transition-all">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <p class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Step 2: Enter Your Domain</p>
+                    <input type="text" wire:model="newDomain"
+                           placeholder="e.g., example.com or sub.example.com"
+                           class="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-electric-blue/50 mb-2"
+                           x-on:keydown.enter="$wire.addDomain()">
+                    @error('newDomain')
+                        <p class="text-red-400 text-xs mb-3">{{ $message }}</p>
+                    @enderror
+                    <p class="text-[10px] text-gray-500 mb-6">DNS propagation may take up to 24-48 hours after updating nameservers.</p>
+
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" wire:click="closeDomainModal()" class="px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs text-gray-400 hover:text-white transition-all cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="button" wire:click="addDomain()" wire:loading.attr="disabled"
+                                class="px-6 py-3 rounded-2xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all disabled:opacity-50 cursor-pointer">
+                            <span wire:loading.remove wire:target="addDomain">Add Domain</span>
+                            <span wire:loading wire:target="addDomain"><i class="fas fa-spinner fa-spin mr-1"></i>Adding...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Server Action Confirmation Modal -->
+    @if($showActionModal)
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-6">
+            <div class="absolute inset-0 bg-dark/90 backdrop-blur-xl" wire:click="cancelServerAction()"></div>
+            <div class="relative w-full max-w-md glass rounded-[3rem] overflow-hidden animate-in zoom-in duration-300">
+                <div class="p-8 bg-gradient-to-r from-red-500/20 to-orange-500/20 border-b border-white/10">
+                    <h3 class="text-xl font-black text-white uppercase tracking-tight">{{ $pendingActionTitle }}</h3>
+                </div>
+                <div class="p-8">
+                    <p class="text-gray-300 text-sm mb-8">{{ $pendingActionMessage }}</p>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" wire:click="cancelServerAction()" class="px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs text-gray-400 hover:text-white transition-all cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="button" wire:click="executeServerAction()" wire:loading.attr="disabled"
+                                class="px-6 py-3 rounded-2xl bg-red-500 text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all disabled:opacity-50 cursor-pointer">
+                            <span wire:loading.remove wire:target="executeServerAction">Confirm</span>
+                            <span wire:loading wire:target="executeServerAction"><i class="fas fa-spinner fa-spin mr-1"></i>Processing...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Ticket Modal -->
+    @if($isTicketModalOpen)
+        <div class="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <div class="absolute inset-0 bg-dark/90 backdrop-blur-xl" wire:click="closeTicketModal()"></div>
+            <div class="relative w-full max-w-2xl glass rounded-[3rem] overflow-hidden animate-in zoom-in duration-300">
+                <div class="p-10 bg-gradient-to-r from-electric-blue to-electric-violet">
+                    <h3 class="text-3xl font-black text-dark uppercase tracking-tighter">Create Support Ticket</h3>
+                    <p class="text-dark/60 font-bold text-sm">Tell us what's on your mind and we'll help you out.</p>
+                </div>
+                <form wire:submit.prevent="createTicket" class="p-10 space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Subject</label>
+                        <input type="text" wire:model="subject" class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all">
+                        @error('subject') <span class="text-red-500 text-[10px] ml-2">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Priority</label>
+                            <select wire:model="priority" class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Message</label>
+                        <textarea wire:model="message" rows="5" class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all"></textarea>
+                        @error('message') <span class="text-red-500 text-[10px] ml-2">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Attachment (Optional)</label>
+                        <input type="file" wire:model="ticketAttachment" class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-xs text-gray-400">
+                        <div wire:loading wire:target="ticketAttachment" class="text-[10px] text-electric-blue ml-2 italic">Uploading...</div>
+                        @error('ticketAttachment') <span class="text-red-500 text-[10px] ml-2">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" wire:click="closeTicketModal()" class="px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-gray-400 hover:text-white transition-all cursor-pointer">Cancel</button>
+                        <button type="submit" class="px-8 py-4 rounded-2xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">Submit Ticket</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    <!-- Upload Modal -->
+    @if($isUploadModalOpen)
+        <div class="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <div class="absolute inset-0 bg-dark/90 backdrop-blur-xl" wire:click="closeUploadModal()"></div>
+            <div class="relative w-full max-w-xl glass rounded-[3rem] overflow-hidden animate-in zoom-in duration-300">
+                <div class="p-10 bg-gradient-to-r from-electric-blue to-electric-violet">
+                    <h3 class="text-3xl font-black text-dark uppercase tracking-tighter">Upload to Vault</h3>
+                    <p class="text-dark/60 font-bold text-sm">Upload assets, requirements or feedback.</p>
+                </div>
+                <form wire:submit.prevent="uploadAsset" class="p-10 space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Project</label>
+                        <select wire:model="selectedProjectId" class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all">
+                            <option value="">Select Project</option>
+                            @foreach($projects as $project)
+                                <option value="{{ $project->id }}">{{ $project->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('selectedProjectId') <span class="text-red-500 text-[10px] ml-2">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">File Name</label>
+                        <input type="text" wire:model="assetName" class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all" placeholder="e.g., Logo Requirements">
+                        @error('assetName') <span class="text-red-500 text-[10px] ml-2">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">File</label>
+                        <div class="relative group">
+                            <input type="file" wire:model="assetFile" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <div class="w-full px-6 py-10 rounded-2xl bg-white/5 border-2 border-dashed border-white/10 group-hover:border-electric-blue/50 transition-all flex flex-col items-center justify-center">
+                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-600 mb-4 group-hover:text-electric-blue transition-colors"></i>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-widest group-hover:text-white transition-colors">
+                                    {{ $assetFile ? $assetFile->getClientOriginalName() : 'Click or drag file to upload' }}
+                                </span>
+                            </div>
+                        </div>
+                        @error('assetFile') <span class="text-red-500 text-[10px] ml-2">{{ $message }}</span> @enderror
+                    </div>
+
+                    <!-- Joined Teams -->
+                    @if($joinedTeams->count() > 0)
+                        <div>
+                            <h3 class="text-sm font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Teams I've Joined</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                @foreach($joinedTeams as $team)
+                                    <div class="p-6 glass rounded-3xl border border-white/10 hover:border-electric-blue/30 transition-all">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <h4 class="font-black text-white uppercase tracking-tight">{{ $team->name }}</h4>
+                                            @if($team->is_active)
+                                                <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-widest">Active</span>
+                                            @else
+                                                <span class="px-2 py-1 rounded-full bg-gray-500/20 text-gray-400 text-[10px] font-black uppercase tracking-widest">Inactive</span>
+                                            @endif
+                                        </div>
+                                        
+                                        @if($team->description)
+                                            <p class="text-gray-400 text-xs mb-4 line-clamp-2">{{ $team->description }}</p>
+                                        @endif
+                                        
+                                        <div class="flex items-center text-xs text-gray-400 mb-2">
+                                            <i class="fas fa-crown w-5 text-electric-blue"></i>
+                                            <span>Owner: {{ $team->owner->name }}</span>
+                                        </div>
+                                        
+                                        <div class="flex items-center text-xs text-gray-400 mb-4">
+                                            <i class="fas fa-users w-5 text-electric-blue"></i>
+                                            <span>{{ $team->users->count() }} members</span>
+                                        </div>
+                                        
+                                        <div class="flex space-x-2">
+                                            <a href="{{ route('teams.show', $team) }}" class="flex-1 py-2 rounded-xl bg-electric-blue/10 text-electric-blue font-black uppercase tracking-widest text-[10px] hover:bg-electric-blue hover:text-dark transition-all text-center">
+                                                View
+                                            </a>
+                                            <a href="{{ route('teams.members', $team) }}" class="flex-1 py-2 rounded-xl bg-white/5 text-gray-300 font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all text-center">
+                                                Members
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Agreements Tab -->
+    <div x-show="activeTab === 'agreements'" x-cloak>
+        @php
+            if(!Auth::user()->referral_code) {
+                Auth::user()->generateReferralCode();
+            }
+        @endphp
+            <div class="p-6 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-electric-blue/10 rounded-3xl border border-pink-500/30 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                <div class="absolute bottom-0 left-0 w-24 h-24 bg-electric-blue/20 rounded-full -ml-12 -mb-12 blur-xl"></div>
+                
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
+                                <i class="fas fa-gift text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-black text-white uppercase tracking-tight">Refer a Friend & Get 10% Off!</h3>
+                                <p class="text-sm text-gray-400">Share your unique referral link and earn discounts on your next milestone</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Referral Stats -->
+                        <div class="flex flex-wrap gap-4 mb-4">
+                            <div class="px-4 py-2 bg-white/5 rounded-xl">
+                                <span class="text-[10px] text-gray-500 uppercase">Total Referrals</span>
+                                <p class="text-lg font-black text-white">{{ Auth::user()->total_referrals }}</p>
+                            </div>
+                            <div class="px-4 py-2 bg-white/5 rounded-xl">
+                                <span class="text-[10px] text-gray-500 uppercase">Successful</span>
+                                <p class="text-lg font-black text-green-500">{{ Auth::user()->successful_referrals }}</p>
+                            </div>
+                            <div class="px-4 py-2 bg-white/5 rounded-xl">
+                                <span class="text-[10px] text-gray-500 uppercase">Discount Balance</span>
+                                <p class="text-lg font-black text-electric-blue">${{ number_format(Auth::user()->referral_discount_balance, 2) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Referral Link & Form -->
+                    <div class="flex flex-col gap-3 md:w-96">
+                        <div class="flex gap-2">
+                            <input type="text" value="{{ Auth::user()->referral_link }}" readonly 
+                                class="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-electric-blue outline-none"
+                                id="referralLink">
+                            <button onclick="copyReferralLink()" class="px-4 py-3 rounded-xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        
+                        <form action="{{ route('client.referrals.store') }}" method="POST" class="flex gap-2">
+                            @csrf
+                            <input type="email" name="referred_email" placeholder="Friend's email address..." required
+                                class="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-pink-500 outline-none placeholder-gray-500">
+                            <button type="submit" class="px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all whitespace-nowrap">
+                                <i class="fas fa-paper-plane mr-1"></i>Send
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                @if(session()->has('referral_success'))
+                    <div class="mt-4 p-3 rounded-xl bg-green-500/20 text-green-500 text-sm flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>{{ session('referral_success') }}
+                    </div>
+                @endif
+                @if(session()->has('referral_error'))
+                    <div class="mt-4 p-3 rounded-xl bg-red-500/20 text-red-500 text-sm flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2"></i>{{ session('referral_error') }}
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <!-- Agreements Tab -->
+        <div x-show="activeTab === 'agreements'" x-cloak>
+            <script>
+                function copyReferralLink() {
+                    const linkInput = document.getElementById('referralLink');
+                    linkInput.select();
+                    document.execCommand('copy');
+
+                    // Show toast notification
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-4 right-4 px-6 py-3 bg-green-500 text-white rounded-xl font-bold z-50 animate-in fade-in';
+                    toast.innerHTML = '<i class="fas fa-check mr-2"></i>Referral link copied!';
+                    document.body.appendChild(toast);
+
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 3000);
+                }
+            </script>
+
+            <!-- Agreements Header -->
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-black text-white uppercase tracking-tight">Service Agreements</h2>
+                    <p class="text-gray-400 text-sm mt-1">View, sign, and track your project agreements</p>
+                </div>
+                <button type="button" wire:click="openAgreementRequestModal()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-electric-blue to-electric-violet text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all cursor-pointer">
+                    <i class="fas fa-plus mr-2"></i>New Project Request
+                </button>
+            </div>
+
+            @if(session()->has('request_success'))
+                <div class="p-4 rounded-xl bg-green-500/20 text-green-500 flex items-center">
+                    <i class="fas fa-check-circle mr-3"></i>
+                    {{ session('request_success') }}
+                </div>
+            @endif
+
+            <!-- Agreement Requests History -->
+            @if($agreementRequests->count() > 0)
+                <div class="space-y-4">
+                    <h3 class="text-lg font-black text-white uppercase tracking-tight">Your Project Requests</h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        @foreach($agreementRequests as $request)
+                            <div class="p-6 glass rounded-2xl border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest {{ $request->status == 'pending' ? 'bg-yellow-500/20 text-yellow-500' : ($request->status == 'under_review' ? 'bg-blue-500/20 text-blue-500' : ($request->status == 'converted' ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-400')) }}">
+                                            {{ $request->status_label }}
+                                        </span>
+                                        <span class="text-[10px] font-black text-gray-500 uppercase">#{{ $request->request_number }}</span>
+                                    </div>
+                                    <h4 class="font-bold text-white text-lg">{{ $request->project_name }}</h4>
+                                    <p class="text-gray-400 text-sm mt-1 line-clamp-2">{{ strip_tags($request->project_description) }}</p>
+                                    <div class="flex items-center gap-4 mt-3">
+                                        @if($request->budget_range)
+                                            <span class="text-[10px] text-gray-500"><i class="fas fa-wallet mr-1"></i> Budget: {{ $request->budget_range }}</span>
+                                        @endif
+                                        @if($request->timeline_expectation)
+                                            <span class="text-[10px] text-gray-500"><i class="fas fa-clock mr-1"></i> Timeline: {{ $request->timeline_expectation }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    @if($request->isConverted() && $request->agreement)
+                                        <button type="button" wire:click="viewAgreement({{ $request->agreement->id }})" class="px-4 py-2 rounded-lg bg-electric-blue text-dark font-bold text-xs uppercase tracking-wider hover:scale-105 transition-all cursor-pointer">
+                                            View Agreement
+                                        </button>
+                                    @elseif($request->status === 'rejected')
+                                        <span class="px-4 py-2 rounded-lg bg-red-500/20 text-red-500 font-bold text-xs uppercase">
+                                            Rejected
+                                        </span>
+                                    @else
+                                        <span class="px-4 py-2 rounded-lg bg-white/10 text-gray-400 font-bold text-xs uppercase">
+                                            <i class="fas fa-clock mr-1"></i> In Progress
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if($selectedAgreement)
+                <!-- Agreement Detail View -->
+                <div class="glass rounded-[3rem] border border-white/10 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <!-- Header -->
+                    <div class="p-8 bg-gradient-to-r from-electric-blue/20 to-electric-violet/20 border-b border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <button type="button" wire:click="closeAgreementView()" class="mb-4 text-[10px] font-black text-electric-blue uppercase tracking-widest flex items-center hover:translate-x-[-4px] transition-all cursor-pointer">
+                                <i class="fas fa-arrow-left mr-2"></i> Back to Agreements
+                            </button>
+                            <div class="flex items-center space-x-3 mb-2">
+                                <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest {{ $selectedAgreement->status == 'signed' ? 'bg-green-500/20 text-green-500' : ($selectedAgreement->status == 'sent' ? 'bg-blue-500/20 text-blue-500' : 'bg-gray-500/20 text-gray-400') }}">
+                                    {{ $selectedAgreement->status_label }}
+                                </span>
+                                <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">#{{ $selectedAgreement->agreement_number }}</span>
+                            </div>
+                            <h2 class="text-3xl font-black text-white uppercase tracking-tight">{{ $selectedAgreement->title }}</h2>
+                            <p class="text-gray-400 text-sm mt-1">{{ $selectedAgreement->project_name }}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            @if(!$selectedAgreement->isSigned())
+                                <span class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest bg-yellow-500/20 text-yellow-500">
+                                    <i class="fas fa-clock mr-1"></i>Awaiting Signature
+                                </span>
+                            @else
+                                <span class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest bg-green-500/20 text-green-500">
+                                    <i class="fas fa-check-circle mr-1"></i>Active
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="p-8 space-y-8">
+                        <!-- Parties Info -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-6 glass rounded-2xl border border-white/10">
+                                <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Service Provider</h3>
+                                <p class="text-lg font-bold text-white">{{ $selectedAgreement->service_provider_name }}</p>
+                                <p class="text-sm text-electric-blue">{{ $selectedAgreement->lead_developer }}</p>
+                            </div>
+                            <div class="p-6 glass rounded-2xl border border-white/10">
+                                <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Client</h3>
+                                <p class="text-lg font-bold text-white">{{ $selectedAgreement->client_name }}</p>
+                                <p class="text-sm text-gray-400">{{ $selectedAgreement->client->email }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Project Overview -->
+                        <div class="p-6 glass rounded-2xl border border-white/10">
+                            <h3 class="text-sm font-black text-white uppercase tracking-widest mb-4">Project Overview</h3>
+                            <div class="prose prose-invert max-w-none text-gray-300 text-sm">
+                                {!! $selectedAgreement->project_overview !!}
+                            </div>
+                        </div>
+
+                        <!-- Work Items -->
+                        @if($selectedAgreement->workItems->count() > 0)
+                            <div class="space-y-4">
+                                <h3 class="text-sm font-black text-white uppercase tracking-widest">Work Items & Costing</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full">
+                                        <thead>
+                                            <tr class="border-b border-white/10">
+                                                <th class="text-left py-4 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Item</th>
+                                                <th class="text-left py-4 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Description</th>
+                                                <th class="text-right py-4 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($selectedAgreement->workItems as $item)
+                                                <tr class="border-b border-white/5">
+                                                    <td class="py-4 px-4 text-sm text-white font-bold">{{ $item->item_name }}</td>
+                                                    <td class="py-4 px-4 text-sm text-gray-400">{{ $item->description }}</td>
+                                                    <td class="py-4 px-4 text-sm text-white font-bold text-right">${{ number_format($item->amount, 2) }}</td>
+                                                </tr>
+                                            @endforeach
+                                            <tr class="bg-electric-blue/10">
+                                                <td class="py-4 px-4 text-sm font-black text-electric-blue uppercase" colspan="2">Total Project Value</td>
+                                                <td class="py-4 px-4 text-lg font-black text-electric-blue text-right">${{ number_format($selectedAgreement->total_amount, 2) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Milestones -->
+                        @if($selectedAgreement->milestones->count() > 0)
+                            <div class="space-y-4">
+                                <h3 class="text-sm font-black text-white uppercase tracking-widest">Timeline & Milestones</h3>
+                                <div class="space-y-3">
+                                    @foreach($selectedAgreement->milestones as $milestone)
+                                        <div class="p-4 glass rounded-2xl border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-3 mb-2">
+                                                    <span class="w-8 h-8 rounded-full bg-electric-blue/20 flex items-center justify-center text-electric-blue text-xs font-black">{{ $milestone->timeline_month }}</span>
+                                                    <h4 class="font-bold text-white">{{ $milestone->phase_name }}</h4>
+                                                    <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest {{ $milestone->status == 'paid' ? 'bg-green-500/20 text-green-500' : ($milestone->status == 'completed' ? 'bg-blue-500/20 text-blue-500' : 'bg-gray-500/20 text-gray-400') }}">
+                                                        {{ $milestone->status }}
+                                                    </span>
+                                                </div>
+                                                <p class="text-sm text-gray-400 ml-11">{{ $milestone->description }}</p>
+                                            </div>
+                                            <div class="text-right flex flex-col items-end gap-2">
+                                                <p class="text-lg font-black text-white">${{ number_format($milestone->payment_amount, 2) }}</p>
+                                                @if($milestone->due_date)
+                                                    <p class="text-[10px] text-gray-500 uppercase">Due: {{ $milestone->due_date->format('M d, Y') }}</p>
+                                                @endif
+                                                @php
+                                                    $pendingProof = \App\Models\PaymentProof::where('milestone_id', $milestone->id)
+                                                        ->where('status', 'pending_verification')
+                                                        ->first();
+                                                @endphp
+
+                                                @if($milestone->status !== 'paid' && $selectedAgreement->isSigned())
+                                                    @if($pendingProof)
+                                                        <div class="flex gap-2 mt-2">
+                                                            <span class="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-500 font-bold text-xs uppercase tracking-wider">
+                                                                <i class="fas fa-clock mr-1"></i>Pending Verification
+                                                            </span>
+                                                        </div>
+                                                    @else
+                                                        <div class="flex gap-2 mt-2" wire:ignore>
+                                                            <button type="button" onclick="window.open('{{ route('milestone.pay', $milestone) }}?t={{ time() }}', '_blank'); return false;" class="px-4 py-2 rounded-lg bg-green-500 text-white font-bold text-xs uppercase tracking-wider hover:scale-105 transition-all">
+                                                                <i class="fas fa-credit-card mr-1"></i>Pay Now
+                                                            </button>
+                                                            <button type="button" onclick="document.getElementById('payment-proof-modal-{{ $milestone->id }}').classList.remove('hidden'); return false;" class="px-4 py-2 rounded-lg bg-electric-blue text-dark font-bold text-xs uppercase tracking-wider hover:scale-105 transition-all">
+                                                                <i class="fas fa-upload mr-1"></i>Upload Proof
+                                                            </button>
+                                                        </div>
+                                                    @endif
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <!-- Payment Proof Modal for this milestone -->
+                                        @if($milestone->status !== 'paid' && $selectedAgreement->isSigned() && !$pendingProof)
+                                            <div id="payment-proof-modal-{{ $milestone->id }}" wire:ignore.self class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                                                <div class="w-full max-w-md glass rounded-[3rem] border border-white/10 overflow-hidden">
+                                                    <div class="p-6 bg-gradient-to-r from-electric-blue/20 to-electric-violet/20 border-b border-white/10 flex items-center justify-between">
+                                                        <h3 class="text-lg font-black text-white uppercase">Submit Payment Proof</h3>
+                                                        <button onclick="document.getElementById('payment-proof-modal-{{ $milestone->id }}').classList.add('hidden')" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                    <form wire:ignore action="{{ route('milestone.payment-proof', $milestone) }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+                                                        @csrf
+                                                        <div>
+                                                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Payment Method</label>
+                                                            <select name="payment_method" required class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-electric-blue outline-none">
+                                                                <option value="easypaisa">EasyPaisa</option>
+                                                                <option value="jazzcash">JazzCash</option>
+                                                                <option value="bank_transfer">Bank Transfer</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Transaction ID</label>
+                                                            <input type="text" name="transaction_id" required placeholder="e.g., T123456789" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-electric-blue outline-none">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Screenshot (Optional)</label>
+                                                            <input type="file" name="screenshot" accept="image/*" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-electric-blue outline-none">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Notes</label>
+                                                            <textarea name="notes" rows="2" placeholder="Any additional information..." class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-electric-blue outline-none resize-none"></textarea>
+                                                        </div>
+                                                        <div class="pt-4 border-t border-white/10">
+                                                            <p class="text-sm text-gray-400 mb-4">Amount to pay: <span class="text-white font-bold">${{ number_format($milestone->payment_amount, 2) }}</span></p>
+                                                            <button type="submit" class="w-full px-6 py-3 rounded-xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+                                                                Submit Payment Proof
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Terms -->
+                        @if($selectedAgreement->payment_terms || $selectedAgreement->deliverables || $selectedAgreement->support_terms)
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                @if($selectedAgreement->payment_terms)
+                                    <div class="p-6 glass rounded-2xl border border-white/10">
+                                        <h4 class="text-[10px] font-black text-electric-blue uppercase tracking-[0.2em] mb-3">Payment Terms</h4>
+                                        <div class="prose prose-invert max-w-none text-gray-400 text-sm">
+                                            {!! $selectedAgreement->payment_terms !!}
+                                        </div>
+                                    </div>
+                                @endif
+                                @if($selectedAgreement->deliverables)
+                                    <div class="p-6 glass rounded-2xl border border-white/10">
+                                        <h4 class="text-[10px] font-black text-electric-blue uppercase tracking-[0.2em] mb-3">Deliverables</h4>
+                                        <div class="prose prose-invert max-w-none text-gray-400 text-sm">
+                                            {!! $selectedAgreement->deliverables !!}
+                                        </div>
+                                    </div>
+                                @endif
+                                @if($selectedAgreement->support_terms)
+                                    <div class="p-6 glass rounded-2xl border border-white/10">
+                                        <h4 class="text-[10px] font-black text-electric-blue uppercase tracking-[0.2em] mb-3">Support Terms</h4>
+                                        <div class="prose prose-invert max-w-none text-gray-400 text-sm">
+                                            {!! $selectedAgreement->support_terms !!}
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+
+                        <!-- History -->
+                        <div class="p-6 glass rounded-2xl border border-white/10">
+                            <h3 class="text-sm font-black text-white uppercase tracking-widest mb-4">Agreement History</h3>
+                            <div class="space-y-3">
+                                @foreach($selectedAgreement->histories->take(10) as $history)
+                                    <div class="flex items-center gap-4 p-3 rounded-xl {{ $history->action == 'signed' ? 'bg-green-500/10' : 'bg-white/5' }}">
+                                        <div class="w-10 h-10 rounded-full {{ $history->action == 'signed' ? 'bg-green-500/20 text-green-500' : 'bg-electric-blue/20 text-electric-blue' }} flex items-center justify-center">
+                                            <i class="fas {{ $history->action_icon }} text-sm"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-bold text-white">{{ $history->description }}</p>
+                                            <p class="text-[10px] text-gray-500">{{ $history->created_at->format('M d, Y • H:i') }}</p>
+                                        </div>
+                                        <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-white/10 text-gray-400">
+                                            {{ $history->action }}
+                                        </span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <!-- Digital Signature Certificate (if signed) -->
+                        @if($selectedAgreement->isSigned() && $selectedAgreement->client_signature_certificate_id)
+                            <div class="p-6 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl border border-green-500/30">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                                        <i class="fas fa-certificate text-xl text-green-500"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-black text-white uppercase tracking-tight">Digital Signature Certificate</h3>
+                                        <p class="text-[10px] text-green-400 font-bold uppercase tracking-widest">✓ Verified & Legally Binding</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-500">Certificate ID:</span>
+                                            <span class="text-green-400 font-mono font-bold">{{ $selectedAgreement->client_signature_certificate_id }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-500">Signed By:</span>
+                                            <span class="text-white font-bold">{{ $selectedAgreement->client_name }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-500">Date & Time:</span>
+                                            <span class="text-white">{{ $selectedAgreement->client_signed_at?->format('M d, Y \a\t h:i A') }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-500">IP Address:</span>
+                                            <span class="text-white font-mono">{{ $selectedAgreement->client_signature_ip ?? 'N/A' }}</span>
+                                        </div>
+                                        <div class="flex flex-col">
+                                            <span class="text-gray-500 text-[10px] uppercase">Browser/Device:</span>
+                                            <span class="text-gray-400 text-xs truncate" title="{{ $selectedAgreement->client_signature_user_agent }}">{{ $selectedAgreement->client_signature_user_agent ?? 'N/A' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-green-500/20">
+                                    <p class="text-xs text-gray-400 text-center">
+                                        This agreement has been electronically signed in accordance with the Information Technology Act.
+                                        All signature data is stored securely for legal verification.
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- AMC Subscription Section -->
+                        @if($selectedAgreement->isSigned())
+                            @php
+                                $activeAmc = $selectedAgreement->activeAmcSubscription();
+                            @endphp
+                            @if($activeAmc)
+                                <!-- Active AMC -->
+                                <div class="p-6 bg-gradient-to-r from-purple-500/10 to-electric-violet/10 rounded-2xl border border-purple-500/30">
+                                    <div class="flex items-center gap-3 mb-4">
+                                        <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
+                                            <i class="fas fa-shield-alt text-xl text-purple-500"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-lg font-black text-white uppercase tracking-tight">AMC Subscription Active</h3>
+                                            <p class="text-[10px] text-purple-400 font-bold uppercase tracking-widest">✓ Priority Support Enabled</p>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+                                        <div>
+                                            <span class="text-gray-500">Plan:</span>
+                                            <span class="text-white font-bold ml-2">{{ $activeAmc->plan_label }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500">Monthly:</span>
+                                            <span class="text-white font-bold ml-2">${{ number_format($activeAmc->monthly_amount, 2) }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500">Expires:</span>
+                                            <span class="text-white font-bold ml-2">{{ $activeAmc->end_date->format('M d, Y') }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-purple-500/20">
+                                        <span class="px-3 py-1 rounded-full bg-white/10 text-[10px] text-gray-300"><i class="fas fa-check text-green-500 mr-1"></i> 24/7 Support</span>
+                                        <span class="px-3 py-1 rounded-full bg-white/10 text-[10px] text-gray-300"><i class="fas fa-check text-green-500 mr-1"></i> Bug Fixes</span>
+                                        <span class="px-3 py-1 rounded-full bg-white/10 text-[10px] text-gray-300"><i class="fas fa-check text-green-500 mr-1"></i> Updates</span>
+                                        <span class="px-3 py-1 rounded-full bg-white/10 text-[10px] text-gray-300"><i class="fas fa-check text-green-500 mr-1"></i> Security Patches</span>
+                                    </div>
+                                </div>
+                            @elseif($selectedAgreement->client_signed_at && $selectedAgreement->client_signed_at->diffInDays(now()) >= 83)
+                                <!-- AMC Offer - Warranty expiring soon -->
+                                <div class="p-6 bg-gradient-to-r from-orange-500/10 to-yellow-500/10 rounded-2xl border border-orange-500/30">
+                                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                                <i class="fas fa-exclamation-triangle text-xl text-orange-500"></i>
+                                            </div>
+                                            <div>
+                                                <h3 class="text-lg font-black text-white uppercase tracking-tight">Free Support Ending Soon!</h3>
+                                                <p class="text-sm text-gray-400">Your 90-day warranty expires in {{ 90 - $selectedAgreement->client_signed_at->diffInDays(now()) }} days</p>
+                                            </div>
+                                        </div>
+                                        <a href="{{ route('client.amc.subscribe', $selectedAgreement) }}" class="px-6 py-3 rounded-xl bg-orange-500 text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all text-center">
+                                            <i class="fas fa-shield-alt mr-2"></i>Subscribe to AMC
+                                        </a>
+                                    </div>
+                                    <div class="mt-4 p-4 bg-white/5 rounded-xl">
+                                        <p class="text-sm text-gray-300 mb-3"><strong>Continue worry-free with our AMC (Annual Maintenance Contract):</strong></p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-400">
+                                            <div><i class="fas fa-check text-green-500 mr-2"></i>24/7 Priority Support</div>
+                                            <div><i class="fas fa-check text-green-500 mr-2"></i>Bug Fixes & Updates</div>
+                                            <div><i class="fas fa-check text-green-500 mr-2"></i>Performance Monitoring</div>
+                                            <div><i class="fas fa-check text-green-500 mr-2"></i>Security Patches</div>
+                                        </div>
+                                        <p class="text-center mt-4 text-lg font-black text-orange-400">Starting from $200/month</p>
+                                    </div>
+                                </div>
+                            @else
+                                <!-- AMC Info - Within warranty period -->
+                                <div class="p-6 bg-gradient-to-r from-gray-500/10 to-gray-600/10 rounded-2xl border border-gray-500/30">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-full bg-gray-500/20 flex items-center justify-center">
+                                            <i class="fas fa-info-circle text-xl text-gray-400"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <h3 class="text-lg font-black text-white uppercase tracking-tight">Free Support Active</h3>
+                                            <p class="text-sm text-gray-400">
+                                                @if($selectedAgreement->client_signed_at)
+                                                    Your complimentary 90-day support ends on {{ $selectedAgreement->client_signed_at->addDays(90)->format('M d, Y') }}
+                                                @else
+                                                    90-day warranty included with your agreement
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <span class="px-4 py-2 rounded-lg bg-green-500/20 text-green-500 text-[10px] font-black uppercase">
+                                            {{ $selectedAgreement->client_signed_at ? (90 - $selectedAgreement->client_signed_at->diffInDays(now())) . ' Days Left' : 'Included' }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @endif
+                        @endif
+
+                        <!-- Signature Section -->
+                        @if(!$selectedAgreement->isSigned())
+                            <div class="p-8 bg-gradient-to-r from-electric-blue/10 to-electric-violet/10 rounded-3xl border border-electric-blue/30">
+                                <h3 class="text-xl font-black text-white uppercase tracking-tight mb-6">Sign Agreement</h3>
+                                <p class="text-gray-400 text-sm mb-6">By signing this agreement, you agree to all terms and conditions outlined above. Please type your full name as your digital signature.</p>
+                                
+                                @if(session()->has('agreement_success'))
+                                    <div class="p-4 rounded-xl bg-green-500/20 text-green-500 mb-6">
+                                        <i class="fas fa-check-circle mr-2"></i>{{ session('agreement_success') }}
+                                    </div>
+                                @endif
+
+                                <form wire:submit.prevent="signAgreement" class="space-y-4">
+                                    <div>
+                                        <input type="text" wire:model="signatureData" placeholder="Type your full name as signature..." 
+                                            class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white text-lg">
+                                        @error('signatureData') <span class="text-red-500 text-sm mt-2 block">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div class="flex gap-4">
+                                        <button type="submit" class="flex-1 px-8 py-4 rounded-2xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+                                            <i class="fas fa-signature mr-2"></i>Sign Agreement
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        @else
+                            <div class="p-8 bg-green-500/10 rounded-3xl border border-green-500/30">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                                            <i class="fas fa-check-circle text-3xl text-green-500"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-xl font-black text-white uppercase tracking-tight">Agreement Signed</h3>
+                                            <p class="text-gray-400">Signed on {{ $selectedAgreement->client_signed_at?->format('M d, Y • H:i') }}</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" wire:click="viewProjectTracking({{ $selectedAgreement->id }})" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-green-500 to-electric-blue text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all flex items-center cursor-pointer">
+                                        <i class="fas fa-chart-line mr-2"></i>Track Project
+                                    </button>
+                                </div>
+                                @if($selectedAgreement->client_signature_data)
+                                    <div class="mt-6 p-6 bg-white/5 rounded-2xl">
+                                        <p class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Client Signature</p>
+                                        <p class="text-lg text-electric-blue font-bold">{{ $selectedAgreement->client_signature_data }}</p>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @elseif($showProjectTracking && $selectedAgreement)
+                <!-- Project Tracking View -->
+                <div class="glass rounded-[3rem] border border-white/10 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div class="p-8 bg-gradient-to-r from-green-500/20 to-electric-blue/20 border-b border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <button type="button" wire:click="closeProjectTracking()" class="mb-4 text-[10px] font-black text-electric-blue uppercase tracking-widest flex items-center hover:translate-x-[-4px] transition-all cursor-pointer">
+                                <i class="fas fa-arrow-left mr-2"></i> Back to Agreement
+                            </button>
+                            <h2 class="text-2xl font-black text-white uppercase tracking-tight">Project Tracking</h2>
+                            <p class="text-gray-400 mt-1">{{ $selectedAgreement->project_name }}</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Overall Progress</p>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-32 h-3 bg-white/10 rounded-full overflow-hidden">
+                                        @php
+                                            $totalTasks = $selectedAgreement->tasks->count();
+                                            $completedTasks = $selectedAgreement->tasks->where('status', 'completed')->count();
+                                            $progress = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0;
+                                        @endphp
+                                        <div class="h-full bg-gradient-to-r from-green-500 to-electric-blue rounded-full" style="width: {{ $progress }}%"></div>
+                                    </div>
+                                    <span class="text-lg font-black text-white">{{ $progress }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-8 space-y-8">
+                        <!-- Progress Stats -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="p-6 glass rounded-2xl border border-white/10 text-center">
+                                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Total Tasks</p>
+                                <p class="text-3xl font-black text-white">{{ $selectedAgreement->tasks->count() }}</p>
+                            </div>
+                            <div class="p-6 glass rounded-2xl border border-white/10 text-center">
+                                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Completed</p>
+                                <p class="text-3xl font-black text-green-500">{{ $selectedAgreement->tasks->where('status', 'completed')->count() }}</p>
+                            </div>
+                            <div class="p-6 glass rounded-2xl border border-white/10 text-center">
+                                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">In Progress</p>
+                                <p class="text-3xl font-black text-blue-500">{{ $selectedAgreement->tasks->where('status', 'in_progress')->count() }}</p>
+                            </div>
+                            <div class="p-6 glass rounded-2xl border border-white/10 text-center">
+                                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Pending</p>
+                                <p class="text-3xl font-black text-yellow-500">{{ $selectedAgreement->tasks->where('status', 'pending')->count() }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Tasks by Status -->
+                        @if($selectedAgreement->tasks->count() > 0)
+                            <div class="space-y-4">
+                                <h3 class="text-sm font-black text-white uppercase tracking-widest">Task Progress</h3>
+                                <div class="space-y-3">
+                                    @foreach($selectedAgreement->tasks as $task)
+                                        <div class="p-4 glass rounded-2xl border border-white/10">
+                                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div class="flex-1">
+                                                    <div class="flex items-center gap-3 mb-2">
+                                                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black
+                                                            {{ $task->status == 'completed' ? 'bg-green-500/20 text-green-500' : ($task->status == 'in_progress' ? 'bg-blue-500/20 text-blue-500' : 'bg-yellow-500/20 text-yellow-500') }}">
+                                                            @if($task->status == 'completed')
+                                                                <i class="fas fa-check"></i>
+                                                            @elseif($task->status == 'in_progress')
+                                                                <i class="fas fa-spinner fa-spin"></i>
+                                                            @else
+                                                                <i class="fas fa-clock"></i>
+                                                            @endif
+                                                        </span>
+                                                        <h4 class="font-bold text-white">{{ $task->task_name }}</h4>
+                                                        <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest
+                                                            {{ $task->priority == 'high' ? 'bg-red-500/20 text-red-500' : ($task->priority == 'medium' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-gray-500/20 text-gray-400') }}">
+                                                            {{ $task->priority }}
+                                                        </span>
+                                                    </div>
+                                                    @if($task->description)
+                                                        <p class="text-sm text-gray-400 ml-11">{{ $task->description }}</p>
+                                                    @endif
+                                                    <div class="flex items-center gap-4 ml-11 mt-2">
+                                                        @if($task->assigned_to)
+                                                            <span class="text-[10px] text-gray-500"><i class="fas fa-user mr-1"></i> {{ $task->assigned_to }}</span>
+                                                        @endif
+                                                        @if($task->due_date)
+                                                            <span class="text-[10px] {{ $task->isOverdue() ? 'text-red-500' : 'text-gray-500' }}">
+                                                                <i class="fas fa-calendar mr-1"></i> Due: {{ $task->due_date->format('M d, Y') }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="w-24 h-2 bg-white/10 rounded-full overflow-hidden mb-2">
+                                                        <div class="h-full bg-gradient-to-r from-electric-blue to-green-500 rounded-full" style="width: {{ $task->progress_percentage }}%"></div>
+                                                    </div>
+                                                    <p class="text-xs text-gray-400">{{ $task->progress_percentage }}% complete</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @else
+                            <div class="py-12 text-center glass rounded-3xl border border-white/10">
+                                <i class="fas fa-tasks text-4xl text-gray-700 mb-4"></i>
+                                <h3 class="text-lg font-bold text-white uppercase mb-2">No Tasks Yet</h3>
+                                <p class="text-gray-500">Tasks will appear here once the project starts.</p>
+                            </div>
+                        @endif
+
+                        <!-- Milestone Progress -->
+                        @if($selectedAgreement->milestones->count() > 0)
+                            <div class="space-y-4">
+                                <h3 class="text-sm font-black text-white uppercase tracking-widest">Milestone Progress</h3>
+                                <div class="space-y-3">
+                                    @foreach($selectedAgreement->milestones as $milestone)
+                                        <div class="p-4 glass rounded-2xl border border-white/10">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <div class="flex items-center gap-3">
+                                                    <span class="w-8 h-8 rounded-full bg-electric-blue/20 flex items-center justify-center text-electric-blue text-xs font-black">{{ $milestone->timeline_month }}</span>
+                                                    <h4 class="font-bold text-white">{{ $milestone->phase_name }}</h4>
+                                                </div>
+                                                <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest
+                                                    {{ $milestone->status == 'paid' ? 'bg-green-500/20 text-green-500' : ($milestone->status == 'completed' ? 'bg-blue-500/20 text-blue-500' : 'bg-gray-500/20 text-gray-400') }}">
+                                                    {{ $milestone->status }}
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center justify-between">
+                                                <p class="text-sm text-gray-400">{{ $milestone->description }}</p>
+                                                <p class="text-lg font-black text-white">${{ number_format($milestone->payment_amount, 2) }}</p>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @else
+                <!-- Agreements List -->
+                @if($agreements->count() > 0)
+                    <div class="grid grid-cols-1 gap-6">
+                        @foreach($agreements as $agreement)
+                            <div wire:click="viewAgreement({{ $agreement->id }})" class="p-8 glass rounded-[2.5rem] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-electric-blue/30 transition-all cursor-pointer group">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-3 mb-2">
+                                        <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest {{ $agreement->status == 'signed' ? 'bg-green-500/20 text-green-500' : ($agreement->status == 'sent' ? 'bg-blue-500/20 text-blue-500' : 'bg-gray-500/20 text-gray-400') }}">
+                                            {{ $agreement->status_label }}
+                                        </span>
+                                        <span class="text-[10px] font-black text-gray-500 uppercase tracking-widest">#{{ $agreement->agreement_number }}</span>
+                                    </div>
+                                    <h3 class="text-xl font-black text-white uppercase tracking-tight mb-2 group-hover:text-electric-blue transition-colors">{{ $agreement->title }}</h3>
+                                    <p class="text-gray-400 text-sm">{{ $agreement->project_name }}</p>
+                                    <div class="flex items-center gap-4 mt-4">
+                                        <span class="text-[10px] font-bold text-gray-500">{{ $agreement->timeline_months }} months timeline</span>
+                                        <span class="text-[10px] font-bold text-electric-blue">{{ $agreement->formatted_total }}</span>
+                                        @if($agreement->isPending())
+                                            <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-500/20 text-yellow-500 animate-pulse">
+                                                Action Required
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right hidden md:block">
+                                        <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Sent On</p>
+                                        <p class="text-white text-xs font-bold">{{ $agreement->sent_at?->format('M d, Y') ?? $agreement->created_at->format('M d, Y') }}</p>
+                                    </div>
+                                    <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-electric-blue group-hover:text-dark transition-all">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="py-20 text-center glass rounded-[3rem]">
+                        <i class="fas fa-file-signature text-5xl text-gray-800 mb-6"></i>
+                        <h3 class="text-2xl font-black text-white uppercase mb-2">No Agreements Yet</h3>
+                        <p class="text-gray-500">Your service agreements will appear here once they're ready.</p>
+                    </div>
+                @endif
+
+                <!-- Portfolio & Success Stories -->
+                <div class="mt-12 pt-12 border-t border-white/10">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 class="text-2xl font-black text-white uppercase tracking-tight">Our Success Stories</h3>
+                            <p class="text-gray-400 text-sm mt-1">Explore our portfolio of completed projects</p>
+                        </div>
+                        <a href="{{ route('portfolio.index') }}" class="text-[10px] font-black text-electric-blue uppercase tracking-widest hover:underline">
+                            View All <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        @forelse($portfolioItems as $portfolio)
+                            <div class="glass rounded-3xl border border-white/10 overflow-hidden group hover:border-electric-blue/30 transition-all">
+                                <div class="h-48 bg-gradient-to-br {{ $portfolio->gradient_from ?? 'from-electric-blue/20' }} {{ $portfolio->gradient_to ?? 'to-electric-violet/20' }} flex items-center justify-center relative overflow-hidden">
+                                    <i class="fas {{ $portfolio->icon ?? 'fa-briefcase' }} text-6xl text-electric-blue/50 group-hover:scale-110 transition-transform"></i>
+                                    <div class="absolute top-4 right-4 px-3 py-1 rounded-full bg-green-500/20 text-green-500 text-[10px] font-black uppercase">
+                                        {{ ucfirst($portfolio->status) }}
+                                    </div>
+                                </div>
+                                <div class="p-6">
+                                    <h4 class="font-bold text-white text-lg mb-2">{{ $portfolio->title }}</h4>
+                                    <p class="text-gray-400 text-sm mb-4">{!! strip_tags($portfolio->description) !!}</p>
+                                    @if(!empty($portfolio->tech_stack))
+                                        <div class="flex items-center gap-3 flex-wrap">
+                                            @foreach($portfolio->tech_stack as $tech)
+                                                <span class="px-2 py-1 rounded bg-white/5 text-[10px] text-gray-400">{{ $tech['name'] ?? $tech }}</span>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <div class="col-span-3 py-12 text-center text-gray-500">
+                                <i class="fas fa-briefcase text-4xl mb-4"></i>
+                                <p>No portfolio items available.</p>
+                            </div>
+                        @endforelse
+                    </div>
+
+                    <!-- Testimonials -->
+                    <div class="mt-12">
+                        <h3 class="text-xl font-black text-white uppercase tracking-tight mb-6">Client Testimonials</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            @forelse($testimonials as $testimonial)
+                                <div class="p-6 glass rounded-2xl border border-white/10">
+                                    <div class="flex items-center gap-4 mb-4">
+                                        <div class="w-12 h-12 rounded-full bg-electric-blue/20 flex items-center justify-center overflow-hidden">
+                                            @if($testimonial->image)
+                                                <img src="{{ Storage::url($testimonial->image) }}" alt="{{ $testimonial->name }}" class="w-full h-full object-cover">
+                                            @else
+                                                <i class="fas fa-user text-electric-blue"></i>
+                                            @endif
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-white">{{ $testimonial->name }}</p>
+                                            <p class="text-[10px] text-gray-500">{{ $testimonial->title }}{{ $testimonial->company ? ', ' . $testimonial->company : '' }}</p>
+                                        </div>
+                                    </div>
+                                    <p class="text-gray-400 text-sm italic">"{{ $testimonial->content }}"</p>
+                                    <div class="flex items-center gap-1 mt-4">
+                                        @for($i = 0; $i < 5; $i++)
+                                            <i class="fas fa-star {{ $i < $testimonial->rating ? 'text-yellow-500' : 'text-gray-600' }} text-xs"></i>
+                                        @endfor
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="col-span-2 py-12 text-center text-gray-500">
+                                    <i class="fas fa-comments text-4xl mb-4"></i>
+                                    <p>No testimonials available.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+        </div>
+
+    <!-- Agreement Request Modal — inside root div, hidden via x-show -->
+    <div
+        x-data="{ open: $wire.entangle('isAgreementRequestModalOpen') }"
+        x-show="open"
+        x-cloak
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+        @click.self="$wire.closeAgreementRequestModal()"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+    >
+        <div class="w-full max-w-2xl glass rounded-[3rem] border border-white/10 overflow-hidden" @click.stop>
+                <div class="p-8 bg-gradient-to-r from-electric-blue/20 to-electric-violet/20 border-b border-white/10 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-black text-white uppercase tracking-tight">New Project Request</h2>
+                        <p class="text-gray-400 text-sm mt-1">Tell us about your project requirements</p>
+                    </div>
+                    <button type="button" wire:click="closeAgreementRequestModal()" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all cursor-pointer">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <form wire:submit.prevent="createAgreementRequest" class="p-8 space-y-6">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">Project Name</label>
+                        <input type="text" wire:model="projectName" placeholder="e.g., E-commerce Mobile App" 
+                            class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white">
+                        @error('projectName') <span class="text-red-500 text-sm mt-2 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">Project Description</label>
+                        <textarea wire:model="projectDescription" rows="4" placeholder="Describe your project, goals, and what you want to achieve..." 
+                            class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white resize-none"></textarea>
+                        @error('projectDescription') <span class="text-red-500 text-sm mt-2 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">Specific Requirements</label>
+                        <textarea wire:model="requirements" rows="3" placeholder="List any specific features, integrations, or technical requirements..." 
+                            class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white resize-none"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">Budget Range</label>
+                            <input type="text" wire:model="budgetRange" placeholder="e.g., $5,000 - $10,000" 
+                                class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">Expected Timeline</label>
+                            <input type="text" wire:model="timelineExpectation" placeholder="e.g., 3-4 months" 
+                                class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">Preferred Technology</label>
+                            <input type="text" wire:model="preferredTechnology" placeholder="e.g., React Native, Laravel" 
+                                class="w-full px-6 py-4 rounded-2xl bg-white/5 border border-white/10 focus:border-electric-blue outline-none transition-all text-white">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-4 pt-4 border-t border-white/10">
+                        <button type="button" wire:click="closeAgreementRequestModal()" class="px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-gray-400 hover:text-white transition-all cursor-pointer">Cancel</button>
+                        <button type="submit" class="px-8 py-4 rounded-2xl bg-electric-blue text-dark font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+                            <i class="fas fa-paper-plane mr-2"></i>Submit Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    </div>{{-- end root div --}}

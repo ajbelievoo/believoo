@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../ghc"
+		}
+	],
+	"settings": {},
+	"workbenchMode": "windsurf-agent-window"
+}
