@@ -24,7 +24,7 @@ const size = document.getElementById('size');
 const clearBtn = document.getElementById('clearBtn');
 const saveBtn = document.getElementById('saveBtn');
 let drawing = false;
-let strokes = {{ $board->data ?? '[]' }};
+let strokes = @json($board->data ?? []);
 
 function resize() {
     canvas.width = canvas.parentElement.clientWidth;

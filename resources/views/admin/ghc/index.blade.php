@@ -174,6 +174,7 @@
         'settings' => ['Settings','fa-cog'],
         'credentials' => ['Credentials','fa-key'],
         'logs' => ['Logs','fa-list-alt'],
+        'system' => ['System Health','fa-heartbeat'],
     ]; @endphp
     @foreach($tabs as $key => $item)
         <a href="{{ route('admin.ghc.index', ['tab' => $key]) }}" class="ghc-tab {{ $tab === $key ? 'active' : '' }}">
@@ -572,6 +573,49 @@
                     <td><span class="ghc-badge ghc-badge-{{ strtolower($l->type) }}">{{ $l->type }}</span></td>
                     <td>{{ $l->message }}</td>
                     <td>{{ \Carbon\Carbon::parse($l->created_at)->format('d M Y H:i') }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
+{{-- ===== SYSTEM HEALTH ===== --}}
+@if($tab === 'system')
+<div class="ghc-grid-4" style="margin-bottom:24px;">
+    <div class="ghc-stat">
+        <div class="ghc-stat-icon" style="background:rgba(34,197,94,0.12);color:#22c55e;"><i class="fas fa-check-circle"></i></div>
+        <div><div style="font-size:1.4rem;font-weight:800;color:#f8fafc;">{{ ucfirst($system['overall'] ?? 'unknown') }}</div><div style="font-size:0.8rem;color:#64748b;">Overall Status</div></div>
+    </div>
+    <div class="ghc-stat">
+        <div class="ghc-stat-icon" style="background:rgba(0,183,255,0.12);color:#00b7ff;"><i class="fas fa-server"></i></div>
+        <div><div style="font-size:1.4rem;font-weight:800;color:#f8fafc;">{{ count($system['services'] ?? []) }}</div><div style="font-size:0.8rem;color:#64748b;">Monitored Services</div></div>
+    </div>
+    <div class="ghc-stat">
+        <div class="ghc-stat-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i class="fas fa-clock"></i></div>
+        <div><div style="font-size:1.4rem;font-weight:800;color:#f8fafc;">{{ isset($system['updatedAt']) ? \Carbon\Carbon::parse($system['updatedAt'])->format('H:i:s') : '—' }}</div><div style="font-size:0.8rem;color:#64748b;">Last Checked</div></div>
+    </div>
+</div>
+
+<div class="ghc-card">
+    <div class="ghc-card-header"><h3><i class="fas fa-heartbeat" style="color:#00b7ff;margin-right:8px;"></i>Public Services</h3></div>
+    <div style="overflow-x:auto;">
+        <table class="ghc-table">
+            <thead><tr><th>Service</th><th>Status</th></tr></thead>
+            <tbody>
+                @foreach($system['services'] ?? [] as $s)
+                <tr>
+                    <td style="font-weight:600;">{{ $s['name'] }}</td>
+                    <td>
+                        @if($s['status'] === 'operational')
+                            <span class="ghc-badge ghc-badge-active">Operational</span>
+                        @elseif($s['status'] === 'degraded')
+                            <span class="ghc-badge ghc-badge-pending">Degraded</span>
+                        @else
+                            <span class="ghc-badge ghc-badge-failed">Outage</span>
+                        @endif
+                    </td>
                 </tr>
                 @endforeach
             </tbody>

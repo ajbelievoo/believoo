@@ -7,6 +7,9 @@
     <div class="bg-slate-900 p-6 rounded-xl border border-slate-800"><div class="text-2xl font-black text-pink-400">{{ $invoices->count() }}</div><div class="text-slate-400 text-sm">Total Invoices</div></div>
     <div class="bg-slate-900 p-6 rounded-xl border border-slate-800"><div class="text-2xl font-black text-green-400">{{ ucfirst($company->plan) }}</div><div class="text-slate-400 text-sm">Current Plan</div></div>
 </div>
+<div class="flex justify-end mb-4">
+    <a href="{{ route('bconnect.billing.upgrade') }}" class="px-4 py-2 bg-cyan-500 text-slate-900 font-bold rounded-lg hover:bg-cyan-400"><i class="fas fa-arrow-up mr-2"></i>Upgrade Plan</a>
+</div>
 <div class="grid grid-cols-3 gap-6">
     <div class="col-span-2 bg-slate-900 rounded-xl border border-slate-800 p-6">
         <h3 class="font-bold mb-4">Invoices</h3>

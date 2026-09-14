@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class MemberController extends Controller {
+    protected $roles = ['super_admin', 'company_admin', 'manager', 'developer', 'client'];
+
     public function index(Request $r) {
         $members = Member::with('user')->where('company_id', $r->input('bconnect_company_id'))->paginate(20);
-        $roles = ['company_admin', 'project_manager', 'developer', 'client'];
+        $roles = $this->roles;
         return view('bconnect.members', compact('members', 'roles'));
     }
 
@@ -20,7 +22,12 @@ class MemberController extends Controller {
         if (!\App\Services\BconnectPlanService::canAddMember($r->input('bconnect_company_id'))) {
             return back()->with('error', 'Member limit reached for your plan. Upgrade to add more.');
         }
-        $data = $r->validate(['name' => 'required', 'email' => 'required|email|unique:users,email', 'role' => 'required', 'permissions' => 'nullable']);
+        $data = $r->validate([
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email',
+            'role' => 'required|in:' . implode(',', $this->roles),
+            'permissions' => 'nullable'
+        ]);
         $password = Str::random(12);
         $user = User::create(['name' => $data['name'], 'email' => $data['email'], 'password' => Hash::make($password)]);
         Member::create([
@@ -46,7 +53,10 @@ class MemberController extends Controller {
         if ($member->company_id != $r->input('bconnect_company_id')) {
             abort(403);
         }
-        $member->update($r->validate(['role' => 'required', 'is_active' => 'boolean']));
+        $member->update($r->validate([
+            'role' => 'required|in:' . implode(',', $this->roles),
+            'is_active' => 'sometimes|boolean'
+        ]));
         return back()->with('success', 'Member updated');
     }
 

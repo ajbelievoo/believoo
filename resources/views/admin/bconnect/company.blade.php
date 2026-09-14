@@ -84,7 +84,7 @@
     </div>
 </div>
 
-<div class="bc-card">
+<div class="bc-card" style="margin-bottom:24px;">
     <div class="bc-detail">
         <div class="bc-detail-icon" style="background:rgba(0,183,255,0.12);color:#00b7ff;"><i class="fas fa-id-card"></i></div>
         <div>
@@ -108,5 +108,74 @@
             </div>
         </div>
     </div>
+    <div class="bc-detail">
+        <div class="bc-detail-icon" style="background:rgba(245,158,11,0.12);color:#f59e0b;"><i class="fas fa-calendar"></i></div>
+        <div>
+            <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;">Plan Expires</div>
+            <div style="font-weight:700;font-size:1rem;color:var(--text-primary);margin-top:4px;">{{ $company->plan_expires_at ? $company->plan_expires_at->format('Y-m-d H:i') : '—' }}</div>
+        </div>
+    </div>
 </div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;">
+    <div class="bc-card" style="padding:20px;">
+        <h3 style="margin:0 0 16px;font-size:1.05rem;font-weight:700;">Actions</h3>
+
+        <form method="POST" action="{{ route('admin.bconnect.company.plan', $company) }}" style="margin-bottom:16px;">@csrf @method('PUT')
+            <div style="margin-bottom:8px;font-size:0.8rem;color:#64748b;">Plan</div>
+            <div style="display:flex;gap:8px;">
+                <select name="plan" class="form-control" style="flex:1;">
+                    <option value="free" {{ $company->plan == 'free' ? 'selected' : '' }}>Free</option>
+                    <option value="pro" {{ $company->plan == 'pro' ? 'selected' : '' }}>Pro</option>
+                    <option value="enterprise" {{ $company->plan == 'enterprise' ? 'selected' : '' }}>Enterprise</option>
+                </select>
+            </div>
+            <div style="margin-top:12px;">
+                <div style="font-size:0.8rem;color:#64748b;margin-bottom:4px;">Plan Expires At</div>
+                <input type="datetime-local" name="plan_expires_at" value="{{ $company->plan_expires_at ? $company->plan_expires_at->format('Y-m-d\TH:i') : '' }}" class="form-control" style="width:100%;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:12px;">Update Plan</button>
+        </form>
+
+        <form method="POST" action="{{ route('admin.bconnect.company.toggle', $company) }}" style="display:inline;">@csrf @method('PUT')
+            <button type="submit" class="btn {{ $company->is_active ? 'btn-danger' : 'btn-success' }} btn-sm" onclick="return confirm('{{ $company->is_active ? 'Suspend' : 'Activate' }} this company?')">
+                {{ $company->is_active ? 'Suspend Company' : 'Activate Company' }}
+            </button>
+        </form>
+
+        @if($company->domain)
+        <form method="POST" action="{{ route('admin.bconnect.company.domain', $company) }}" style="display:inline;margin-left:8px;">@csrf
+            <button type="submit" class="btn btn-info btn-sm" onclick="return confirm('Apply vhost for {{ $company->domain }}?')">Apply Domain</button>
+        </form>
+        @endif
+    </div>
+
+    <div class="bc-card" style="padding:20px;">
+        <h3 style="margin:0 0 16px;font-size:1.05rem;font-weight:700;">Notify Admins</h3>
+        <form method="POST" action="{{ route('admin.bconnect.company.notify', $company) }}">@csrf
+            <input type="text" name="title" placeholder="Title" class="form-control" style="width:100%;margin-bottom:10px;" required>
+            <textarea name="message" rows="3" placeholder="Message" class="form-control" style="width:100%;margin-bottom:10px;" required></textarea>
+            <button type="submit" class="btn btn-primary btn-sm">Send Notification</button>
+        </form>
+    </div>
+</div>
+
+@if($invoices->count())
+<div class="bc-card" style="margin-top:24px;padding:20px;">
+    <h3 style="margin:0 0 16px;font-size:1.05rem;font-weight:700;">Recent Invoices</h3>
+    <table class="table table-sm table-striped">
+        <thead><tr><th>Number</th><th>Amount</th><th>Status</th><th>Created</th></tr></thead>
+        <tbody>
+            @foreach($invoices as $i)
+            <tr>
+                <td>{{ $i->invoice_number }}</td>
+                <td>₹{{ number_format($i->amount, 2) }}</td>
+                <td><span class="badge bg-{{ $i->status == 'paid' ? 'success' : 'warning' }}">{{ ucfirst($i->status) }}</span></td>
+                <td>{{ $i->created_at->format('Y-m-d') }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
 @endsection

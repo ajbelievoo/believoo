@@ -12,10 +12,13 @@ class BconnectAudit
     {
         $response = $next($request);
 
-        if ($request->input('bconnect_company_id') && in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+        $companyId = $request->input('bconnect_company_id');
+        $memberId = optional($request->input('bconnect_member'))->id;
+
+        if ($companyId && $memberId && in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
             AuditLog::create([
-                'company_id' => $request->input('bconnect_company_id'),
-                'member_id' => optional($request->input('bconnect_member'))->id ?: 0,
+                'company_id' => $companyId,
+                'member_id' => $memberId,
                 'action' => $request->route()?->getName() ?: 'unknown',
                 'ip_address' => $request->ip(),
                 'details' => json_encode(['url' => $request->fullUrl(), 'method' => $request->method()]),

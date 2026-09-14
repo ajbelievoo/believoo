@@ -15,6 +15,12 @@ class BconnectAuth
             return redirect()->route('bconnect.login');
         }
 
+        // Allow the company setup flow to run even when no company exists yet.
+        $route = $request->route()?->getName();
+        if (in_array($route, ['bconnect.company.setup', 'bconnect.company.store'])) {
+            return $next($request);
+        }
+
         $user = Auth::user();
         $companyId = session('bconnect_company_id');
 

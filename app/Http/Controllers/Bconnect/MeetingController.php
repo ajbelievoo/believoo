@@ -5,6 +5,7 @@ use App\Models\Bconnect\Meeting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class MeetingController extends Controller {
     public function index(Request $r) {
@@ -19,7 +20,10 @@ class MeetingController extends Controller {
         if (!\App\Services\BconnectPlanService::canCreateMeeting($r->input('bconnect_company_id'))) {
             return back()->with('error', 'Meeting limit reached for your plan. Upgrade to Pro/Enterprise.');
         }
-        $data = $r->validate(['title' => 'required', 'project_id' => 'nullable|exists:bconnect_projects,id']);
+        $data = $r->validate([
+            'title' => 'required',
+            'project_id' => ['nullable', Rule::exists('bconnect_projects', 'id')->where('company_id', $r->input('bconnect_company_id'))],
+        ]);
         $room = 'bc-' . uniqid();
         $meeting = Meeting::create([
             'company_id' => $r->input('bconnect_company_id'),

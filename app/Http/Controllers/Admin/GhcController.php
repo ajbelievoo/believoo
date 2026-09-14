@@ -71,10 +71,11 @@ class GhcController extends Controller
         $brand = $this->ghcApiGet('/admin/brand');
         $settings = $this->ghcApiGet('/admin/settings');
         $credentials = $this->ghcApiGet('/admin/credentials');
+        $system = $this->ghcApiGet('/public/status');
 
         return view('admin.ghc.index', compact(
             'tab', 'stats', 'orders', 'subscriptions', 'domains', 'tickets', 'users', 'payments', 'logs',
-            'catalog', 'tlds', 'margins', 'brand', 'settings', 'credentials'
+            'catalog', 'tlds', 'margins', 'brand', 'settings', 'credentials', 'system'
         ));
     }
 

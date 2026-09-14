@@ -11,9 +11,18 @@ class BconnectRole
 
     public function handle(Request $request, Closure $next, $role)
     {
-        if (!in_array($request->input('bconnect_role'), explode('|', $role))) {
+        $userRole = $request->input('bconnect_role');
+        $allowed = explode('|', $role);
+
+        // Super admins and global admins bypass role checks.
+        if ($userRole === 'super_admin' || $userRole === 'admin') {
+            return $next($request);
+        }
+
+        if (!in_array($userRole, $allowed)) {
             abort(403, 'Access denied. Required role: ' . $role);
         }
+
         return $next($request);
     }
 }

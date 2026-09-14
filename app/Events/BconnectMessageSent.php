@@ -30,6 +30,7 @@ class BconnectMessageSent implements ShouldBroadcast
         return [
             'id' => $this->message->id,
             'message' => $this->message->message,
+            'attachments' => $this->message->attachments ?? [],
             'member_id' => $this->message->member_id,
             'member' => ['name' => $this->message->member->user->name],
             'created_at' => $this->message->created_at->format('H:i'),

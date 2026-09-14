@@ -128,3 +128,9 @@ Schedule::command('announcement:evaluate-ab')
     ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/evaluate-ab-tests.log'));
+
+// Downgrade expired B-CONNECT plans daily at 04:00
+Schedule::command('bconnect:plan-expiry')
+    ->dailyAt('04:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/bconnect-plan-expiry.log'));

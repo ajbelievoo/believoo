@@ -14,7 +14,14 @@ class BconnectPlanService {
     public static function check($companyId, $feature) {
         $company = Company::find($companyId);
         if (!$company) return false;
-        $plan = self::$limits[$company->plan] ?? self::$limits['free'];
+
+        // Treat paid plans as free once they expire (until renewal).
+        $planName = $company->plan;
+        if ($planName !== 'free' && $company->plan_expires_at && $company->plan_expires_at->isPast()) {
+            $planName = 'free';
+        }
+
+        $plan = self::$limits[$planName] ?? self::$limits['free'];
         if (is_bool($plan[$feature] ?? false)) return $plan[$feature];
         return $plan[$feature] ?? 0;
     }

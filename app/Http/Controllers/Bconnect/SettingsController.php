@@ -12,7 +12,17 @@ class SettingsController extends Controller {
 
     public function update(Request $r) {
         $company = Company::findOrFail($r->input('bconnect_company_id'));
-        $company->update($r->validate(['name' => 'required', 'plan' => 'required']));
+        $data = $r->validate([
+            'name' => 'required',
+            'plan' => 'required|in:free,pro,enterprise',
+            'is_active' => 'sometimes|boolean'
+        ]);
+
+        if (!array_key_exists('is_active', $data)) {
+            $data['is_active'] = $company->is_active;
+        }
+
+        $company->update($data);
         return back()->with('success', 'Settings saved');
     }
 }

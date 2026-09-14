@@ -10,6 +10,7 @@ use App\Services\NotifyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class TicketController extends Controller {
     public function index(Request $r) {
@@ -30,7 +31,13 @@ class TicketController extends Controller {
         if (!\App\Services\BconnectPlanService::canCreateTicket($r->input('bconnect_company_id'))) {
             return back()->with('error', 'Ticket limit reached for your plan. Upgrade to Pro/Enterprise.');
         }
-        $data = $r->validate(['project_id' => 'required|exists:bconnect_projects,id', 'title' => 'required', 'description' => 'required', 'type' => 'required', 'priority' => 'required']);
+        $data = $r->validate([
+            'project_id' => ['required', Rule::exists('bconnect_projects', 'id')->where('company_id', $r->input('bconnect_company_id'))],
+            'title' => 'required',
+            'description' => 'required',
+            'type' => 'required|in:bug,feature,task,question',
+            'priority' => 'required|in:low,medium,high,critical',
+        ]);
         $attachments = [];
         if ($r->hasFile('attachments')) {
             foreach ($r->file('attachments') as $file) {
@@ -149,7 +156,7 @@ class TicketController extends Controller {
 
     public function updateStatus(Request $r, Ticket $ticket) {
         if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
-        $ticket->update($r->validate(['status' => 'required']));
+        $ticket->update($r->validate(['status' => 'required|in:open,in_progress,resolved,closed,reopened']));
         if ($ticket->status == 'resolved') $ticket->update(['resolved_at' => now()]);
         return back()->with('success', 'Status updated');
     }
