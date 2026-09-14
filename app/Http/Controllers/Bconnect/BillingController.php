@@ -1,92 +1,82 @@
 <?php
+
 namespace App\Http\Controllers\Bconnect;
+
 use App\Http\Controllers\Controller;
+use App\Mail\BconnectInvoiceMail;
 use App\Models\Bconnect\Company;
 use App\Models\Bconnect\Invoice;
+use App\Models\Bconnect\Member;
 use App\Models\Bconnect\Notification;
 use App\Models\Setting;
+use App\Services\BconnectInvoicePdfService;
+use App\Services\BconnectSubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Razorpay\Api\Api;
 
-class BillingController extends Controller {
-    public static $plans = [
-        'free' => ['name' => 'Free', 'price' => 0, 'members' => 2, 'calls' => '1-on-1', 'remote' => false, 'ai' => false],
-        'pro' => ['name' => 'Pro / Developer', 'price' => 1999, 'members' => 10, 'calls' => 'Unlimited', 'remote' => true, 'ai' => false],
-        'enterprise' => ['name' => 'Enterprise / Business', 'price' => 9999, 'members' => null, 'calls' => 'Unlimited', 'remote' => true, 'ai' => true],
-    ];
+class BillingController extends Controller
+{
+    public static $plans;
+
+    public function __construct()
+    {
+        self::$plans = BconnectSubscriptionService::$plans;
+    }
 
     public function index(Request $r) {
         $company = Company::findOrFail($r->input('bconnect_company_id'));
         $invoices = Invoice::where('company_id', $company->id)->latest()->paginate(20);
-        return view('bconnect.billing', compact('company', 'invoices'));
+        $status = BconnectSubscriptionService::status($company);
+        $days = BconnectSubscriptionService::daysUntilExpiry($company);
+        return view('bconnect.billing', compact('company', 'invoices', 'status', 'days'));
     }
 
     public function upgrade(Request $r) {
         $company = Company::findOrFail($r->input('bconnect_company_id'));
-        return view('bconnect.upgrade', ['company' => $company, 'plans' => self::$plans]);
+        return view('bconnect.upgrade', ['company' => $company, 'plans' => BconnectSubscriptionService::$plans]);
     }
 
     public function processUpgrade(Request $r) {
         $company = Company::findOrFail($r->input('bconnect_company_id'));
-        $data = $r->validate(['plan' => 'required|in:pro,enterprise', 'billing_cycle' => 'nullable|in:monthly,yearly']);
+        $data = $r->validate([
+            'plan' => 'required|in:pro,enterprise',
+            'billing_cycle' => 'nullable|in:monthly,yearly',
+        ]);
+
         $plan = $data['plan'];
         $cycle = $data['billing_cycle'] ?? 'monthly';
 
-        if (!isset(self::$plans[$plan])) {
+        if (!BconnectSubscriptionService::isPaidPlan($plan)) {
             return back()->with('error', 'Invalid plan selected.');
         }
 
-        $basePrice = self::$plans[$plan]['price'];
-        $multiplier = $cycle === 'yearly' ? 10 : 1;
-        $amount = $basePrice * $multiplier;
+        $price = BconnectSubscriptionService::planPrice($plan, $cycle);
 
-        $inv = Invoice::create([
+        $invoice = Invoice::create([
             'company_id' => $company->id,
             'client_id' => $r->input('bconnect_member')->id,
             'invoice_number' => 'BCU-' . strtoupper(uniqid()),
-            'amount' => $amount,
+            'amount' => $price,
             'currency' => 'INR',
             'status' => 'pending',
-            'description' => "B-CONNECT {$cycle} plan upgrade to " . self::$plans[$plan]['name'],
+            'description' => "B-CONNECT {$cycle} plan upgrade to " . BconnectSubscriptionService::$plans[$plan]['name'],
             'metadata' => [
                 'plan_upgrade' => $plan,
                 'billing_cycle' => $cycle,
             ],
         ]);
 
-        return redirect()->route('bconnect.billing.pay', $inv->id)->with('info', 'Please complete payment to activate the plan.');
-    }
-
-    protected function applyPlanUpgrade(Invoice $invoice) {
-        $plan = $invoice->metadata['plan_upgrade'] ?? null;
-        if (!$plan || !isset(self::$plans[$plan])) {
-            return;
+        try {
+            Mail::to($r->input('bconnect_member')->user->email)->send(new BconnectInvoiceMail($invoice, 'created'));
+        } catch (\Throwable $e) {
+            Log::warning('B-Connect invoice creation email failed: ' . $e->getMessage());
         }
 
-        $company = Company::find($invoice->company_id);
-        if (!$company) {
-            return;
-        }
-
-        $cycle = $invoice->metadata['billing_cycle'] ?? 'monthly';
-        $months = $cycle === 'yearly' ? 12 : 1;
-
-        $company->update([
-            'plan' => $plan,
-            'plan_expires_at' => now()->addMonths($months)->endOfDay(),
-        ]);
-
-        Notification::create([
-            'company_id' => $company->id,
-            'member_id' => $invoice->client_id ?: 0,
-            'type' => 'billing',
-            'title' => 'Plan upgraded',
-            'message' => 'Your workspace has been upgraded to ' . self::$plans[$plan]['name'] . ' for ' . $months . ' month(s).',
-            'url' => route('bconnect.billing'),
-        ]);
+        return redirect()->route('bconnect.billing.pay', $invoice->id)->with('info', 'Please complete payment to activate the plan.');
     }
 
     public function storeInvoice(Request $r) {
@@ -99,7 +89,10 @@ class BillingController extends Controller {
             'amount' => 'required|numeric|min:0',
             'description' => 'required',
         ]);
+
         $company = Company::findOrFail($companyId);
+        $client = Member::with('user')->findOrFail($data['client_id']);
+
         $inv = Invoice::create([
             'company_id' => $company->id,
             'client_id' => $data['client_id'],
@@ -109,6 +102,15 @@ class BillingController extends Controller {
             'status' => 'pending',
             'description' => $data['description'],
         ]);
+
+        try {
+            if ($client->user?->email) {
+                Mail::to($client->user->email)->send(new BconnectInvoiceMail($inv, 'created'));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('B-Connect invoice creation email failed: ' . $e->getMessage());
+        }
+
         return redirect()->route('bconnect.billing')->with('success', 'Invoice #' . $inv->invoice_number . ' created');
     }
 
@@ -124,13 +126,13 @@ class BillingController extends Controller {
                 'currency' => strtoupper($inv->currency ?? 'INR'),
                 'payment_capture' => 1,
             ]);
-            $inv->update(['metadata' => ['razorpay_order_id' => $order['id']]]);
+            $inv->update(['metadata' => array_merge($inv->metadata ?? [], ['razorpay_order_id' => $order['id']])]);
             return view('bconnect.payment.razorpay', ['invoice' => $inv, 'order' => $order, 'key' => $settings['razorpay_key_id']]);
         }
 
         if (($settings['cashfree_enabled'] ?? '0') == '1' && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key'])) {
             $orderId = $inv->invoice_number . '-' . time();
-            $inv->update(['metadata' => ['cashfree_order_id' => $orderId]]);
+            $inv->update(['metadata' => array_merge($inv->metadata ?? [], ['cashfree_order_id' => $orderId])]);
 
             $payload = [
                 'appId' => $settings['cashfree_app_id'],
@@ -168,6 +170,15 @@ class BillingController extends Controller {
         return back()->with('error', 'No payment gateway configured. Go to Admin → Settings → Payment.');
     }
 
+    public function downloadInvoice(Request $r, $invoice) {
+        $inv = Invoice::where('id', $invoice)->where('company_id', $r->input('bconnect_company_id'))->firstOrFail();
+        $pdf = BconnectInvoicePdfService::generate($inv);
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="invoice-' . $inv->invoice_number . '.pdf"',
+        ]);
+    }
+
     public function razorpayCallback(Request $request) {
         $settings = Setting::pluck('value', 'key')->toArray();
 
@@ -180,8 +191,16 @@ class BillingController extends Controller {
             $api->utility->verifyPaymentSignature($request->all());
             $inv = Invoice::where('metadata->razorpay_order_id', $request->razorpay_order_id)->firstOrFail();
             $inv->update(['status' => 'paid', 'paid_at' => now()]);
-            $this->applyPlanUpgrade($inv);
+
+            if ($inv->metadata['plan_upgrade'] ?? false) {
+                BconnectSubscriptionService::activatePlan($inv->company, $inv->metadata['plan_upgrade'], $inv->metadata['billing_cycle'] ?? 'monthly', $inv->amount, $inv);
+            } elseif ($inv->metadata['plan_renewal'] ?? false) {
+                BconnectSubscriptionService::applyRenewalPayment($inv);
+            }
+
+            $this->sendPaidEmail($inv);
             $this->notify($inv, 'Invoice paid via Razorpay');
+
             return redirect()->route('bconnect.billing')->with('success', 'Payment successful');
         } catch (\Exception $e) {
             Log::error('Razorpay callback verification failed: ' . $e->getMessage());
@@ -197,7 +216,6 @@ class BillingController extends Controller {
             return redirect()->route('bconnect.billing')->with('error', 'Invoice not found.');
         }
 
-        // Verify Cashfree legacy response signature when available.
         $signature = $request->signature;
         if ($signature && !empty($settings['cashfree_secret_key'])) {
             $data = ($request->orderId ?? '') . ($request->orderAmount ?? '') . ($request->referenceId ?? '') . ($request->txStatus ?? '') . ($request->paymentMode ?? '') . ($request->txMsg ?? '') . ($request->txTime ?? '');
@@ -210,8 +228,16 @@ class BillingController extends Controller {
 
         if ($request->txStatus === 'SUCCESS') {
             $inv->update(['status' => 'paid', 'paid_at' => now()]);
-            $this->applyPlanUpgrade($inv);
+
+            if ($inv->metadata['plan_upgrade'] ?? false) {
+                BconnectSubscriptionService::activatePlan($inv->company, $inv->metadata['plan_upgrade'], $inv->metadata['billing_cycle'] ?? 'monthly', $inv->amount, $inv);
+            } elseif ($inv->metadata['plan_renewal'] ?? false) {
+                BconnectSubscriptionService::applyRenewalPayment($inv);
+            }
+
+            $this->sendPaidEmail($inv);
             $this->notify($inv, 'Invoice paid via Cashfree');
+
             return redirect()->route('bconnect.billing')->with('success', 'Payment successful');
         }
 
@@ -224,15 +250,77 @@ class BillingController extends Controller {
             return back()->with('info', 'Invoice already paid.');
         }
         $inv->update(['status' => 'paid', 'paid_at' => now(), 'metadata' => array_merge($inv->metadata ?? [], ['manual' => true])]);
-        $this->applyPlanUpgrade($inv);
+
+        if ($inv->metadata['plan_upgrade'] ?? false) {
+            BconnectSubscriptionService::activatePlan($inv->company, $inv->metadata['plan_upgrade'], $inv->metadata['billing_cycle'] ?? 'monthly', $inv->amount, $inv);
+        } elseif ($inv->metadata['plan_renewal'] ?? false) {
+            BconnectSubscriptionService::applyRenewalPayment($inv);
+        }
+
+        $this->sendPaidEmail($inv);
         $this->notify($inv, 'Invoice marked as paid manually');
+
         return redirect()->route('bconnect.billing')->with('success', 'Invoice marked as paid');
     }
 
+    public function cancelSubscription(Request $r) {
+        $company = Company::findOrFail($r->input('bconnect_company_id'));
+        $cancelled = BconnectSubscriptionService::cancel($company);
+        return $cancelled
+            ? back()->with('success', 'Subscription cancelled. Active until ' . ($company->plan_expires_at?->format('M d, Y') ?? 'expiry') . '.')
+            : back()->with('error', 'No active paid subscription to cancel.');
+    }
+
+    public function renewSubscription(Request $r) {
+        $company = Company::findOrFail($r->input('bconnect_company_id'));
+        $cycle = $r->input('billing_cycle', 'monthly');
+        $invoice = BconnectSubscriptionService::createRenewalInvoice($company, $cycle);
+
+        if (!$invoice) {
+            return back()->with('error', 'Cannot renew this plan.');
+        }
+
+        return redirect()->route('bconnect.billing.pay', $invoice->id)->with('info', 'Renewal invoice created. Please complete payment.');
+    }
+
+    protected function sendPaidEmail(Invoice $inv): void
+    {
+        try {
+            $emails = [];
+            if ($inv->client && $inv->client->user && $inv->client->user->email) {
+                $emails[] = $inv->client->user->email;
+            }
+
+            $admins = $inv->company->members()->whereIn('role', ['company_admin', 'super_admin'])->where('is_active', true)->with('user')->get();
+            foreach ($admins as $admin) {
+                if ($admin->user && $admin->user->email) {
+                    $emails[] = $admin->user->email;
+                }
+            }
+
+            foreach (array_unique($emails) as $email) {
+                Mail::to($email)->send(new BconnectInvoiceMail($inv, 'paid'));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('B-Connect paid email failed: ' . $e->getMessage());
+        }
+    }
+
     protected function notify($invoice, $message) {
+        $memberId = $invoice->client_id;
+        if (!$memberId) {
+            $admin = $invoice->company->members()->whereIn('role', ['company_admin', 'super_admin'])->where('is_active', true)->first();
+            $memberId = $admin?->id ?? 0;
+        }
+
+        // Ensure member_id is valid to satisfy foreign key constraints.
+        if ($memberId <= 0) {
+            return;
+        }
+
         Notification::create([
             'company_id' => $invoice->company_id,
-            'member_id' => $invoice->client_id ?: 0,
+            'member_id' => $memberId,
             'type' => 'billing',
             'title' => $message,
             'message' => 'Invoice ' . $invoice->invoice_number . ' paid ₹' . $invoice->amount,

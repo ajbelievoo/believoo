@@ -38,7 +38,7 @@ class BconnectMail
     {
         $members = \App\Models\Bconnect\Member::with('user')
             ->where('company_id', $companyId)
-            ->whereIn('role', ['company_admin', 'owner'])
+            ->whereIn('role', ['company_admin', 'super_admin'])
             ->get();
 
         foreach ($members as $member) {

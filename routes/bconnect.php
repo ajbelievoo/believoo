@@ -51,6 +51,7 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
     Route::get('/billing', [\App\Http\Controllers\Bconnect\BillingController::class, 'index'])->name('bconnect.billing');
     Route::get('/billing/upgrade', [\App\Http\Controllers\Bconnect\BillingController::class, 'upgrade'])->name('bconnect.billing.upgrade');
     Route::get('/invoices/{invoice}/pay', [\App\Http\Controllers\Bconnect\BillingController::class, 'payInvoice'])->name('bconnect.billing.pay');
+    Route::get('/invoices/{invoice}/download', [\App\Http\Controllers\Bconnect\BillingController::class, 'downloadInvoice'])->name('bconnect.billing.download');
 
     // Agora token for meetings/remote
     Route::post('/agora/token', [\App\Http\Controllers\Bconnect\AgoraController::class, 'token'])->name('bconnect.agora.token');
@@ -82,6 +83,8 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
         Route::post('/invoices', [\App\Http\Controllers\Bconnect\BillingController::class, 'storeInvoice'])->name('bconnect.invoices.store');
         Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\Bconnect\BillingController::class, 'markPaid'])->name('bconnect.billing.markPaid');
         Route::post('/billing/upgrade', [\App\Http\Controllers\Bconnect\BillingController::class, 'processUpgrade'])->name('bconnect.billing.upgrade.process');
+        Route::post('/billing/cancel', [\App\Http\Controllers\Bconnect\BillingController::class, 'cancelSubscription'])->name('bconnect.billing.cancel');
+        Route::post('/billing/renew', [\App\Http\Controllers\Bconnect\BillingController::class, 'renewSubscription'])->name('bconnect.billing.renew');
         Route::post('/settings', [\App\Http\Controllers\Bconnect\SettingsController::class, 'update'])->name('bconnect.settings.update');
     });
 

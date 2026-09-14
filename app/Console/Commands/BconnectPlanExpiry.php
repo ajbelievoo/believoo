@@ -23,7 +23,11 @@ class BconnectPlanExpiry extends Command
 
             $company->update([
                 'plan' => 'free',
+                'subscription_status' => 'free',
                 'plan_expires_at' => null,
+                'trial_ends_at' => null,
+                'grace_period_until' => null,
+                'next_invoice_at' => null,
             ]);
 
             // Notify the company admin(s)

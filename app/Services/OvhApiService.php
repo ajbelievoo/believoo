@@ -22,11 +22,13 @@ class OvhApiService
 
         if ($this->enabled) {
             try {
+                $endpoint = $this->config['endpoint'] ?? 'https://eu.api.ovh.com/1.0';
+                // OVH SDK constructor expects positional arguments; endpoint param is $api_endpoint.
                 $this->client = new Api(
-                    applicationKey:    $this->config['application_key'] ?? '',
-                    applicationSecret: $this->config['application_secret'] ?? '',
-                    endpoint:          $this->config['endpoint'] ?? 'https://eu.api.ovh.com/1.0',
-                    consumer_key:      $this->config['consumer_key'] ?? '',
+                    $this->config['application_key'] ?? '',
+                    $this->config['application_secret'] ?? '',
+                    $endpoint,
+                    $this->config['consumer_key'] ?? '',
                 );
             } catch (\Exception $e) {
                 Log::error('OVH API client init failed', ['error' => $e->getMessage()]);
