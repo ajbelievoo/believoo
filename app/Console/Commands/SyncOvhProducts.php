@@ -92,7 +92,7 @@ class SyncOvhProducts extends Command
                 'slug'          => $this->slugify($plan['plan_code']),
                 'category'      => 'vps_2026',
                 'display_name'  => $plan['display_name'],
-                'description'   => 'OVHcloud VPS plan synced via API',
+                'description'   => 'GHC Cloud VPS plan synced via API',
                 'cpu_cores'     => $plan['cpu_cores'] ?? 1,
                 'memory_gb'     => $plan['memory_gb'] ?? 1,
                 'disk_gb'       => $plan['disk_gb'] ?? 20,

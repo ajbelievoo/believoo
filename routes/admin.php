@@ -24,7 +24,7 @@ use App\Http\Controllers\Admin\GhcController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\AnnouncementController;
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name('admin.')->group(function () {
 
     // Dashboard - Only one route needed
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
@@ -87,6 +87,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('ai-training/{correction}', [\App\Http\Controllers\Admin\AiTrainingController::class, 'destroy'])->name('ai-training.destroy');
     Route::resource('chat-flows', \App\Http\Controllers\Admin\ChatFlowController::class)->except('show');
     Route::get('agent-leaderboard', [\App\Http\Controllers\Admin\AgentLeaderboardController::class, 'index'])->name('agent-leaderboard.index');
+    Route::get('audit-logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('conversions', [\App\Http\Controllers\Admin\ConversionController::class, 'index'])->name('conversions.index');
     Route::get('chat-archive', [\App\Http\Controllers\Admin\ChatArchiveController::class, 'index'])->name('chat-archive.index');
     Route::get('chat-archive/export', [\App\Http\Controllers\Admin\ChatArchiveController::class, 'export'])->name('chat-archive.export');
@@ -143,6 +144,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('test-mail', [MailTestController::class, 'send'])->name('settings.test-mail');
+    Route::redirect('site-settings', 'settings');
 
     // Exchange Rates
     Route::get('exchange-rates', [ExchangeRateController::class, 'index'])->name('exchange-rates.index');

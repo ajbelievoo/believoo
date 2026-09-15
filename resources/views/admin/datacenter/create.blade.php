@@ -280,7 +280,7 @@
             
             <div class="form-group">
                 <label class="form-label">Provider (Optional)</label>
-                <input type="text" class="form-input" name="provider_name" placeholder="e.g., OVH, Hetzner, AWS">
+                <input type="text" class="form-input" name="provider_name" placeholder="e.g., GHC Cloud, Hetzner, AWS">
             </div>
             
             <div class="form-group">

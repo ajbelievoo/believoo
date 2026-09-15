@@ -39,8 +39,9 @@
                         </div>
                     </div>
                 </div>
-                <div class="p-6">
+                <div class="p-6 space-y-10">
                     @include('profile.partials.update-password-form')
+                    @include('profile.partials.two-factor-form')
                 </div>
             </div>
 

@@ -27,7 +27,7 @@
                     <p style="color: #8b9bb4; font-size: 0.9rem; margin: 4px 0 0;">
                         {{ ucfirst($vpsPlan->category) }} VPS
                         @if(!empty($vpsPlan->ovh_plan_code))
-                            <span style="color: #22c55e; margin-left: 8px;"><i class="fas fa-check-circle"></i> OVH Powered</span>
+                            <span style="color: #22c55e; margin-left: 8px;"><i class="fas fa-check-circle"></i> GHC Cloud Powered</span>
                         @endif
                     </p>
                 </div>

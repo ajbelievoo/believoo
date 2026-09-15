@@ -14,7 +14,7 @@ class CheckOvhBalance extends Command
     protected $signature = 'ovh:check-balance
                             {--threshold=50 : Low-balance warning threshold in account currency}';
 
-    protected $description = 'Check OVHcloud account balance and alert admins if low';
+    protected $description = 'Check upstream cloud account balance and alert admins if low';
 
     public function handle(): int
     {
@@ -31,25 +31,25 @@ class CheckOvhBalance extends Command
             $currency = $balance['currency'] ?? 'EUR';
             $threshold = (float) $this->option('threshold');
 
-            $this->info("OVH balance: {$amount} {$currency}");
-            Log::info('OVH balance check', $balance);
+            $this->info("Cloud balance: {$amount} {$currency}");
+            Log::info('Cloud balance check', $balance);
 
             // Persist balance in settings for dashboard display.
             \App\Models\Setting::updateOrCreate(
-                ['key' => 'ovh_balance_amount'],
-                ['value' => (string) $amount, 'group' => 'OVH', 'type' => 'string']
+                ['key' => 'cloud_balance_amount'],
+                ['value' => (string) $amount, 'group' => 'Cloud', 'type' => 'string']
             );
             \App\Models\Setting::updateOrCreate(
-                ['key' => 'ovh_balance_currency'],
-                ['value' => $currency, 'group' => 'OVH', 'type' => 'string']
+                ['key' => 'cloud_balance_currency'],
+                ['value' => $currency, 'group' => 'Cloud', 'type' => 'string']
             );
             \App\Models\Setting::updateOrCreate(
-                ['key' => 'ovh_balance_checked_at'],
-                ['value' => now()->toDateTimeString(), 'group' => 'OVH', 'type' => 'string']
+                ['key' => 'cloud_balance_checked_at'],
+                ['value' => now()->toDateTimeString(), 'group' => 'Cloud', 'type' => 'string']
             );
 
             if ($amount < $threshold) {
-                $message = "OVHcloud account balance is low: {$amount} {$currency} (below {$threshold} {$currency}). Add funds to avoid order failures.";
+                $message = "Your GHC cloud wallet balance is low: {$amount} {$currency} (below {$threshold} {$currency}). Add funds to avoid order failures.";
 
                 Log::warning($message);
                 $this->warn($message);
@@ -61,16 +61,16 @@ class CheckOvhBalance extends Command
                 }
 
                 Notification::send($admins, new AdminAlertNotification(
-                    title: 'Low OVH Wallet Balance',
+                    title: 'Low GHC Cloud Wallet Balance',
                     message: $message,
-                    actionUrl: url('/admin/site-settings'),
-                    actionLabel: 'Top Up OVH Wallet'
+                    actionUrl: url('/admin/settings'),
+                    actionLabel: 'Top Up Cloud Wallet'
                 ));
             }
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            Log::error('OVH balance check failed', ['error' => $e->getMessage()]);
+            Log::error('Cloud balance check failed', ['error' => $e->getMessage()]);
             $this->error('Balance check failed: ' . $e->getMessage());
             return self::FAILURE;
         }

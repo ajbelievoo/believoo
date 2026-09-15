@@ -147,11 +147,11 @@
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
             <div>
                 <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #8b9bb4;">
-                    Cost Price (OVH Price) <span style="color: #ef4444;">*</span>
+                    Cost Price (Cloud Price) <span style="color: #ef4444;">*</span>
                 </label>
                 <input type="number" name="cost_price" value="{{ old('cost_price', $vpsPlan->cost_price) }}" required step="0.01" min="0"
                     style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: var(--text-primary); font-size: 0.95rem;">
-                <small style="color: #6b7280; font-size: 0.75rem;">What you pay to OVH</small>
+                <small style="color: #6b7280; font-size: 0.75rem;">What you pay to Cloud</small>
             </div>
 
             <div>
@@ -236,16 +236,16 @@
         </div>
     </div>
 
-    {{-- OVH Mapping --}}
+    {{-- Cloud Mapping --}}
     <div style="margin-top: 24px; padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
         <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
-            <i class="fas fa-cloud" style="margin-right: 8px; color: #00b7ff;"></i>OVH Mapping
+            <i class="fas fa-cloud" style="margin-right: 8px; color: #00b7ff;"></i>Cloud Mapping
         </h4>
 
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
             <div>
                 <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #8b9bb4;">
-                    OVH Plan Code
+                    Cloud Plan Code
                 </label>
                 <input type="text" name="ovh_plan_code" value="{{ old('ovh_plan_code', $vpsPlan->ovh_plan_code) }}" placeholder="e.g., vps-2024-1-2-40"
                     style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: var(--text-primary); font-size: 0.95rem;">
@@ -254,7 +254,7 @@
 
             <div>
                 <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #8b9bb4;">
-                    OVH Region / Datacenter
+                    Cloud Region / Datacenter
                 </label>
                 <input type="text" name="ovh_region" value="{{ old('ovh_region', $vpsPlan->ovh_config['region'] ?? '') }}" placeholder="e.g., gra / sbg / rbx"
                     style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: var(--text-primary); font-size: 0.95rem;">

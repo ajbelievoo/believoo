@@ -24,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'bconnect' => \App\Http\Middleware\BconnectAuth::class,
             'bconnect.role' => \App\Http\Middleware\BconnectRole::class,
             'bconnect.audit' => \App\Http\Middleware\BconnectAudit::class,
+            '2fa' => \App\Http\Middleware\RequireTwoFactor::class,
+            'log.admin' => \App\Http\Middleware\LogAdminActions::class,
         ]);
 
         // API rate limiting

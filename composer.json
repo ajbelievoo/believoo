@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "bacon/bacon-qr-code": "^3.1",
         "barryvdh/laravel-dompdf": "^3.0",
         "cashfree/cashfree-pg": "^5.0",
         "filament/filament": "^3.2",
@@ -16,6 +17,7 @@
         "laravel/tinker": "^2.9",
         "minishlink/web-push": "^11.0",
         "ovh/ovh": "^3.5",
+        "pragmarx/google2fa-laravel": "^3.0",
         "pusher/pusher-php-server": "*",
         "razorpay/razorpay": "^2.9",
         "taylanunutmaz/agora-token-builder": "^1.1"

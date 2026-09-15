@@ -88,7 +88,86 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'last_payment_date' => 'date',
             'plan_price' => 'decimal:2',
             'wallet_balance' => 'decimal:2',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    public function twoFactorEnabled(): bool
+    {
+        return !is_null($this->two_factor_secret) && !is_null($this->two_factor_confirmed_at);
+    }
+
+    public function twoFactorRecoveryCodes(): array
+    {
+        return json_decode($this->two_factor_recovery_codes ?? '[]', true) ?: [];
+    }
+
+    public function twoFactorQrCodeUrl(): string
+    {
+        return \PragmaRX\Google2FALaravel\Facade::getQRCodeUrl(
+            config('app.name', 'Believoo'),
+            $this->email,
+            $this->two_factor_secret
+        );
+    }
+
+    public function twoFactorQrCodeSvg(int $size = 200): string
+    {
+        return \PragmaRX\Google2FALaravel\Facade::getQRCodeInline(
+            config('app.name', 'Believoo'),
+            $this->email,
+            $this->two_factor_secret,
+            $size
+        );
+    }
+
+    public function generateTwoFactorSecret(): void
+    {
+        $this->two_factor_secret = \PragmaRX\Google2FALaravel\Facade::generateSecretKey();
+    }
+
+    public function verifyTwoFactorCode(string $code): bool
+    {
+        if (!$this->two_factor_secret) {
+            return false;
+        }
+
+        return \PragmaRX\Google2FALaravel\Facade::verifyKey(
+            $this->two_factor_secret,
+            $code,
+            config('google2fa.window', 1)
+        );
+    }
+
+    public function generateRecoveryCodes(): array
+    {
+        $codes = [];
+        for ($i = 0; $i < 8; $i++) {
+            $codes[] = bin2hex(random_bytes(4));
+        }
+
+        $this->two_factor_recovery_codes = json_encode($codes);
+        return $codes;
+    }
+
+    public function verifyTwoFactorRecoveryCode(string $code): bool
+    {
+        $codes = $this->twoFactorRecoveryCodes();
+        if (in_array($code, $codes, true)) {
+            $this->two_factor_recovery_codes = json_encode(array_values(array_diff($codes, [$code])));
+            return true;
+        }
+
+        return false;
+    }
+
+    public function disableTwoFactor(): void
+    {
+        $this->two_factor_secret = null;
+        $this->two_factor_recovery_codes = null;
+        $this->two_factor_confirmed_at = null;
     }
 
     /**

@@ -510,6 +510,9 @@
                 <a href="{{ route('admin.security.index') }}" class="nav-link {{ request()->routeIs('admin.security.*') ? 'active' : '' }}">
                     <i class="fas fa-shield-alt"></i><span>Security</span>
                 </a>
+                <a href="{{ route('admin.audit-logs.index') }}" class="nav-link {{ request()->routeIs('admin.audit-logs.*') ? 'active' : '' }}">
+                    <i class="fas fa-clipboard-list"></i><span>Audit Logs</span>
+                </a>
                 <a href="{{ route('admin.teams.index') }}" class="nav-link {{ request()->routeIs('admin.teams.*') ? 'active' : '' }}">
                     <i class="fas fa-users-cog"></i><span>Teams</span>
                 </a>

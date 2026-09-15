@@ -1,18 +1,13 @@
 {
 	"folders": [
 		{
-			"name": "believoo",
 			"path": "."
 		},
 		{
-			"name": "ghc",
 			"path": "../ghc"
 		},
 		{
 			"path": "../music"
-		},
-		{
-			"path": "../hitune"
 		}
 	],
 	"settings": {},

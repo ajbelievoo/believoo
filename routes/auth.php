@@ -8,10 +8,14 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    Route::get('two-factor-challenge', [TwoFactorController::class, 'challenge'])->name('two-factor.challenge');
+    Route::post('two-factor-challenge', [TwoFactorController::class, 'verify'])->name('two-factor.verify');
+
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
@@ -36,6 +40,12 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('two-factor-setup', [TwoFactorController::class, 'setup'])->name('two-factor.setup');
+    Route::post('two-factor-setup', [TwoFactorController::class, 'enable'])->name('two-factor.enable');
+    Route::get('two-factor-recovery', [TwoFactorController::class, 'recovery'])->name('two-factor.recovery');
+    Route::post('two-factor-recovery', [TwoFactorController::class, 'regenerate'])->name('two-factor.regenerate');
+    Route::delete('two-factor', [TwoFactorController::class, 'destroy'])->name('two-factor.destroy');
+
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 

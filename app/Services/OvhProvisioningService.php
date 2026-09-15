@@ -170,8 +170,8 @@ class OvhProvisioningService
                 'billing_cycle' => 'monthly',
                 'start_date' => now(),
                 'expiry_date' => now(),
-                'admin_notes' => 'OVH order failed: ' . $e->getMessage(),
-                'provider_name' => 'ovh',
+                'admin_notes' => 'Cloud order failed: ' . $e->getMessage(),
+                'provider_name' => 'cloud',
             ]);
 
             // Notify admins.
@@ -180,8 +180,8 @@ class OvhProvisioningService
                 $admins = User::take(3)->get();
             }
             \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminAlertNotification(
-                title: 'OVH Order Failed - Manual Action Required',
-                message: "Order #{$order->id} ({$order->tier_name}) was paid by the customer but the OVH order failed: {$e->getMessage()}. Check the hosting record #{$hosting->id}.",
+                title: 'Cloud Order Failed - Manual Action Required',
+                message: "Order #{$order->id} ({$order->tier_name}) was paid by the customer but the cloud provisioning order failed: {$e->getMessage()}. Check the hosting record #{$hosting->id}.",
                 actionUrl: url('/admin/user-hostings/' . $hosting->id),
                 actionLabel: 'View Hosting'
             ));

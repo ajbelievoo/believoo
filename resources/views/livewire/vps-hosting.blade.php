@@ -16,7 +16,7 @@
                 VPS <span class="text-sky-600 dark:text-cyan-400">Hosting</span>
             </h1>
             <p class="text-xl max-w-2xl mx-auto mb-6 text-slate-600 dark:text-gray-400">
-                High-performance virtual private servers with NVMe storage, unlimited traffic, and enterprise-grade infrastructure powered by OVHCloud.
+                High-performance virtual private servers with NVMe storage, unlimited traffic, and enterprise-grade infrastructure powered by GHC Cloud.
             </p>
             
             {{-- Currency Toggle --}}
@@ -208,7 +208,7 @@
         <div class="max-w-7xl mx-auto text-center">
             <p class="text-sm text-slate-500 dark:text-gray-500">
                 <i class="fas fa-info-circle mr-2"></i>
-                All prices are in USD ($). Infrastructure powered by <span class="text-sky-600 dark:text-cyan-400">OVHCloud</span>. Managed by <span class="text-sky-600 dark:text-cyan-400">Believoo</span>.
+                All prices are in USD ($). Infrastructure powered by <span class="text-sky-600 dark:text-cyan-400">GHC Cloud</span>. Managed by <span class="text-sky-600 dark:text-cyan-400">Believoo</span>.
             </p>
         </div>
     </section>

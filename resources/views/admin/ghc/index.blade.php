@@ -514,7 +514,7 @@
     <div style="padding:20px;">
         <form method="POST" action="{{ route('admin.ghc.credentials.update') }}">
             @csrf
-            <h4 style="font-size:0.85rem;font-weight:700;color:#00b7ff;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">Provider (OVH)</h4>
+            <h4 style="font-size:0.85rem;font-weight:700;color:#00b7ff;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">Provider (Cloud)</h4>
             <div class="ghc-grid-2" style="margin-bottom:24px;">
                 <div>
                     <label style="display:block;font-size:0.75rem;color:#64748b;margin-bottom:6px;">Application Key</label>

@@ -11,7 +11,10 @@ use App\Models\Bconnect\Project;
 use App\Models\Bconnect\RemoteSession;
 use App\Models\Bconnect\Ticket;
 use App\Models\Bconnect\TicketComment;
+use App\Services\AuditService;
 use App\Services\BconnectMail;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
@@ -205,6 +208,23 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->registerBconnectObservers();
+
+        // Audit log: login / logout
+        Event::listen(Login::class, function (Login $event) {
+            try {
+                AuditService::auth('login', $event->user->id, 'User logged in');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Audit login failed: ' . $e->getMessage());
+            }
+        });
+
+        Event::listen(Logout::class, function (Logout $event) {
+            try {
+                AuditService::auth('logout', $event->user?->id, 'User logged out');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Audit logout failed: ' . $e->getMessage());
+            }
+        });
     }
 
     /**

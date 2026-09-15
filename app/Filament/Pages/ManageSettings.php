@@ -304,11 +304,11 @@ class ManageSettings extends Page
                                     ->collapsible(),
                             ]),
 
-                        Tabs\Tab::make('OVH Reseller')
+                        Tabs\Tab::make('Cloud Reseller')
                             ->icon('heroicon-o-cloud')
                             ->schema([
-                                Section::make('OVHcloud API Credentials')
-                                    ->description('Used to fetch real-time catalog, place orders, and deduct from your OVH prepaid account.')
+                                Section::make('Cloud API Credentials')
+                                    ->description('Used to fetch real-time catalog, place orders, and deduct from your cloud prepaid account.')
                                     ->schema([
                                         Grid::make(2)
                                             ->schema([
@@ -354,11 +354,11 @@ class ManageSettings extends Page
                                     ->collapsible(),
 
                                 Section::make('Balance')
-                                    ->description('Current OVH prepaid / fidelity account balance.')
+                                    ->description('Current cloud prepaid / fidelity account balance.')
                                     ->schema([
-                                        \Filament\Forms\Components\Placeholder::make('ovh_balance_placeholder')
+                                        \Filament\Forms\Components\Placeholder::make('cloud_balance_placeholder')
                                             ->label('Balance')
-                                            ->content(fn () => $this->getOvhBalanceText()),
+                                            ->content(fn () => $this->getCloudBalanceText()),
                                     ])
                                     ->collapsible(),
                             ]),
@@ -514,14 +514,14 @@ class ManageSettings extends Page
     }
 
     /**
-     * Display current OVH account balance if credentials are configured.
+     * Display current cloud account balance if credentials are configured.
      */
-    public function getOvhBalanceText(): string
+    public function getCloudBalanceText(): string
     {
         try {
             $service = new \App\Services\OvhApiService();
             if (!$service->isEnabled()) {
-                return 'OVH API not configured.';
+                return 'Cloud API not configured.';
             }
             $balance = $service->getAccountBalance();
             return number_format($balance['balance'], 2) . ' ' . ($balance['currency'] ?? 'EUR');

@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">VPS Plans Management</h1>
-        <p class="page-subtitle">Manage OVH-style VPS plans with 2.5x pricing</p>
+        <p class="page-subtitle">Manage Cloud-style VPS plans with 2.5x pricing</p>
     </div>
     <div style="display: flex; gap: 12px;">
         <a href="{{ route('admin.vps-plans.create') }}" class="btn btn-primary">
@@ -46,7 +46,7 @@
 {{-- Bulk Price Update --}}
 <div style="margin-bottom: 30px; padding: 24px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px;">
     <h4 style="font-size: 1rem; font-weight: 600; color: #f59e0b; margin-bottom: 16px;">
-        <i class="fas fa-calculator" style="margin-right: 8px;"></i>Bulk Price Update (2.5x OVH Pricing)
+        <i class="fas fa-calculator" style="margin-right: 8px;"></i>Bulk Price Update (2.5x Cloud Pricing)
     </h4>
     <form action="{{ route('admin.vps-plans.bulk-price-update') }}" method="POST" style="display: flex; gap: 12px; align-items: flex-end;">
         @csrf
@@ -187,12 +187,12 @@
 
 <div style="margin-top: 30px; padding: 24px; background: rgba(0, 183, 255, 0.05); border: 1px solid rgba(0, 183, 255, 0.2); border-radius: 12px;">
     <h4 style="font-size: 1rem; font-weight: 600; color: #00b7ff; margin-bottom: 16px;">
-        <i class="fas fa-info-circle" style="margin-right: 8px;"></i>OVH-Style VPS Plans
+        <i class="fas fa-info-circle" style="margin-right: 8px;"></i>Cloud-Style VPS Plans
     </h4>
     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; font-size: 0.85rem; color: #8b9bb4;">
         <div>
             <strong style="color: #fff;">Pricing Strategy:</strong>
-            <p style="margin: 4px 0 0 0;">Cost Price = OVH actual price, Selling Price = 2.5× for profit margin</p>
+            <p style="margin: 4px 0 0 0;">Cost Price = Cloud actual price, Selling Price = 2.5× for profit margin</p>
         </div>
         <div>
             <strong style="color: #fff;">Categories:</strong>
@@ -204,7 +204,7 @@
         </div>
         <div>
             <strong style="color: #fff;">Sold Out:</strong>
-            <p style="margin: 4px 0 0 0;">Mark plans as sold out to show as unavailable (like OVH does)</p>
+            <p style="margin: 4px 0 0 0;">Mark plans as sold out to show as unavailable (like Cloud does)</p>
         </div>
     </div>
 </div>

@@ -1,6 +1,6 @@
 {{-- Hosting Tab --}}
 @if($selectedHosting)
-    {{-- OVH-Style Hosting Details View --}}
+    {{-- Cloud-Style Hosting Details View --}}
     <div class="animate-in fade-in slide-in-from-bottom-4 duration-500" x-data="{ showVnc: false }">
         
         {{-- Loading Overlay --}}
@@ -421,7 +421,7 @@
         @endif
 
 
-        {{-- OVH-Style Working Tabs --}}
+        {{-- Cloud-Style Working Tabs --}}
         <div class="flex space-x-1 mb-6 p-1 bg-white/5 rounded-2xl w-fit overflow-x-auto">
             <button wire:click="setHostingTab('home')" class="px-6 py-2 rounded-xl font-black uppercase tracking-wider text-xs {{ $activeHostingTab === 'home' ? 'bg-electric-blue text-dark' : 'text-gray-400 hover:text-white' }} transition-all whitespace-nowrap">
                 <i class="fas fa-home mr-1"></i> Home
@@ -1606,7 +1606,7 @@
                     </button>
                 </div>
 
-                {{-- Connect External Domain Modal - Hostinger/OVH Style --}}
+                {{-- Connect External Domain Modal - Hostinger/Cloud Style --}}
                 <div id="connect-domain-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
                     <div class="glass rounded-3xl border border-white/20 p-6 max-w-lg w-full shadow-2xl transform transition-all my-8 max-h-[90vh] overflow-y-auto">
                         <div class="flex items-center justify-between mb-6">
@@ -1677,7 +1677,7 @@
             </div>
         </div>
 
-        {{-- Nameservers Section - Hostinger/OVH Style --}}
+        {{-- Nameservers Section - Hostinger/Cloud Style --}}
         @php
             $believooNs = \App\Models\DnsRecord::BELIEVOO_NS ?? ['ns1.believoo.com', 'ns2.believoo.com'];
             $rawNs = $selectedHosting?->domain?->nameservers ?? [];
@@ -3179,7 +3179,7 @@
             });
         });
 
-        // DNS Records Management - Hostinger/OVH Style
+        // DNS Records Management - Hostinger/Cloud Style
         window.fetchDnsRecords = async function(domainId) {
             if (!domainId) {
                 alert('No domain selected');

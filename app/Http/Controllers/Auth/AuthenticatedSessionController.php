@@ -34,9 +34,18 @@ class AuthenticatedSessionController extends Controller
                 return back()->withErrors(['phone' => 'These credentials do not match our records.']);
             }
 
+            if ($user->twoFactorEnabled()) {
+                return $this->redirectToTwoFactorChallenge($request, $user);
+            }
+
             Auth::login($user, $request->boolean('remember'));
         } else {
             $request->authenticate();
+            $user = Auth::user();
+
+            if ($user && $user->twoFactorEnabled()) {
+                return $this->redirectToTwoFactorChallenge($request, $user);
+            }
         }
 
         $request->session()->regenerate();
@@ -51,6 +60,23 @@ class AuthenticatedSessionController extends Controller
         }
 
         return redirect()->intended(route('client.dashboard', absolute: false));
+    }
+
+    /**
+     * Redirect the user to the two-factor challenge screen.
+     */
+    protected function redirectToTwoFactorChallenge(Request $request, User $user): RedirectResponse
+    {
+        if ($request->filled('phone')) {
+            // Phone login did not create a session yet, no need to logout
+        } else {
+            Auth::logout();
+        }
+
+        $request->session()->put('two_factor_user_id', $user->id);
+        $request->session()->put('two_factor_remember', $request->boolean('remember'));
+
+        return redirect()->route('two-factor.challenge');
     }
 
     /**

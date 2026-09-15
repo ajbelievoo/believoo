@@ -174,7 +174,7 @@
         </h3>
         <span style="font-size: 0.75rem; color: #8b9bb4;">
             <i class="fas fa-server" style="margin-right: 4px;"></i>
-            OVH Server: ns548195
+            Cloud Server: ns548195
         </span>
     </div>
     
@@ -217,11 +217,11 @@
                 <div style="font-size: 0.75rem; color: #8b9bb4; margin-top: 6px; text-align: right;">{{ $inventoryStatus['disk_percent'] }}% Used</div>
             </div>
 
-            {{-- OVH Bandwidth Meter --}}
+            {{-- Cloud Bandwidth Meter --}}
             <div style="background: linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%); border-radius: 12px; padding: 16px; border: 1px solid rgba(0, 183, 255, 0.2);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <div style="font-size: 0.75rem; color: #00b7ff; text-transform: uppercase; font-weight: 600;">
-                        <i class="fas fa-network-wired" style="margin-right: 4px;"></i>OVH Bandwidth
+                        <i class="fas fa-network-wired" style="margin-right: 4px;"></i>Cloud Bandwidth
                     </div>
                     <div style="font-size: 0.8rem; color: #8b9bb4;">{{ $inventoryStatus['total_bandwidth_tb'] }} TiB/Month</div>
                 </div>

@@ -1,121 +1,364 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>404 Not Found - Believoo</title>
-    
+    <meta name="robots" content="noindex, follow">
+    <title>404 - Page Not Found</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,800,900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    @php
+        $host = request()->getHost();
+        $isBc = str_contains($host, 'bc.believoo.com');
+        $isGhc = str_contains($host, 'ghc.believoo.com');
+        $isSupport = str_contains($host, 'support.believoo.com');
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+        if ($isBc) {
+            $brand = \App\Helpers\BconnectHelper::brandData();
+            $brandName = $brand['brand_name'] ?? 'B-CONNECT';
+            $logo = $brand['logo'] ?? '';
+            $primary = $brand['primary_color'] ?? '#00B7FF';
+            $bg = '#ffffff';
+            $text = '#0f172a';
+            $muted = '#64748b';
+            $homeUrl = 'https://bc.believoo.com';
+        } elseif ($isGhc) {
+            $brandName = 'GHC';
+            $logo = '';
+            $primary = '#00B7FF';
+            $bg = '#f8fcff';
+            $text = '#0f172a';
+            $muted = '#64748b';
+            $homeUrl = 'https://ghc.believoo.com';
+        } else {
+            $brandName = 'Believoo';
+            $logo = \App\Models\Setting::where('key','logo')->value('value') ?: '';
+            $primary = '#00B7FF';
+            $bg = '#050505';
+            $text = '#ffffff';
+            $muted = '#94a3b8';
+            $homeUrl = 'https://believoo.com';
+        }
 
+        if (empty($logo)) {
+            $logo = 'https://' . $host . '/storage/settings/logo.png';
+        }
+    @endphp
     <style>
-        [x-cloak] { display: none !important; }
         :root {
-            --electric-blue: #00B7FF;
-            --electric-violet: #7000FF;
-            --dark: #050505;
+            --primary: {{ $primary }};
+            --bg: {{ $bg }};
+            --text: {{ $text }};
+            --muted: {{ $muted }};
         }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background-color: var(--dark);
             font-family: 'Figtree', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            min-height: 100vh;
         }
-        .bg-dark { background-color: var(--dark); }
-        .text-electric-blue { color: var(--electric-blue); }
-        .bg-electric-blue { background-color: var(--electric-blue); }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0); }
-            50% { transform: translateY(-20px) rotate(2deg); }
+        #drone-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
         }
-        .animate-float {
-            animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 0.3; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.1); }
-        }
-        .animate-pulse-slow {
-            animation: pulse-slow 8s ease-in-out infinite;
-        }
-
-        .glitch-text {
+        .wrap {
             position: relative;
-            text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
-                        -0.025em -0.05em 0 rgba(0, 255, 0, 0.75),
-                        0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
-            animation: glitch 500ms infinite;
+            z-index: 10;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
         }
-
-        @keyframes glitch {
-            0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.05em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
-            14% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.05em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
-            15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
-            49% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
-            50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
-            99% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
-            100% { text-shadow: -0.025em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+        .home-icon {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: rgba(0, 183, 255, 0.1);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 1.25rem;
+            border: 1px solid rgba(0, 183, 255, 0.2);
+            backdrop-filter: blur(8px);
+            transition: all .3s ease;
+        }
+        .home-icon:hover { background: var(--primary); color: #fff; transform: translateY(-2px); }
+        .brand {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .brand img { height: 36px; width: auto; object-fit: contain; border-radius: 8px; }
+        .hero {
+            max-width: 760px;
+            animation: floatIn 1s ease-out both;
+        }
+        .hero h1 {
+            font-size: clamp(8rem, 22vw, 16rem);
+            font-weight: 900;
+            line-height: 1;
+            color: var(--primary);
+            opacity: .95;
+            text-shadow: 0 20px 60px rgba(0,183,255,.25);
+        }
+        .hero h2 {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 800;
+            margin: 10px 0 14px;
+        }
+        .hero p {
+            font-size: clamp(1rem, 2.2vw, 1.25rem);
+            color: var(--muted);
+            max-width: 560px;
+            margin: 0 auto 32px;
+            line-height: 1.6;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 30px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: .95rem;
+            text-decoration: none;
+            transition: all .25s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 12px 30px rgba(0,183,255,.35);
+        }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(0,183,255,.45); }
+        .btn-ghost {
+            background: rgba(0,183,255,.08);
+            color: var(--primary);
+            border: 1px solid rgba(0,183,255,.25);
+        }
+        .btn-ghost:hover { background: rgba(0,183,255,.16); }
+        .search {
+            margin-top: 28px;
+            position: relative;
+            width: min(100%, 420px);
+        }
+        .search input {
+            width: 100%;
+            padding: 14px 22px 14px 48px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,183,255,.25);
+            background: rgba(0,183,255,.06);
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            font-family: inherit;
+        }
+        .search i {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+        }
+        .footer {
+            position: fixed;
+            bottom: 20px;
+            left: 0; right: 0;
+            text-align: center;
+            font-size: .8rem;
+            color: var(--muted);
+            z-index: 10;
+        }
+        @keyframes floatIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 640px) {
+            .home-icon, .brand { top: 16px; }
+            .home-icon { left: 16px; width: 42px; height: 42px; }
+            .brand { right: 16px; font-size: .95rem; }
+            .brand img { height: 28px; }
         }
     </style>
 </head>
-<body class="antialiased text-gray-200">
-    <div class="min-h-screen bg-dark flex flex-col items-center justify-center px-6 relative overflow-hidden">
-        <!-- Animated Background Orbs -->
-        <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-electric-blue/10 rounded-full blur-[120px] animate-pulse-slow"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-electric-violet/10 rounded-full blur-[120px] animate-pulse-slow" style="animation-delay: -4s;"></div>
+<body>
+    <canvas id="drone-canvas"></canvas>
 
-        <!-- Main Content -->
-        <div class="relative z-10 flex flex-col items-center text-center">
-            <!-- Large 404 Text -->
-            <div class="relative mb-8">
-                <h1 class="text-[10rem] md:text-[15rem] font-black text-white leading-none tracking-tighter select-none glitch-text">
-                    404
-                </h1>
-                <div class="absolute -top-4 -right-4 w-12 h-12 bg-electric-blue rounded-full animate-ping opacity-20"></div>
+    <a href="{{ $homeUrl }}" class="home-icon" aria-label="Home"><i class="fas fa-home"></i></a>
+    <a href="{{ $homeUrl }}" class="brand">
+        @if($logo)
+            <img src="{{ $logo }}" alt="{{ $brandName }}" onerror="this.style.display='none'">
+        @endif
+        <span>{{ $brandName }}</span>
+    </a>
+
+    <main class="wrap">
+        <div class="hero">
+            <h1>404</h1>
+            <h2>Sorry, The Page Not Found!</h2>
+            <p>It looks like this page took off with the drones. The link may be broken or the page may have been moved.</p>
+            <div class="actions">
+                <a href="{{ $homeUrl }}" class="btn btn-primary"><i class="fas fa-home"></i> Back to Home</a>
+                <a href="{{ $homeUrl }}/contact" class="btn btn-ghost"><i class="fas fa-headset"></i> Contact Support</a>
+                <button class="btn btn-ghost" onclick="history.back()"><i class="fas fa-arrow-left"></i> Go Back</button>
             </div>
-
-            <!-- Error Message -->
-            <div class="max-w-xl mx-auto space-y-6">
-                <h2 class="text-3xl md:text-5xl font-black text-white uppercase tracking-tight">
-                    Page <span class="text-electric-blue">Not Found</span>
-                </h2>
-                <p class="text-gray-400 text-lg font-medium leading-relaxed">
-                    Oops! It looks like you've wandered into an uncharted digital territory. 
-                    The page you're looking for doesn't exist or has been moved.
-                </p>
-
-                <!-- Action Buttons -->
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-6 pt-10">
-                    <a href="/" class="group relative px-10 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 transition-all duration-300">
-                        <span class="relative z-10">Return to Home</span>
-                    </a>
-                    
-                    <button onclick="history.back()" class="px-10 py-5 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-white/10 transition-all duration-300">
-                        Go Back
-                    </button>
-                </div>
-            </div>
-
-            <!-- Footer / Contact -->
-            <div class="mt-20 flex flex-col items-center space-y-4">
-                <div class="flex items-center space-x-6">
-                    <a href="https://instagram.com/believoo" class="text-gray-500 hover:text-white transition-colors"><i class="fab fa-instagram text-xl"></i></a>
-                    <a href="https://linkedin.com/company/believoo" class="text-gray-500 hover:text-white transition-colors"><i class="fab fa-linkedin text-xl"></i></a>
-                    <a href="https://twitter.com/believoo" class="text-gray-500 hover:text-white transition-colors"><i class="fab fa-x-twitter text-xl"></i></a>
-                </div>
-                <p class="text-[10px] font-black text-gray-700 uppercase tracking-[0.4em]">
-                    &copy; {{ date('Y') }} Believoo. All Rights Reserved.
-                </p>
-            </div>
+            <form class="search" action="{{ $homeUrl }}/search" method="get">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" placeholder="Search what you need..." aria-label="Search">
+            </form>
         </div>
+    </main>
 
-        <!-- Floating Elements Decor -->
-        <div class="absolute top-1/4 left-10 w-4 h-4 bg-electric-blue/20 rounded-full animate-float opacity-50"></div>
-        <div class="absolute bottom-1/4 right-10 w-6 h-6 bg-electric-violet/20 rounded-full animate-float opacity-50" style="animation-delay: -2s;"></div>
-        <div class="absolute top-1/3 right-1/4 w-2 h-2 bg-white/10 rounded-full animate-float opacity-30" style="animation-delay: -4s;"></div>
-    </div>
+    <footer class="footer">&copy; {{ date('Y') }} {{ $brandName }}. All rights reserved.</footer>
+
+    <script>
+        const canvas = document.getElementById('drone-canvas');
+        const ctx = canvas.getContext('2d');
+        const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#00B7FF';
+        const text = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#ffffff';
+        let width, height;
+        let drones = [];
+        let mouse = { x: null, y: null };
+        const DRONE_COUNT = 55;
+        const CONNECT_DIST = 160;
+        const MOUSE_DIST = 220;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+
+        class Drone {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.7;
+                this.vy = (Math.random() - 0.5) * 0.7;
+                this.size = 5 + Math.random() * 5;
+                this.angle = Math.random() * Math.PI * 2;
+                this.spin = (Math.random() - 0.5) * 0.04;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.angle += this.spin;
+
+                if (this.x < -30) this.x = width + 30;
+                if (this.x > width + 30) this.x = -30;
+                if (this.y < -30) this.y = height + 30;
+                if (this.y > height + 30) this.y = -30;
+
+                if (mouse.x !== null) {
+                    const dx = this.x - mouse.x;
+                    const dy = this.y - mouse.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < MOUSE_DIST && d > 0) {
+                        this.x += (dx / d) * 2.2;
+                        this.y += (dy / d) * 2.2;
+                    }
+                }
+            }
+            draw() {
+                drawDrone(ctx, this.x, this.y, this.size, this.angle, primary);
+            }
+        }
+
+        function drawDrone(c, x, y, size, angle, color) {
+            c.save();
+            c.translate(x, y);
+            c.rotate(angle);
+            c.strokeStyle = color;
+            c.globalAlpha = 0.55;
+            c.lineWidth = 1.2;
+            c.beginPath();
+            c.moveTo(-size, 0); c.lineTo(size, 0);
+            c.moveTo(0, -size); c.lineTo(0, size);
+            c.stroke();
+
+            c.fillStyle = color;
+            const rotors = [[-size, 0], [size, 0], [0, -size], [0, size]];
+            rotors.forEach(([dx, dy]) => {
+                c.beginPath();
+                c.arc(dx, dy, size / 3.5, 0, Math.PI * 2);
+                c.fill();
+            });
+
+            c.beginPath();
+            c.arc(0, 0, size / 5, 0, Math.PI * 2);
+            c.fill();
+            c.restore();
+        }
+
+        function drawConnections() {
+            for (let i = 0; i < drones.length; i++) {
+                for (let j = i + 1; j < drones.length; j++) {
+                    const dx = drones[i].x - drones[j].x;
+                    const dy = drones[i].y - drones[j].y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < CONNECT_DIST) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = primary;
+                        ctx.globalAlpha = 0.12 * (1 - d / CONNECT_DIST);
+                        ctx.lineWidth = 0.8;
+                        ctx.moveTo(drones[i].x, drones[i].y);
+                        ctx.lineTo(drones[j].x, drones[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function init() {
+            resize();
+            for (let i = 0; i < DRONE_COUNT; i++) drones.push(new Drone());
+            loop();
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, width, height);
+            drawConnections();
+            drones.forEach(d => { d.update(); d.draw(); });
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+        window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
+
+        init();
+    </script>
 </body>
 </html>

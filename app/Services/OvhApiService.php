@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Ovh\Api;
 
@@ -204,10 +206,16 @@ class OvhApiService
     // ------------------------------------------------------------------------
 
     /**
-     * Get OVH account balance (prepaid wallet).
+     * Get cloud account balance (prepaid wallet).
      */
     public function getAccountBalance(): array
     {
+        // Try the GHC Python backend first — it uses a newer cURL/OpenSSL stack.
+        $pythonBalance = $this->getAccountBalanceFromPython();
+        if ($pythonBalance !== null) {
+            return $pythonBalance;
+        }
+
         $balance = 0.0;
         $currency = 'EUR';
         $subsidiary = $this->config['ovh_subsidiary'] ?? 'FR';
@@ -216,10 +224,10 @@ class OvhApiService
             $me = $this->get('/me');
             $currency = $me['currency'] ?? 'EUR';
         } catch (\Exception $e) {
-            Log::warning('OVH /me call failed', ['error' => $e->getMessage()]);
+            Log::warning('Cloud /me call failed', ['error' => $e->getMessage()]);
         }
 
-        // OVH prepaid account balance (e.g. /me/ovhAccount/FR)
+        // Cloud prepaid account balance (e.g. /me/ovhAccount/FR)
         try {
             $ovhAccount = $this->get('/me/ovhAccount/' . $subsidiary);
             if (is_array($ovhAccount)) {
@@ -227,7 +235,7 @@ class OvhApiService
                 $currency = $ovhAccount['currency'] ?? $currency;
             }
         } catch (\Exception $e) {
-            Log::warning('OVH /me/ovhAccount call failed', ['error' => $e->getMessage(), 'subsidiary' => $subsidiary]);
+            Log::warning('Cloud /me/ovhAccount call failed', ['error' => $e->getMessage(), 'subsidiary' => $subsidiary]);
         }
 
         // Fallback: fidelity / loyalty account.
@@ -239,7 +247,7 @@ class OvhApiService
                     $currency = $fidelity['currency'] ?? $currency;
                 }
             } catch (\Exception $e) {
-                Log::warning('OVH /me/fidelityAccount call failed', ['error' => $e->getMessage()]);
+                Log::warning('Cloud /me/fidelityAccount call failed', ['error' => $e->getMessage()]);
             }
         }
 
@@ -247,6 +255,48 @@ class OvhApiService
             'balance'  => $balance,
             'currency' => $currency,
         ];
+    }
+
+    /**
+     * Fetch the cloud account balance from the GHC Python backend.
+     */
+    protected function getAccountBalanceFromPython(): ?array
+    {
+        try {
+            $serviceKey = DB::connection('ghc')->table('admin_configs')->where('key', 'ghc_admin_service_key')->value('value');
+            if (!$serviceKey) {
+                return null;
+            }
+            $adminEmail = DB::connection('ghc')->table('users')->where('role', 'admin')->value('email') ?? 'admin@believoo.com';
+            $auth = Http::timeout(5)->post('http://127.0.0.1:8000/api/admin/service-auth', [
+                'serviceKey' => $serviceKey,
+                'email' => $adminEmail,
+            ]);
+            if (!$auth->successful()) {
+                return null;
+            }
+            $token = $auth->json('token');
+            if (!$token) {
+                return null;
+            }
+
+            $response = Http::withToken($token)->timeout(15)->get('http://127.0.0.1:8000/api/admin/cloud/balance');
+            if (!$response->successful()) {
+                return null;
+            }
+            $data = $response->json();
+            if (!isset($data['balance'])) {
+                return null;
+            }
+
+            return [
+                'balance'  => (float) $data['balance'],
+                'currency' => $data['currency'] ?? 'EUR',
+            ];
+        } catch (\Exception $e) {
+            Log::warning('Cloud balance fetch from Python backend failed', ['error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     /**

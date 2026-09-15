@@ -1756,7 +1756,7 @@
                         </div>
                     </a>
                     <p class="text-gray-400 text-sm mb-6 max-w-sm">
-                        Premium hosting solutions powered by OVHCloud. 99.9% uptime guarantee with 24/7 expert support.
+                        Premium hosting solutions powered by GHC Cloud. 99.9% uptime guarantee with 24/7 expert support.
                     </p>
                     <div class="flex gap-3">
                         @foreach(['twitter' => 'fab fa-twitter', 'linkedin' => 'fab fa-linkedin-in', 'github' => 'fab fa-github', 'instagram' => 'fab fa-instagram'] as $social => $icon)

@@ -9,20 +9,20 @@ class TestOvhCredentials extends Command
 {
     protected $signature = 'ovh:test-credentials';
 
-    protected $description = 'Test OVHcloud API credentials and show account balance';
+    protected $description = 'Test cloud provider API credentials and show account balance';
 
     public function handle(): int
     {
         $service = new OvhApiService();
 
         if (!$service->isEnabled()) {
-            $this->error('OVH API is not configured.');
-            $this->info('Go to Admin > Site Settings > OVH Reseller and add your credentials.');
+            $this->error('Cloud API is not configured.');
+            $this->info('Go to Admin > Settings > Cloud Reseller and add your credentials.');
             return self::FAILURE;
         }
 
         try {
-            $this->info('Testing OVH API connection...');
+            $this->info('Testing cloud API connection...');
             $me = $service->get('/me');
 
             $this->info('Connected successfully!');
@@ -44,12 +44,12 @@ class TestOvhCredentials extends Command
             if (!empty($means)) {
                 $this->info('Available payment means: ' . implode(', ', $means));
             } else {
-                $this->warn('No payment means found. Add a payment method or prepaid balance in OVH manager.');
+                $this->warn('No payment means found. Add a payment method or prepaid balance in the cloud provider manager.');
             }
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('OVH API connection failed: ' . $e->getMessage());
+            $this->error('Cloud API connection failed: ' . $e->getMessage());
             return self::FAILURE;
         }
     }

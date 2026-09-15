@@ -299,7 +299,7 @@
                     <!-- Description -->
                     <p class="text-lg mb-8 max-w-xl leading-relaxed"
                        :class="$store.darkMode.on ? 'text-gray-400' : 'text-slate-600'">
-                        Enterprise-grade hosting powered by OVHCloud. Free SSL, daily backups, 99.9% uptime, and 24/7 expert support included.
+                        Enterprise-grade hosting powered by GHC Cloud. Free SSL, daily backups, 99.9% uptime, and 24/7 expert support included.
                     </p>
 
                     <!-- Feature Pills -->
@@ -608,7 +608,7 @@
                         <span :class="$store.darkMode.on ? 'gradient-text-dark' : 'gradient-text-light'">Worldwide</span>
                     </h2>
                     <p class="mb-6" :class="$store.darkMode.on ? 'text-gray-400' : 'text-slate-600'">
-                        Choose from 15 premium locations powered by OVHCloud. Deploy closer to your users.
+                        Choose from 15 premium locations powered by GHC Cloud. Deploy closer to your users.
                     </p>
                     <div class="grid grid-cols-2 gap-3">
                         @foreach([['🇫🇷','Paris'],['🇩🇪','Frankfurt'],['🇬🇧','London'],['🇺🇸','New York'],['🇸🇬','Singapore'],['🇦🇺','Sydney'],['🇮🇳','Mumbai'],['🇨🇦','Toronto']] as $dc)
@@ -669,7 +669,7 @@
         <div class="max-w-7xl mx-auto text-center">
             <p class="text-sm" :class="$store.darkMode.on ? 'text-gray-500' : 'text-slate-500'">
                 <i class="fas fa-info-circle mr-2"></i>
-                All hosting services powered by <span :class="$store.darkMode.on ? 'text-cyan-400' : 'text-sky-600'">OVHCloud</span> and managed by <span :class="$store.darkMode.on ? 'text-cyan-400' : 'text-sky-600'">Believoo Systems</span>
+                All hosting services powered by <span :class="$store.darkMode.on ? 'text-cyan-400' : 'text-sky-600'">GHC Cloud</span> and managed by <span :class="$store.darkMode.on ? 'text-cyan-400' : 'text-sky-600'">Believoo Systems</span>
             </p>
         </div>
     </section>

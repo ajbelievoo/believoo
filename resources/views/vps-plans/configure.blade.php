@@ -4,7 +4,7 @@
     $ovhConfig = $vpsPlan->ovh_config ?? [];
     $isOvh = !empty($vpsPlan->ovh_plan_code);
     $ovhRegion = $ovhConfig['raw_offer']['region'] ?? $ovhConfig['raw_offer']['location'] ?? null;
-    $datacenter = $ovhRegion ?? 'OVHcloud European Network';
+    $datacenter = $ovhRegion ?? 'GHC Cloud European Network';
     $osList = $ovhConfig['os_list'] ?? ['Ubuntu 22.04', 'Debian 12', 'Rocky Linux 9', 'AlmaLinux 9', 'Windows Server'];
     $selectedOs = session('vps_selected_os', $osList[0] ?? 'Ubuntu 22.04');
 @endphp
@@ -37,7 +37,7 @@
                             <p style="color: #8b9bb4; font-size: 0.9rem; margin: 4px 0 0;">
                                 {{ ucfirst($vpsPlan->category) }} VPS • {{ $datacenter }}
                                 @if($isOvh)
-                                    <span style="color: #22c55e; margin-left: 8px;"><i class="fas fa-check-circle"></i> OVH Powered</span>
+                                    <span style="color: #22c55e; margin-left: 8px;"><i class="fas fa-check-circle"></i> Cloud Powered</span>
                                 @endif
                             </p>
                         </div>
@@ -140,10 +140,10 @@
                 @if($isOvh)
                 <div style="background: rgba(34,197,94,0.05); border: 1px solid rgba(34,197,94,0.15); border-radius: 12px; padding: 16px;">
                     <div style="display: flex; align-items: center; gap: 8px; color: #22c55e; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
-                        <i class="fas fa-shield-alt"></i> OVHcloud Powered
+                        <i class="fas fa-shield-alt"></i> GHC Cloud Powered
                     </div>
                     <p style="font-size: 0.75rem; color: #8b9bb4; margin: 0;">
-                        This plan is provisioned directly on OVHcloud infrastructure. Your service will be ordered from OVH and managed through your Believoo dashboard.
+                        This plan is provisioned directly on GHC Cloud infrastructure. Your service will be ordered from Cloud and managed through your Believoo dashboard.
                     </p>
                 </div>
                 @endif
@@ -186,7 +186,7 @@
                         </div>
                         @if($vpsPlan->cost_price)
                         <div style="font-size: 0.7rem; color: #8b9bb4; text-align: right; margin-top: 4px;">
-                            OVH cost: ₹{{ number_format($vpsPlan->cost_price, 0) }} | Margin included
+                            Cloud cost: ₹{{ number_format($vpsPlan->cost_price, 0) }} | Margin included
                         </div>
                         @endif
                         @if($vpsPlan->installation_free)
