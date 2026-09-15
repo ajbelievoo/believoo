@@ -17,7 +17,7 @@ class ResellerController extends Controller
 
     public function create()
     {
-        $users = User::where('role', 'client')->orderBy('name')->pluck('name', 'id');
+        $users = User::where('is_admin', false)->orderBy('name')->pluck('name', 'id');
         return view('admin.resellers.form', compact('users'));
     }
 
@@ -48,7 +48,7 @@ class ResellerController extends Controller
 
     public function edit(Reseller $reseller)
     {
-        $users = User::where('role', 'client')->orderBy('name')->pluck('name', 'id');
+        $users = User::where('is_admin', false)->orderBy('name')->pluck('name', 'id');
         return view('admin.resellers.form', compact('reseller', 'users'));
     }
 

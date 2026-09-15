@@ -85,6 +85,11 @@ class Checkout extends Component
                 break;
             }
         }
+
+        // Domains are always billed yearly through OVH.
+        if (str_starts_with(strtolower($service->category ?? ''), 'ovh_domain')) {
+            $this->billingMonths = 12;
+        }
         
         $this->updateAmount();
     }

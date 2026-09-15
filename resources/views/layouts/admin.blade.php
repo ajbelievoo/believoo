@@ -608,6 +608,14 @@
                 <a href="{{ route('admin.settings.index') }}" class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
                     <i class="fas fa-cog"></i><span>Settings</span>
                 </a>
+                <a href="{{ route('admin.sso-providers.index') }}" class="nav-link {{ request()->routeIs('admin.sso-providers.*') ? 'active' : '' }}">
+                    <i class="fas fa-shield-alt"></i><span>SSO Providers</span>
+                    <span class="nav-badge new">NEW</span>
+                </a>
+                <a href="{{ route('admin.resellers.index') }}" class="nav-link {{ request()->routeIs('admin.resellers.*') ? 'active' : '' }}">
+                    <i class="fas fa-store"></i><span>Resellers</span>
+                    <span class="nav-badge new">NEW</span>
+                </a>
                 <a href="{{ url('/panel') }}" class="nav-link" target="_blank" rel="noopener">
                     <i class="fas fa-layer-group"></i><span>Advanced Tools (Filament)</span>
                 </a>

@@ -17,12 +17,14 @@ class ServiceIndex extends Component
         }
 
         return view('livewire.service-index', [
-            'services' => Service::where('is_active', true)->whereNotIn('slug', [
-                'managed-vps-cloud',
-                'vps-1', 'vps-2', 'vps-3', 'vps-4', 'vps-5', 'vps-6',
-                'web-hosting-starter', 'web-hosting-business', 'web-hosting-pro',
-                'streaming-addon',
-            ])->get(),
+            'services' => Service::where('is_active', true)
+                ->whereNotIn('category', ['ovh_domains'])
+                ->whereNotIn('slug', [
+                    'managed-vps-cloud',
+                    'vps-1', 'vps-2', 'vps-3', 'vps-4', 'vps-5', 'vps-6',
+                    'web-hosting-starter', 'web-hosting-business', 'web-hosting-pro',
+                    'streaming-addon',
+                ])->get(),
             'streamingPlans' => $streamingPlans,
         ])->layout('components.layouts.believoo', [
             'title' => 'IT Services & Cloud Solutions in India - Believoo',

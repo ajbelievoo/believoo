@@ -167,6 +167,29 @@
                     @endif
                 </div>
             @endif
+
+            @php
+                $ssoProviders = \App\Models\SsoProvider::active()->get();
+            @endphp
+
+            @if($ssoProviders->isNotEmpty())
+                <div class="relative flex items-center justify-center py-4">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-slate-200"></div>
+                    </div>
+                    <span class="relative px-4 bg-white text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Or enterprise login
+                    </span>
+                </div>
+
+                <div class="space-y-3">
+                    @foreach($ssoProviders as $provider)
+                        <a href="{{ route('sso.redirect', $provider->slug) }}" class="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-200 transition-colors">
+                            <i class="fas fa-building"></i> {{ $provider->name }}
+                        </a>
+                    @endforeach
+                </div>
+            @endif
         </form>
     </div>
 

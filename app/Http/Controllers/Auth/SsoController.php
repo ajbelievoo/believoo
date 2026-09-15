@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use OneLogin\Saml2\Auth as SamlAuth;
-use OneLogin\Saml2\Utils as SamlUtils;
 
 class SsoController extends Controller
 {
@@ -115,13 +114,14 @@ class SsoController extends Controller
             $user = User::where('email', $email)->first();
 
             if (!$user && $provider->auto_provision) {
-                $user = User::create([
+                $user = new User([
                     'name' => $attributes['name'] ?? ($attributes[0] ?? explode('@', $email)[0]),
                     'email' => $email,
                     'password' => bcrypt(Str::random(64)),
-                    'role' => 'client',
-                    'email_verified_at' => now(),
+                    'is_admin' => false,
                 ]);
+                $user->email_verified_at = now();
+                $user->save();
             }
 
             if (!$user) {
@@ -151,9 +151,24 @@ class SsoController extends Controller
         $provider = SsoProvider::active()->where('slug', $slug)->firstOrFail();
         $settings = $provider->samlSettings();
 
-        $cert = $settings['sp']['x509cert'] ?? '';
+        $entityId = e($settings['sp']['entityId']);
+        $acsUrl = e($settings['sp']['assertionConsumerService']['url']);
+        $sloUrl = e($settings['sp']['singleLogoutService']['url']);
+        $cert = e($settings['sp']['x509cert'] ?? '');
 
-        $metadata = SamlUtils::metadata($settings['sp']['entityId'], null, null, $cert, null);
+        $certBlock = $cert ? '<KeyDescriptor use="signing"><ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:X509Data><ds:X509Certificate>' . $cert . '</ds:X509Certificate></ds:X509Data></ds:KeyInfo></KeyDescriptor>' : '';
+
+        $metadata = <<<XML
+<?xml version="1.0"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{$entityId}">
+  <SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    {$certBlock}
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="{$sloUrl}"/>
+    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="{$acsUrl}" index="1" isDefault="true"/>
+    <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
+  </SPSSODescriptor>
+</EntityDescriptor>
+XML;
 
         return response($metadata, 200, ['Content-Type' => 'application/xml']);
     }

@@ -10,6 +10,7 @@ use App\Http\Controllers\UpgradeController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TeamInvitationController;
 use App\Livewire\ServiceIndex;
+use App\Livewire\DomainSearch;
 use App\Livewire\About;
 use App\Livewire\Contact;
 use App\Livewire\ServiceDetail;
@@ -89,6 +90,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/services', ServiceIndex::class)->name('services.index');
+Route::get('/domains', DomainSearch::class)->name('domains.search');
 Route::get('/services/streaming', [\App\Http\Controllers\StreamingPlansController::class, 'index'])->name('services.streaming');
 Route::get('/services/{service:slug}', ServiceDetail::class)->name('services.show');
 Route::get('/portfolio', PortfolioIndex::class)->name('portfolio.index');

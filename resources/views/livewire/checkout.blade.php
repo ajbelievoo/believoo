@@ -522,6 +522,19 @@
 
             <!-- Payment Section -->
             <div class="xl:col-span-5 glass rounded-3xl p-6 lg:p-8 border border-white/10 h-fit">
+                @if($service->ovhProduct && in_array(strtoupper($service->ovhProduct->category), ['DOMAINS', 'DOMAIN']))
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-black uppercase mb-4 text-white flex items-center gap-3">
+                            <i class="fas fa-globe text-[#00B7FF]"></i>
+                            Domain Name
+                        </h2>
+                        <label for="ovh-domain" class="block text-sm font-medium text-gray-400 mb-2">Enter the domain you want to register</label>
+                        <input type="text" id="ovh-domain" name="ovh-domain" placeholder="example.com"
+                               class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#00B7FF] focus:ring-1 focus:ring-[#00B7FF]"
+                               value="{{ old('ovh-domain', $service->ovhProduct->plan_code) }}">
+                    </div>
+                @endif
+
                 <h2 class="text-2xl font-black uppercase mb-6 text-white flex items-center gap-3">
                     <i class="fas fa-credit-card text-[#00B7FF]"></i>
                     Payment Method
@@ -710,6 +723,7 @@
         let quantity = {{ $quantity }};
         let paymentGateway = '{{ $paymentGateway }}';
         const csrfToken = '{{ csrf_token() }}';
+        const ovhDomain = document.getElementById('ovh-domain')?.value || '';
 
         // Sync with Livewire updates
         document.addEventListener('livewire:initialized', () => {
@@ -783,6 +797,7 @@
                 },
                 body: JSON.stringify({
                     service_id: serviceId,
+                    domain: ovhDomain,
                     tier_name: tierName,
                     amount: amountInINR,
                     billing_months: billingMonths,
@@ -817,6 +832,7 @@
                 },
                 body: JSON.stringify({
                     service_id: serviceId,
+                    domain: ovhDomain,
                     tier_name: tierName,
                     amount: amount,
                     billing_months: billingMonths,
@@ -907,6 +923,7 @@
                 },
                 body: JSON.stringify({
                     service_id: serviceId,
+                    domain: ovhDomain,
                     tier_name: tierName,
                     amount: amountInINR,
                     billing_months: billingMonths,
@@ -972,6 +989,7 @@
                 },
                 body: JSON.stringify({
                     service_id: serviceId,
+                    domain: ovhDomain,
                     tier_name: tierName,
                     amount: amount,
                     billing_months: billingMonths,
@@ -1014,6 +1032,7 @@
                 },
                 body: JSON.stringify({
                     service_id: serviceId,
+                    domain: ovhDomain,
                     tier_name: tierName,
                     amount: amount,
                     billing_months: billingMonths,
