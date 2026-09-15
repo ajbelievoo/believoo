@@ -47,6 +47,11 @@ class Service extends Model
     }
     
     // Calculate price for a specific billing cycle
+    public function ovhProduct()
+    {
+        return $this->hasOne(OvhProduct::class, 'service_id');
+    }
+
     public function getPriceForCycle(int $months, ?string $tierName = null): float
     {
         $basePrice = $this->price;

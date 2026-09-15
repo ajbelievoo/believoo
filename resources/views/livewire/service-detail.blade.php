@@ -18,10 +18,17 @@
                     </div>
 
                     <div class="mt-8 flex flex-col sm:flex-row gap-4">
-                        <a href="#pricing" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
-                            View Pricing
-                            <i class="fas fa-arrow-down text-sm"></i>
-                        </a>
+                        @if($service->ovhProduct && $service->ovhProduct->is_active)
+                            <a href="{{ route('checkout', ['service' => $service->slug]) }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
+                                Buy Now
+                                <i class="fas fa-arrow-right text-sm"></i>
+                            </a>
+                        @else
+                            <a href="#pricing" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
+                                View Pricing
+                                <i class="fas fa-arrow-down text-sm"></i>
+                            </a>
+                        @endif
                         <a href="{{ route('contact') }}" class="inline-flex items-center justify-center px-8 py-4 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                             Contact Us
                         </a>
@@ -93,16 +100,29 @@
                     <div class="text-5xl md:text-6xl font-bold text-white mb-4">
                         <span class="text-amber-500">{{ $currencySymbol }}</span>{{ number_format($service->price, 2) }}
                     </div>
-                    <p class="text-slate-300 mb-8 max-w-xl mx-auto">Final cost depends on scope and complexity. Contact us for a detailed quote.</p>
-                    <div class="flex flex-col sm:flex-row justify-center gap-4">
-                        <a href="#inquiry" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
-                            Start Project
-                            <i class="fas fa-arrow-right text-sm"></i>
-                        </a>
-                        <a href="{{ route('contact') }}" class="inline-flex items-center justify-center px-8 py-4 rounded-xl border border-slate-600 text-white font-semibold hover:bg-slate-800 transition">
-                            Talk to Sales
-                        </a>
-                    </div>
+                    @if($service->ovhProduct && $service->ovhProduct->is_active)
+                        <p class="text-slate-300 mb-8 max-w-xl mx-auto">Instant provisioning through {{ $service->ovhProduct->category }} after payment.</p>
+                        <div class="flex flex-col sm:flex-row justify-center gap-4">
+                            <a href="{{ route('checkout', ['service' => $service->slug]) }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
+                                Buy Now
+                                <i class="fas fa-arrow-right text-sm"></i>
+                            </a>
+                            <a href="{{ route('contact') }}" class="inline-flex items-center justify-center px-8 py-4 rounded-xl border border-slate-600 text-white font-semibold hover:bg-slate-800 transition">
+                                Talk to Sales
+                            </a>
+                        </div>
+                    @else
+                        <p class="text-slate-300 mb-8 max-w-xl mx-auto">Final cost depends on scope and complexity. Contact us for a detailed quote.</p>
+                        <div class="flex flex-col sm:flex-row justify-center gap-4">
+                            <a href="#inquiry" class="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
+                                Start Project
+                                <i class="fas fa-arrow-right text-sm"></i>
+                            </a>
+                            <a href="{{ route('contact') }}" class="inline-flex items-center justify-center px-8 py-4 rounded-xl border border-slate-600 text-white font-semibold hover:bg-slate-800 transition">
+                                Talk to Sales
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -113,7 +133,7 @@
                             <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{{ $tier['name'] ?? 'Tier' }}</h3>
                             <p class="text-slate-500 dark:text-slate-400 text-sm mb-4">{{ $tier['description'] ?? '' }}</p>
                             <div class="text-3xl font-bold text-amber-600 mb-6">{{ $currencySymbol }}{{ number_format($tier['price'] ?? $service->price, 2) }}</div>
-                            <a href="#inquiry" class="inline-flex items-center justify-center w-full px-6 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-amber-500 hover:text-white hover:border-amber-500 dark:hover:text-white transition">
+                            <a href="{{ route('checkout', ['service' => $service->slug, 'tier' => $tier['name'] ?? null]) }}" class="inline-flex items-center justify-center w-full px-6 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-amber-500 hover:text-white hover:border-amber-500 dark:hover:text-white transition">
                                 Choose Plan
                             </a>
                         </div>

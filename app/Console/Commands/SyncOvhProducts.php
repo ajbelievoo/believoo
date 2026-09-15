@@ -153,6 +153,30 @@ class SyncOvhProducts extends Command
                     VpsPlan::create($payload);
                     $created++;
                 }
+
+                // Also keep a unified OvhProduct record so VPS shows up in the catalog checkout flow.
+                $product = OvhProduct::updateOrCreate(
+                    ['category' => 'VPS', 'plan_code' => $plan['plan_code']],
+                    [
+                        'family'         => 'vps',
+                        'invoice_name'   => $plan['display_name'] ?? $plan['plan_code'],
+                        'description'    => $plan['display_name'] ?? 'GHC Cloud VPS plan',
+                        'cpu_cores'      => $plan['cpu_cores'] ?? 1,
+                        'ram_gb'         => $plan['memory_gb'] ?? 1,
+                        'disk_gb'        => $plan['disk_gb'] ?? 20,
+                        'disk_type'      => $plan['disk_type'] ?? 'SSD',
+                        'currency'       => 'INR',
+                        'price_monthly'  => $saleInInr,
+                        'cost_price'     => $priced['cost_price'],
+                        'sale_price'     => $saleInInr,
+                        'commission_percent' => $priced['margin_percent'],
+                        'durations'      => $plan['raw']['durations'] ?? [['duration' => 'P1M', 'price' => $ovhMonthly]],
+                        'ovh_config'     => $ovhConfig,
+                        'is_active'      => true,
+                    ]
+                );
+
+                $this->syncServiceForProduct($product);
             }
 
             $synced++;
@@ -339,7 +363,9 @@ class SyncOvhProducts extends Command
     protected function syncServiceForProduct(OvhProduct $product): void
     {
         // Skip categories that are not directly orderable through the generic cart flow.
-        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'LICENSE', 'IP_ADDON', 'CDN'])) {
+        // Domains need a domain name input in checkout; dedicated can be ordered with
+        // no OS (none_64.en) and installed by the customer later.
+        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'DOMAINS', 'DOMAIN', 'LICENSE', 'IP_ADDON', 'CDN'])) {
             return;
         }
 
@@ -357,15 +383,17 @@ class SyncOvhProducts extends Command
             $features[] = $product->bandwidth_mbps . ' Mbps';
         }
 
+        $priceUsd = $this->convertToUsd((float) $product->price_monthly, 'INR');
+
         $serviceData = [
             'title'         => $product->display_name,
             'slug'          => $this->slugify($product->plan_code),
             'category'      => 'ovh_' . strtolower($product->category),
             'description'   => $product->description ?: 'OVH ' . $product->category_label . ' plan',
-            'price'         => $product->price_monthly,
+            'price'         => $priceUsd,
             'price_label'   => 'per month',
             'pricing_tiers' => [
-                ['name' => 'default', 'price' => $product->price_monthly],
+                ['name' => 'default', 'price' => $priceUsd],
             ],
             'billing_cycles' => Service::getDefaultBillingCycles(),
             'features'      => $features,
