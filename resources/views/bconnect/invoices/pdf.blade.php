@@ -43,6 +43,7 @@
         </div>
         <div class="meta-row">
             <div><span class="meta-label">Issue Date:</span> <span class="meta-value">{{ $invoice->created_at->format('M d, Y') }}</span></div>
+            <div><span class="meta-label">Due Date:</span> <span class="meta-value">{{ $invoice->due_at?->format('M d, Y') ?? 'On receipt' }}</span></div>
             @if($invoice->paid_at)<div><span class="meta-label">Paid Date:</span> <span class="meta-value">{{ $invoice->paid_at->format('M d, Y') }}</span></div>@endif
         </div>
     </div>

@@ -25,6 +25,7 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
 
     // Common workspace views
     Route::get('/dashboard', [\App\Http\Controllers\Bconnect\DashboardController::class, 'index'])->name('bconnect.dashboard');
+    Route::get('/client', [\App\Http\Controllers\Bconnect\ClientPortalController::class, 'index'])->name('bconnect.client.dashboard');
     Route::get('/company/setup', [\App\Http\Controllers\Bconnect\CompanyController::class, 'setup'])->name('bconnect.company.setup');
     Route::post('/company/setup', [\App\Http\Controllers\Bconnect\CompanyController::class, 'store'])->name('bconnect.company.store');
     Route::get('/company', [\App\Http\Controllers\Bconnect\CompanyController::class, 'index'])->name('bconnect.company');

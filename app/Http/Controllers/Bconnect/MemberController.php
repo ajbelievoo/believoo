@@ -13,9 +13,13 @@ class MemberController extends Controller {
     protected $roles = ['super_admin', 'company_admin', 'manager', 'developer', 'client'];
 
     public function index(Request $r) {
-        $members = Member::with('user')->where('company_id', $r->input('bconnect_company_id'))->paginate(20);
+        $companyId = $r->input('bconnect_company_id');
+        $members = Member::with('user')->where('company_id', $companyId)->paginate(20);
         $roles = $this->roles;
-        return view('bconnect.members', compact('members', 'roles'));
+        $canAdd = \App\Services\BconnectPlanService::canAddMember($companyId);
+        $memberUsage = Member::where('company_id', $companyId)->where('is_active', true)->count();
+        $memberLimit = \App\Services\BconnectPlanService::check($companyId, 'members');
+        return view('bconnect.members', compact('members', 'roles', 'canAdd', 'memberUsage', 'memberLimit'));
     }
 
     public function store(Request $r) {

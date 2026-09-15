@@ -9,62 +9,92 @@
 <meta name="theme-color" content="#00B7FF">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'#06b6d4'}}};</script>
+<link rel="stylesheet" href="/css/bconnect.css">
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'#00b7ff'}}};</script>
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <meta name="vapid-key" content="{{ \App\Models\Setting::where('key', 'vapid_public_key')->value('value') ?? '' }}">
 <link rel="manifest" href="/manifest.json">
 @vite(['resources/js/app.js'])
 <script src="/push-init.js"></script>
-<style>body{background:#0f172a;color:#e2e8f0;font-family:Inter,ui-sans-serif,system-ui;}</style>
+<style>body{background:var(--bc-bg);color:var(--bc-text);}</style>
 </head>
 <body class="min-h-screen flex">
-<aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
-    <div class="p-6 flex items-center gap-3">
-        <img src="{{ $bconnectBrand['logo'] }}" class="h-8 w-8 rounded" alt="B-CONNECT">
-        <div><h1 class="text-xl font-black text-cyan-400">B-CONNECT</h1><p class="text-xs text-slate-500 mt-1">{{ $bconnectCompany->name ?? 'Workspace' }}</p></div>
-    </div>
-    <nav class="flex-1 px-4 space-y-1">
-        <a href="{{ route('bconnect.dashboard') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.dashboard') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-home w-6"></i>Dashboard</a>
-        <a href="{{ route('bconnect.projects.index') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.projects.*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-folder w-6"></i>Projects</a>
-        <a href="{{ route('bconnect.meetings') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.meeting*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-video w-6"></i>Meetings</a>
-        <a href="{{ route('bconnect.tickets') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.tickets*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-bug w-6"></i>Tickets</a>
-        @if(in_array($bconnectCompany?->plan ?? 'free', ['pro','enterprise']))
-        <a href="{{ route('bconnect.remote') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.remote*') && !request()->routeIs('bconnect.remote.agent') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-desktop w-6"></i>Remote</a>
-        <a href="{{ route('bconnect.remote.agent') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.remote.agent') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-download w-6"></i>Desktop Agent</a>
-        @endif
-        <a href="{{ route('bconnect.billing') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.billing*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-file-invoice w-6"></i>Billing</a>
-        <a href="{{ route('bconnect.members') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.members*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-users w-6"></i>Members</a>
-        <a href="{{ route('bconnect.company') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.company*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-building w-6"></i>Company</a>
-        <a href="{{ route('bconnect.files') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.files*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-folder-open w-6"></i>Files</a>
-        <a href="{{ route('bconnect.audit') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.audit*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-shield-alt w-6"></i>Audit Logs</a>
-        <a href="{{ route('bconnect.support') }}" class="block px-4 py-3 rounded-lg hover:bg-slate-800 {{ request()->routeIs('bconnect.support*') ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300' }}"><i class="fas fa-question-circle w-6"></i>Support</a>
-    </nav>
-    <div class="p-4 border-t border-slate-800">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs">{{ substr(Auth::user()->name,0,1) }}</div>
-            <div class="text-sm"><div class="font-medium">{{ Auth::user()->name }}</div><div class="text-slate-500 text-xs">{{ ucfirst($bconnectRole ?? '') }}</div></div>
+<div id="mobileOverlay" class="bc-overlay" onclick="toggleSidebar()"></div>
+<aside id="sidebar" class="bc-sidebar w-64 bg-[#0b1220] border-r border-[var(--bc-border)] flex flex-col h-screen z-50">
+    <div class="p-5 flex items-center gap-3 border-b border-[var(--bc-border)]">
+        <img src="{{ $bconnectBrand['logo'] }}" class="h-9 w-9 rounded-lg" alt="B-CONNECT">
+        <div>
+            <h1 class="text-lg font-black tracking-tight" style="color:var(--bc-cyan)">B-CONNECT</h1>
+            <p class="text-[11px] text-slate-500 mt-0.5 truncate max-w-[140px]">{{ $bconnectCompany->name ?? 'Workspace' }}</p>
         </div>
-        <form method="POST" action="{{ route('bconnect.logout') }}" class="mt-3">@csrf
-            <button type="submit" class="w-full text-left px-4 py-2 rounded-lg hover:bg-red-500/10 text-red-400 text-sm"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+    </div>
+    <div class="px-4 py-3">
+        @php
+            $planStatus = \App\Services\BconnectSubscriptionService::status($bconnectCompany ?? new \App\Models\Bconnect\Company(['plan' => 'free']));
+            $days = \App\Services\BconnectSubscriptionService::daysUntilExpiry($bconnectCompany ?? null);
+        @endphp
+        <div class="bc-plan-ring {{ $planStatus }} w-full justify-between">
+            <span class="truncate">{{ ucfirst($bconnectCompany?->plan ?? 'free') }}</span>
+            <span class="text-[10px] text-slate-400">{{ $days !== null ? $days . 'd' : '—' }}</span>
+        </div>
+    </div>
+    <nav class="flex-1 px-4 py-2 overflow-y-auto">
+        <a href="{{ route('bconnect.dashboard') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.dashboard') ? 'active' : '' }}"><i class="fas fa-home"></i>Dashboard</a>
+        <a href="{{ route('bconnect.projects.index') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.projects.*') ? 'active' : '' }}"><i class="fas fa-folder"></i>Projects</a>
+        <a href="{{ route('bconnect.meetings') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.meeting*') ? 'active' : '' }}"><i class="fas fa-video"></i>Meetings</a>
+        <a href="{{ route('bconnect.tickets') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.tickets*') ? 'active' : '' }}"><i class="fas fa-bug"></i>Tickets</a>
+        @if(in_array($bconnectCompany?->plan ?? 'free', ['pro','enterprise']))
+        <a href="{{ route('bconnect.remote') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.remote*') && !request()->routeIs('bconnect.remote.agent') ? 'active' : '' }}"><i class="fas fa-desktop"></i>Remote</a>
+        @endif
+        <a href="{{ route('bconnect.billing') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.billing*') ? 'active' : '' }}"><i class="fas fa-file-invoice"></i>Billing</a>
+        <a href="{{ route('bconnect.members') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.members*') ? 'active' : '' }}"><i class="fas fa-users"></i>Members</a>
+        <a href="{{ route('bconnect.company') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.company*') ? 'active' : '' }}"><i class="fas fa-building"></i>Company</a>
+        <a href="{{ route('bconnect.files') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.files*') ? 'active' : '' }}"><i class="fas fa-folder-open"></i>Files</a>
+        <a href="{{ route('bconnect.audit') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.audit*') ? 'active' : '' }}"><i class="fas fa-shield-alt"></i>Audit Logs</a>
+        <a href="{{ route('bconnect.support') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.support*') ? 'active' : '' }}"><i class="fas fa-question-circle"></i>Support</a>
+    </nav>
+    <div class="p-4 border-t border-[var(--bc-border)]">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">{{ substr(Auth::user()->name,0,1) }}</div>
+            <div class="text-sm">
+                <div class="font-medium truncate max-w-[120px]">{{ Auth::user()->name }}</div>
+                <div class="text-slate-500 text-xs">{{ ucfirst(str_replace('_', ' ', $bconnectRole ?? '')) }}</div>
+            </div>
+        </div>
+        <form method="POST" action="{{ route('bconnect.logout') }}">@csrf
+            <button type="submit" class="bc-btn bc-btn-danger w-full text-sm"><i class="fas fa-sign-out-alt"></i>Logout</button>
         </form>
     </div>
 </aside>
-<main class="flex-1 flex flex-col overflow-hidden">
-    <header class="h-16 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between px-8">
-        <h2 class="font-bold text-lg">@yield('title')</h2>
+<main class="flex-1 flex flex-col overflow-hidden min-w-0">
+    <header class="h-16 bg-[#0f172a]/90 backdrop-blur border-b border-[var(--bc-border)] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
+        <div class="flex items-center gap-3">
+            <button class="bc-mobile-menu-btn bc-btn bc-btn-secondary p-2 text-sm" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+            <h2 class="font-bold text-lg truncate">@yield('title')</h2>
+        </div>
         <div class="flex items-center gap-4">
-            <a href="{{ route('bconnect.notifications') }}" class="relative text-slate-400 hover:text-white">
+            <a href="{{ route('bconnect.billing') }}" class="hidden sm:flex items-center gap-2 text-xs text-slate-400 hover:text-white bc-badge bc-badge-slate">
+                <i class="fas fa-crown text-cyan-400"></i>{{ ucfirst($bconnectCompany?->plan ?? 'free') }}
+            </a>
+            <a href="{{ route('bconnect.notifications') }}" class="relative text-slate-400 hover:text-white text-lg">
                 <i class="fas fa-bell"></i>
                 @php $unread = \App\Models\Bconnect\Notification::where('member_id', optional($bconnectMember)->id)->where('is_read', false)->count(); @endphp
                 @if($unread > 0)<span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">{{ $unread }}</span>@endif
             </a>
         </div>
     </header>
-    <div class="flex-1 overflow-y-auto p-8">
-        @if(session('success'))<div class="mb-4 p-4 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20">{{ session('success') }}</div>@endif
-        @if(session('error'))<div class="mb-4 p-4 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">{{ session('error') }}</div>@endif
+    <div class="flex-1 overflow-y-auto p-4 lg:p-8">
+        @if(session('success'))<div class="bc-animate mb-4 p-4 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-2"><i class="fas fa-check-circle"></i>{{ session('success') }}</div>@endif
+        @if(session('error'))<div class="bc-animate mb-4 p-4 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i>{{ session('error') }}</div>@endif
+        @if(session('info'))<div class="bc-animate mb-4 p-4 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-2"><i class="fas fa-info-circle"></i>{{ session('info') }}</div>@endif
         @yield('content')
     </div>
 </main>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('mobileOverlay').classList.toggle('open');
+}
+</script>
 </body>
 </html>

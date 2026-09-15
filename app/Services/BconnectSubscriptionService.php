@@ -97,6 +97,8 @@ class BconnectSubscriptionService
                 'currency' => 'INR',
                 'status' => 'paid',
                 'paid_at' => now(),
+                'due_at' => now(),
+                'is_subscription' => true,
                 'description' => "B-CONNECT {$cycle} plan activation to " . self::$plans[$plan]['name'],
                 'metadata' => [
                     'plan_upgrade' => $plan,
@@ -160,6 +162,8 @@ class BconnectSubscriptionService
             'amount' => $price,
             'currency' => 'INR',
             'status' => 'pending',
+            'due_at' => now()->addDays(7),
+            'is_subscription' => true,
             'description' => "B-CONNECT {$cycle} plan renewal to " . self::$plans[$plan]['name'],
             'metadata' => [
                 'plan_renewal' => true,

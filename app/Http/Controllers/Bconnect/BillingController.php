@@ -63,6 +63,8 @@ class BillingController extends Controller
             'amount' => $price,
             'currency' => 'INR',
             'status' => 'pending',
+            'due_at' => now()->addDays(7),
+            'is_subscription' => true,
             'description' => "B-CONNECT {$cycle} plan upgrade to " . BconnectSubscriptionService::$plans[$plan]['name'],
             'metadata' => [
                 'plan_upgrade' => $plan,
@@ -100,6 +102,7 @@ class BillingController extends Controller
             'amount' => $data['amount'],
             'currency' => 'INR',
             'status' => 'pending',
+            'due_at' => now()->addDays(7),
             'description' => $data['description'],
         ]);
 

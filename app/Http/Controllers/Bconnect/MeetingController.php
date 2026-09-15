@@ -11,9 +11,12 @@ class MeetingController extends Controller {
     public function index(Request $r) {
         $meetings = Meeting::where('company_id', $r->input('bconnect_company_id'))
             ->with('creator.user')
-            ->latest()
+            ->orderByRaw('ISNULL(scheduled_at)')
+            ->orderBy('scheduled_at', 'asc')
+            ->latest('started_at')
             ->paginate(20);
-        return view('bconnect.meetings', compact('meetings'));
+        $projects = \App\Models\Bconnect\Project::where('company_id', $r->input('bconnect_company_id'))->get();
+        return view('bconnect.meetings', compact('meetings', 'projects'));
     }
 
     public function store(Request $r) {
@@ -23,6 +26,8 @@ class MeetingController extends Controller {
         $data = $r->validate([
             'title' => 'required',
             'project_id' => ['nullable', Rule::exists('bconnect_projects', 'id')->where('company_id', $r->input('bconnect_company_id'))],
+            'scheduled_at' => 'nullable|date',
+            'duration_minutes' => 'nullable|integer|min:1',
         ]);
         $room = 'bc-' . uniqid();
         $meeting = Meeting::create([
@@ -31,7 +36,9 @@ class MeetingController extends Controller {
             'created_by' => $r->input('bconnect_member')->id,
             'room_id' => $room,
             'title' => $data['title'],
-            'started_at' => now(),
+            'scheduled_at' => $data['scheduled_at'] ?? now(),
+            'started_at' => $data['scheduled_at'] ? null : now(),
+            'duration_minutes' => $data['duration_minutes'] ?? null,
         ]);
         return redirect()->route('bconnect.meeting.room', $room)->with('success', 'Meeting room created');
     }

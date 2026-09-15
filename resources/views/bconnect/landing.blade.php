@@ -144,7 +144,7 @@
         <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <div class="p-8 rounded-2xl border border-slate-200 bg-white">
                 <h3 class="text-xl font-bold">Free</h3>
-                <div class="text-4xl font-extrabold my-4">">₹0</div>
+                <div class="text-4xl font-extrabold my-4">₹0</div>
                 <ul class="space-y-3 text-slate-600 text-sm mb-8">
                     <li><i class="fas fa-check text-green-500 mr-2"></i>2 team members</li>
                     <li><i class="fas fa-check text-green-500 mr-2"></i>1-on-1 calls</li>

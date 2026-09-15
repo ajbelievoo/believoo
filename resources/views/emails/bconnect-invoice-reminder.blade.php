@@ -29,6 +29,7 @@
             <div class="details">
                 <p><strong>Description</strong> {{ $invoice->description }}</p>
                 <p><strong>Created</strong> {{ $invoice->created_at->format('M d, Y') }}</p>
+                <p><strong>Due Date</strong> {{ $invoice->due_at?->format('M d, Y') ?? 'On receipt' }}</p>
             </div>
 
             <div class="amount">₹{{ number_format($invoice->amount, 2) }}</div>

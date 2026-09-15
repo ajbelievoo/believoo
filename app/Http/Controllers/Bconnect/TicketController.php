@@ -24,7 +24,10 @@ class TicketController extends Controller {
             ->when($r->project_id, fn($q) => $q->where('project_id', $r->project_id))
             ->latest()->paginate(20);
         $projects = Project::where('company_id', $r->input('bconnect_company_id'))->get();
-        return view('bconnect.tickets', compact('tickets', 'projects'));
+        $canCreate = \App\Services\BconnectPlanService::canCreateTicket($r->input('bconnect_company_id'));
+        $ticketUsage = \App\Models\Bconnect\Ticket::where('company_id', $r->input('bconnect_company_id'))->count();
+        $ticketLimit = \App\Services\BconnectPlanService::check($r->input('bconnect_company_id'), 'tickets');
+        return view('bconnect.tickets', compact('tickets', 'projects', 'canCreate', 'ticketUsage', 'ticketLimit'));
     }
 
     public function store(Request $r) {
@@ -35,7 +38,7 @@ class TicketController extends Controller {
             'project_id' => ['required', Rule::exists('bconnect_projects', 'id')->where('company_id', $r->input('bconnect_company_id'))],
             'title' => 'required',
             'description' => 'required',
-            'type' => 'required|in:bug,feature,task,question',
+            'type' => 'required|in:bug,feature,task,question,support',
             'priority' => 'required|in:low,medium,high,critical',
         ]);
         $attachments = [];
