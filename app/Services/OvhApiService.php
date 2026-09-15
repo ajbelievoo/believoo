@@ -742,23 +742,134 @@ class OvhApiService
     }
 
     /**
-     * Convenience: order a single VPS from OVH and pay with the OVH account wallet.
+     * Map a synced OVH product category to the OVH cart family endpoint segment.
      */
-    public function orderVps(string $planCode, int $quantity = 1, string $duration = 'P1M', string $os = 'Ubuntu 22.04'): OvhOrderResult
+    protected function cartFamilyForCategory(string $category): string
     {
-        $cart = $this->createCart('Believoo VPS order');
+        return match (strtoupper($category)) {
+            'VPS'            => 'vps',
+            'DEDICATED'      => 'baremetalServers',
+            'WEB_HOSTING'    => 'webHosting',
+            'PUBLIC_CLOUD'   => 'cloud',
+            'PRIVATE_CLOUD'  => 'privateCloud',
+            'DOMAINS'        => 'domain',
+            'DOMAIN'         => 'domain',
+            default          => throw new \InvalidArgumentException("Unsupported OVH category for cart: {$category}"),
+        };
+    }
+
+    /**
+     * Add any catalog product to a cart using the correct family endpoint.
+     */
+    public function addItemToCart(string $cartId, string $category, string $planCode, string $duration = 'P1M', int $quantity = 1, ?string $domain = null): array
+    {
+        $family = $this->cartFamilyForCategory($category);
+
+        $payload = [
+            'planCode'    => $planCode,
+            'duration'    => $duration,
+            'pricingMode' => 'default',
+            'quantity'    => $quantity,
+        ];
+
+        if ($family === 'domain' && $domain) {
+            $payload['domain'] = $domain;
+        }
+
+        return $this->post("/order/cart/{$cartId}/{$family}", $payload);
+    }
+
+    /**
+     * Fetch required configuration labels/values for a cart item.
+     */
+    public function getRequiredCartConfiguration(string $cartId, string $itemId): array
+    {
+        $configs = $this->get("/order/cart/{$cartId}/item/{$itemId}/requiredConfiguration") ?: [];
+
+        $options = [];
+        foreach ($configs as $config) {
+            $label = $config['label'] ?? null;
+            if ($label) {
+                $options[$label] = [
+                    'required'      => $config['required'] ?? false,
+                    'type'          => $config['type'] ?? null,
+                    'allowedValues' => $config['allowedValues'] ?? null,
+                ];
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Auto-configure a cart item with sensible defaults for the given category.
+     * Uses requiredConfiguration to avoid sending unsupported labels.
+     */
+    public function autoConfigureCartItem(string $cartId, string $itemId, string $category, array $overrides = []): void
+    {
+        $required = $this->getRequiredCartConfiguration($cartId, $itemId);
+
+        $defaults = match (strtoupper($category)) {
+            'VPS' => [
+                'vps_datacenter' => $overrides['datacenter'] ?? 'GRA',
+                'vps_os'         => $overrides['os'] ?? 'Ubuntu 22.04',
+                'region'         => $overrides['region'] ?? 'europe',
+                'infrastructure' => $overrides['infrastructure'] ?? 'production',
+            ],
+            'DEDICATED' => [
+                'dedicated_datacenter' => $overrides['datacenter'] ?? 'rbx',
+                'dedicated_os'         => $overrides['os'] ?? 'none_64.en',
+                'region'               => $overrides['region'] ?? 'europe',
+                'enable-backup'        => $overrides['enable_backup'] ?? 'false',
+            ],
+            'WEB_HOSTING' => [
+                'district'     => $overrides['datacenter'] ?? 'gra3',
+                'dns_zone'     => $overrides['dns_zone'] ?? 'NO_CHANGE',
+                'legacy_domain' => $overrides['legacy_domain'] ?? '',
+            ],
+            'PUBLIC_CLOUD' => [
+                'infrastructure' => $overrides['infrastructure'] ?? 'production',
+                'description'    => $overrides['description'] ?? 'Believoo cloud project',
+            ],
+            'DOMAINS', 'DOMAIN' => [
+                'DNS'            => $overrides['dns'] ?? 'NO_CHANGE',
+                'OWNER_LEGAL_AGE' => 'true',
+            ],
+            default => [],
+        };
+
+        foreach ($defaults as $label => $value) {
+            if (!array_key_exists($label, $required)) {
+                continue;
+            }
+
+            $allowed = $required[$label]['allowedValues'] ?? null;
+            if (is_array($allowed) && !in_array((string) $value, array_map('strval', $allowed), true)) {
+                // Fall back to the first allowed value if the default is not accepted.
+                $value = $allowed[0] ?? $value;
+            }
+
+            $this->configureCartItem($cartId, $itemId, $label, (string) $value);
+        }
+    }
+
+    /**
+     * Place a generic OVH catalog product order.
+     */
+    public function orderProduct(string $category, string $planCode, int $quantity = 1, string $duration = 'P1M', array $config = []): OvhOrderResult
+    {
+        $cart = $this->createCart('Believoo ' . $category . ' order');
         $cartId = $cart['cartId'];
 
         try {
-            $item = $this->addVpsToCart($cartId, $planCode, $duration, $quantity);
+            $domain = $config['domain'] ?? null;
+            $item = $this->addItemToCart($cartId, $category, $planCode, $duration, $quantity, $domain);
             $itemId = $item['itemId'] ?? null;
 
             if ($itemId) {
-                $this->configureCartItem($cartId, (string) $itemId, 'vps_datacenter', 'GRA');
-                $this->configureCartItem($cartId, (string) $itemId, 'vps_os', $os);
+                $this->autoConfigureCartItem($cartId, (string) $itemId, $category, $config);
             }
 
-            // Create the sales-order without auto-pay so we can explicitly pay from the wallet.
             $checkout = $this->checkoutCart($cartId, false);
 
             $orderId = $checkout['orderId'] ?? null;
@@ -766,15 +877,18 @@ class OvhApiService
                 throw new \RuntimeException('OVH checkout did not return an orderId: ' . json_encode($checkout));
             }
 
-            // Pay using whichever registered payment mean OVH allows for this order.
-            try {
-                $this->payOrderWithFirstAvailableMean($orderId);
-            } catch (\Exception $e) {
-                Log::error('OVH payment failed after order creation', [
-                    'order_id' => $orderId,
-                    'error'    => $e->getMessage(),
-                ]);
-                throw new \RuntimeException('OVH order created but payment failed: ' . $e->getMessage());
+            // Free orders (e.g. public-cloud discovery) may not need a payment mean.
+            $total = $this->extractTotalFromCheckout($checkout);
+            if ($total !== 0.0) {
+                try {
+                    $this->payOrderWithFirstAvailableMean($orderId);
+                } catch (\Exception $e) {
+                    Log::error('OVH payment failed after order creation', [
+                        'order_id' => $orderId,
+                        'error'    => $e->getMessage(),
+                    ]);
+                    throw new \RuntimeException('OVH order created but payment failed: ' . $e->getMessage());
+                }
             }
 
             return new OvhOrderResult(
@@ -786,7 +900,6 @@ class OvhApiService
                 raw:       $checkout,
             );
         } catch (\Exception $e) {
-            // Best-effort cleanup so we do not leave stale OVH carts behind.
             try {
                 $this->delete('/order/cart/' . $cartId);
             } catch (\Exception $cleanup) {
@@ -794,6 +907,30 @@ class OvhApiService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Extract the total price (with tax) from a checkout response.
+     */
+    protected function extractTotalFromCheckout(array $checkout): float
+    {
+        foreach ($checkout['prices'] ?? [] as $price) {
+            if (($price['label'] ?? '') === 'TOTAL') {
+                return (float) ($price['price']['value'] ?? 0);
+            }
+        }
+        return 0.0;
+    }
+
+    /**
+     * Convenience: order a single VPS from OVH and pay with the OVH account wallet.
+     */
+    public function orderVps(string $planCode, int $quantity = 1, string $duration = 'P1M', string $os = 'Ubuntu 22.04'): OvhOrderResult
+    {
+        return $this->orderProduct('VPS', $planCode, $quantity, $duration, [
+            'os' => $os,
+            'datacenter' => 'GRA',
+        ]);
     }
 }
 

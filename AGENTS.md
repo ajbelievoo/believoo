@@ -29,6 +29,7 @@ Examples:
 - Order delivery status is polled from `/me/order/{orderId}/status` (the status is not included in the main order object).
 - The VPS service name is extracted from an order detail line whose `domain` matches `^vps-[a-z0-9]+\.vps\.ovh\.[a-z]+$`. Option/backup lines append `-linux`, `-autobackup`, etc. and are ignored.
 - Unified OVH catalog products are stored in `ovh_products` and managed from the custom admin panel at `/admin/ovh-products`.
+- `OvhApiService` can now place orders for any synced category (VPS, dedicated, web hosting, public cloud, domains) via `orderProduct()`; `OvhProvisioningService` and `PollOvhServiceDelivery` handle category-specific configuration and delivery polling.
 - License, IP add-on, and CDN products are **not exposed** by OVH's public catalog API for this account (`/order/catalog/public/{license,ip,cdn}` all return `Got an invalid (or empty) URL`). These are server add-ons, not standalone catalog categories, so they are not synced or presented as sellable products.
 
 ## Mail Server (believoo.com email hosting)

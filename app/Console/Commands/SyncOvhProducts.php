@@ -6,6 +6,7 @@ use App\Models\ExchangeRate;
 use App\Models\OvhProduct;
 use App\Models\VpsPlan;
 use App\Services\OvhApiService;
+use App\Services\OvhPricingService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -81,6 +82,8 @@ class SyncOvhProducts extends Command
         $created = 0;
         $updated = 0;
 
+        $pricing = new OvhPricingService();
+
         foreach ($plans as $plan) {
             $ovhMonthly = $plan['price_monthly'];
             $ovhCurrency = $plan['currency_code'] ?? 'EUR';
@@ -91,7 +94,8 @@ class SyncOvhProducts extends Command
             }
 
             $costInInr = $this->convertToInr($ovhMonthly, $ovhCurrency);
-            $saleInInr = $costInInr * (1 + $commission / 100);
+            $priced = $pricing->calculate($costInInr, 'vps', $plan['plan_code'], $commission);
+            $saleInInr = $priced['sale_price'];
 
             $ovhConfig = [
                 'plan_code'     => $plan['plan_code'],
@@ -99,7 +103,8 @@ class SyncOvhProducts extends Command
                 'pricing_mode'  => $plan['pricing_mode'],
                 'ovh_currency'  => $ovhCurrency,
                 'ovh_price'     => $ovhMonthly,
-                'commission'    => $commission,
+                'commission'    => $priced['margin_percent'],
+                'pricing_rule_id' => $priced['rule_id'],
                 'raw_offer'     => $plan['raw'] ?? [],
             ];
 
@@ -178,6 +183,8 @@ class SyncOvhProducts extends Command
         $created = 0;
         $updated = 0;
 
+        $pricing = new OvhPricingService();
+
         foreach ($plans as $plan) {
             $planCode = $plan['plan_code'] ?? null;
             if (!$planCode) {
@@ -192,7 +199,8 @@ class SyncOvhProducts extends Command
             }
 
             $costInInr = $this->convertToInr($monthly['price'], $monthly['currency'] ?? ($plan['currency'] ?? 'EUR'));
-            $saleInInr = $costInInr * (1 + $commission / 100);
+            $priced = $pricing->calculate($costInInr, $slug, $planCode, $commission);
+            $saleInInr = $priced['sale_price'];
 
             $payload = [
                 'category'          => $category,
@@ -206,10 +214,10 @@ class SyncOvhProducts extends Command
                 'disk_type'         => $plan['disk_type'] ?? null,
                 'bandwidth_mbps'    => $plan['bandwidth_mbps'] ?? null,
                 'currency'          => 'INR',
-                'price_monthly'     => round($saleInInr, 2),
-                'cost_price'        => round($costInInr, 2),
-                'sale_price'        => round($saleInInr, 2),
-                'commission_percent'=> $commission,
+                'price_monthly'     => $saleInInr,
+                'cost_price'        => $priced['cost_price'],
+                'sale_price'        => $saleInInr,
+                'commission_percent'=> $priced['margin_percent'],
                 'durations'         => $plan['durations'] ?? [],
                 'ovh_config'        => [
                     'plan_code'    => $planCode,

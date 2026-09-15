@@ -219,6 +219,9 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
         Route::patch('/{ovhProduct}/toggle-active', [App\Http\Controllers\Admin\OvhProductController::class, 'toggleActive'])->name('toggle-active');
     });
 
+    // OVH Dynamic Pricing Rules
+    Route::resource('ovh-pricing-rules', App\Http\Controllers\Admin\OvhPricingRuleController::class)->names('ovh-pricing-rules');
+
     // Datacenter / Proxmox Nodes Management
     Route::prefix('datacenter')->name('datacenter.')->group(function () {
         Route::get('/', [App\Http\Controllers\Admin\DatacenterController::class, 'index'])->name('index');

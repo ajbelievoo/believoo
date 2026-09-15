@@ -21,6 +21,22 @@ class PaymentController extends Controller
     {
         $metadata = [];
 
+        // If an OVH product is explicitly selected, prefer that.
+        if ($request->filled('ovh_product_id')) {
+            $product = \App\Models\OvhProduct::find($request->input('ovh_product_id'));
+            if ($product && $product->is_active) {
+                $metadata['ovh_product_id'] = $product->id;
+                $metadata['ovh_category']   = $product->category;
+                $metadata['cpu_cores']      = $product->cpu_cores;
+                $metadata['ram_gb']         = $product->ram_gb;
+                $metadata['disk_gb']        = $product->disk_gb;
+                $metadata['os']             = $request->input('os', session('ovh_selected_os', 'Ubuntu 22.04'));
+                $metadata['datacenter']     = $request->input('datacenter');
+                $metadata['domain']         = $request->input('domain');
+                $metadata['dns_zone']       = $request->input('dns_zone');
+            }
+        }
+
         $searchName = trim($request->tier_name ?? '');
 
         // If no tier_name but we have a service, try service title as fallback
@@ -29,7 +45,7 @@ class PaymentController extends Controller
         }
 
         // If tier_name (or service title) matches a VPS plan, include specs in metadata
-        if (!empty($searchName)) {
+        if (empty($metadata['ovh_product_id']) && !empty($searchName)) {
             $plan = \App\Models\VpsPlan::whereRaw('LOWER(name) = LOWER(?)', [$searchName])
                 ->orWhereRaw('LOWER(slug) = LOWER(?)', [$searchName])
                 ->first();

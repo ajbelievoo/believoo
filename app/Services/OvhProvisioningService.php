@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\OvhProduct;
 use App\Models\Order;
 use App\Models\UserHosting;
 use App\Models\User;
@@ -18,6 +19,11 @@ class OvhProvisioningService
     public function isOvhOrder(Order $order): bool
     {
         $metadata = $order->metadata ?? [];
+
+        if (!empty($metadata['ovh_product_id'])) {
+            return OvhProduct::where('id', $metadata['ovh_product_id'])->exists();
+        }
+
         $vpsPlanId = $metadata['vps_plan_id'] ?? null;
 
         if ($vpsPlanId) {
@@ -36,6 +42,13 @@ class OvhProvisioningService
             if ($plan && !empty($plan->ovh_plan_code)) {
                 return true;
             }
+
+            $product = OvhProduct::whereRaw('LOWER(plan_code) = LOWER(?)', [$tierName])
+                ->orWhereRaw('LOWER(invoice_name) = LOWER(?)', [$tierName])
+                ->first();
+            if ($product) {
+                return true;
+            }
         }
 
         return false;
@@ -47,17 +60,13 @@ class OvhProvisioningService
     public function provisionFromOrder(Order $order): ?UserHosting
     {
         $metadata = $order->metadata ?? [];
-        $vpsPlanId = $metadata['vps_plan_id'] ?? null;
-        $plan = $vpsPlanId ? VpsPlan::find($vpsPlanId) : null;
+        $plan = $this->resolveOvhPlan($order);
 
         if (!$plan) {
-            $plan = $this->resolvePlanFromTier($order->tier_name);
-        }
-
-        if (!$plan || empty($plan->ovh_plan_code)) {
-            Log::error('OVH provisioning failed: plan not found or missing ovh_plan_code', [
-                'order_id' => $order->id,
+            Log::error('OVH provisioning failed: no OVH-linked product found for order', [
+                'order_id'  => $order->id,
                 'tier_name' => $order->tier_name,
+                'metadata'  => $metadata,
             ]);
             return null;
         }
@@ -86,13 +95,16 @@ class OvhProvisioningService
             return null;
         }
 
+        $category = $plan['category'];
+        $planCode = $plan['plan_code'];
+
         try {
-            return DB::transaction(function () use ($order, $plan, $ovhService, $metadata) {
+            return DB::transaction(function () use ($order, $plan, $ovhService, $metadata, $category, $planCode) {
                 // Idempotency check.
                 $existing = UserHosting::where('order_id', $order->id)->first();
                 if ($existing) {
                     Log::info('OVH provisioning skipped: hosting already exists', [
-                        'order_id' => $order->id,
+                        'order_id'   => $order->id,
                         'hosting_id' => $existing->id,
                     ]);
                     return $existing;
@@ -102,54 +114,74 @@ class OvhProvisioningService
                 $duration = $this->monthsToIsoDuration($billingMonths);
                 $quantity = (int) ($metadata['quantity'] ?? 1);
 
+                // Domains are billed yearly by default.
+                if (in_array(strtoupper($category), ['DOMAINS', 'DOMAIN']) && $billingMonths < 12) {
+                    $duration = 'P1Y';
+                    $billingMonths = 12;
+                }
+
+                // Build configuration from order metadata.
+                $config = array_merge($metadata['ovh_config'] ?? [], [
+                    'os'         => $metadata['os'] ?? null,
+                    'datacenter' => $metadata['datacenter'] ?? null,
+                    'domain'     => $metadata['domain'] ?? null,
+                    'dns_zone'   => $metadata['dns_zone'] ?? null,
+                ]);
+
                 // Place order with OVH.
-                $os = $metadata['os'] ?? 'Ubuntu 22.04';
-                $ovhOrder = $ovhService->orderVps($plan->ovh_plan_code, $quantity, $duration, $os);
+                $ovhOrder = $category === 'VPS'
+                    ? $ovhService->orderVps($planCode, $quantity, $duration, $config['os'] ?? 'Ubuntu 22.04')
+                    : $ovhService->orderProduct($category, $planCode, $quantity, $duration, $config);
 
                 $ovhOrderId = $ovhOrder->orderId;
                 $ovhCost = $ovhOrder->getTotalWithTax();
 
                 Log::info('OVH order placed', [
-                    'order_id' => $order->id,
+                    'order_id'     => $order->id,
                     'ovh_order_id' => $ovhOrderId,
-                    'ovh_cost' => $ovhCost,
-                    'plan_code' => $plan->ovh_plan_code,
+                    'ovh_cost'     => $ovhCost,
+                    'plan_code'    => $planCode,
+                    'category'     => $category,
                 ]);
+
+                $hostingType = 'ovh_' . strtolower(str_replace(' ', '_', $category));
 
                 // Create local hosting record in provisioning state.
                 $hosting = UserHosting::create([
-                    'user_id' => $order->user_id,
-                    'order_id' => $order->id,
-                    'service_id' => $order->service_id,
-                    'hosting_type' => 'ovh_vps',
-                    'plan_name' => $plan->display_name ?? $plan->name,
-                    'status' => 'provisioning',
-                    'price' => $order->amount,
-                    'billing_cycle' => $this->billingCycleFromMonths($billingMonths),
-                    'start_date' => now(),
-                    'expiry_date' => now()->addMonths($billingMonths),
-                    'cpu_cores' => $plan->cpu_cores,
-                    'ram_size' => $plan->memory_gb,
-                    'storage_size' => $plan->disk_gb,
-                    'os_name' => $metadata['os'] ?? 'Ubuntu 22.04',
-                    'root_password' => $this->generateSecurePassword(),
-                    'admin_notes' => "OVH order placed: {$ovhOrderId}. Plan code: {$plan->ovh_plan_code}. Awaiting service delivery.",
-                    'provider_name' => 'ovh',
+                    'user_id'           => $order->user_id,
+                    'order_id'          => $order->id,
+                    'service_id'        => $order->service_id,
+                    'hosting_type'      => $hostingType,
+                    'plan_name'         => $plan['display_name'],
+                    'primary_domain'    => $metadata['domain'] ?? null,
+                    'status'            => 'provisioning',
+                    'price'             => $order->amount,
+                    'billing_cycle'     => $this->billingCycleFromMonths($billingMonths),
+                    'start_date'        => now(),
+                    'expiry_date'       => now()->addMonths($billingMonths),
+                    'cpu_cores'         => $plan['cpu_cores'],
+                    'ram_size'          => $plan['ram_size'],
+                    'storage_size'      => $plan['disk_size'],
+                    'os_name'           => $metadata['os'] ?? $plan['os_name'],
+                    'root_password'     => $this->generateSecurePassword(),
+                    'admin_notes'       => "OVH order placed: {$ovhOrderId}. Plan code: {$planCode}. Category: {$category}. Awaiting service delivery.",
+                    'provider_name'     => 'ovh',
                     'provider_order_id' => $ovhOrderId,
-                    'provider_metadata' => array_merge($plan->ovh_config ?? [], [
-                        'ovh_order_id' => $ovhOrderId,
+                    'provider_metadata' => array_merge($plan['ovh_config'] ?? [], [
+                        'category'      => $category,
+                        'ovh_order_id'  => $ovhOrderId,
                         'ovh_order_url' => $ovhOrder->url,
-                        'ovh_cost' => $ovhCost,
+                        'ovh_cost'      => $ovhCost,
                     ]),
                 ]);
 
-                $this->createInvoiceFromOrder($order, $hosting);
+                $this->createInvoiceFromOrder($order, $hosting, $category);
 
                 $user = User::find($order->user_id);
                 if ($user) {
                     $user->notify(new \App\Notifications\VpsServerNotification('payment_success', [
                         'amount' => number_format($order->amount, 2),
-                        'plan' => $hosting->plan_name,
+                        'plan'   => $hosting->plan_name,
                     ]));
                     $user->notify(new \App\Notifications\VpsServerNotification('vm_provisioning', [
                         'plan' => $hosting->plan_name,
@@ -169,17 +201,17 @@ class OvhProvisioningService
 
             // Record a failed hosting entry so the admin can see and fix it manually.
             $hosting = UserHosting::create([
-                'user_id' => $order->user_id,
-                'order_id' => $order->id,
-                'service_id' => $order->service_id,
-                'hosting_type' => 'ovh_vps',
-                'plan_name' => $order->tier_name ?: 'OVH VPS',
-                'status' => 'failed',
-                'price' => $order->amount,
+                'user_id'       => $order->user_id,
+                'order_id'      => $order->id,
+                'service_id'    => $order->service_id,
+                'hosting_type'  => 'ovh_' . strtolower(str_replace(' ', '_', $category ?? 'unknown')),
+                'plan_name'     => $order->tier_name ?: 'OVH ' . ucfirst(strtolower($category ?? 'product')),
+                'status'        => 'failed',
+                'price'         => $order->amount,
                 'billing_cycle' => 'monthly',
-                'start_date' => now(),
-                'expiry_date' => now(),
-                'admin_notes' => 'Cloud order failed: ' . $e->getMessage(),
+                'start_date'    => now(),
+                'expiry_date'   => now(),
+                'admin_notes'   => 'Cloud order failed: ' . $e->getMessage(),
                 'provider_name' => 'cloud',
             ]);
 
@@ -190,7 +222,7 @@ class OvhProvisioningService
             }
             \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminAlertNotification(
                 title: 'Cloud Order Failed - Manual Action Required',
-                message: "Order #{$order->id} ({$order->tier_name}) was paid by the customer but the cloud provisioning order failed: {$e->getMessage()}. Check the hosting record #{$hosting->id}.",
+                message: "Order #{$order->id} ({$order->tier_name}) was paid by the customer but the OVH provisioning order failed: {$e->getMessage()}. Check the hosting record #{$hosting->id}.",
                 actionUrl: url('/admin/user-hostings/' . $hosting->id),
                 actionLabel: 'View Hosting'
             ));
@@ -200,16 +232,83 @@ class OvhProvisioningService
     }
 
     /**
-     * Try to find a VpsPlan from the order tier name.
+     * Resolve the OVH product / plan for an order.
+     * Returns a normalized array with category, plan_code, display_name, specs, etc.
      */
-    protected function resolvePlanFromTier(?string $tierName): ?VpsPlan
+    protected function resolveOvhPlan(Order $order): ?array
     {
-        if (empty($tierName)) {
-            return null;
+        $metadata = $order->metadata ?? [];
+
+        // Highest priority: explicit OvhProduct.
+        if (!empty($metadata['ovh_product_id'])) {
+            $product = OvhProduct::find($metadata['ovh_product_id']);
+            if ($product && $product->is_active) {
+                return $this->normalizeOvhProduct($product);
+            }
         }
-        return VpsPlan::whereRaw('LOWER(name) = LOWER(?)', [$tierName])
-            ->orWhereRaw('LOWER(slug) = LOWER(?)', [$tierName])
-            ->first();
+
+        // Legacy VPS plan path.
+        $vpsPlanId = $metadata['vps_plan_id'] ?? null;
+        if ($vpsPlanId) {
+            $plan = VpsPlan::find($vpsPlanId);
+            if ($plan && !empty($plan->ovh_plan_code)) {
+                return $this->normalizeVpsPlan($plan);
+            }
+        }
+
+        // Try tier name / slug against VpsPlan.
+        $tierName = trim($order->tier_name ?? '');
+        if ($tierName) {
+            $plan = VpsPlan::whereRaw('LOWER(name) = LOWER(?)', [$tierName])
+                ->orWhereRaw('LOWER(slug) = LOWER(?)', [$tierName])
+                ->first();
+            if ($plan && !empty($plan->ovh_plan_code)) {
+                return $this->normalizeVpsPlan($plan);
+            }
+
+            $product = OvhProduct::whereRaw('LOWER(plan_code) = LOWER(?)', [$tierName])
+                ->orWhereRaw('LOWER(invoice_name) = LOWER(?)', [$tierName])
+                ->first();
+            if ($product && $product->is_active) {
+                return $this->normalizeOvhProduct($product);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize a VpsPlan for generic provisioning.
+     */
+    protected function normalizeVpsPlan(VpsPlan $plan): array
+    {
+        return [
+            'category'     => 'VPS',
+            'plan_code'    => $plan->ovh_plan_code,
+            'display_name' => $plan->display_name ?? $plan->name,
+            'cpu_cores'    => $plan->cpu_cores,
+            'ram_size'     => $plan->memory_gb,
+            'disk_size'    => $plan->disk_gb,
+            'os_name'      => $plan->os ?? 'Ubuntu 22.04',
+            'ovh_config'   => $plan->ovh_config ?? [],
+        ];
+    }
+
+    /**
+     * Normalize an OvhProduct for generic provisioning.
+     */
+    protected function normalizeOvhProduct(OvhProduct $product): array
+    {
+        return [
+            'category'     => $product->category,
+            'plan_code'    => $product->plan_code,
+            'display_name' => $product->display_name ?? $product->plan_code,
+            'cpu_cores'    => $product->cpu_cores,
+            'ram_size'     => $product->ram_gb,
+            'disk_size'    => $product->disk_gb,
+            'os_name'      => null,
+            'ovh_config'   => $product->ovh_config ?? [],
+        ];
     }
 
     /**
@@ -254,14 +353,23 @@ class OvhProvisioningService
     /**
      * Create a local invoice for the order.
      */
-    protected function createInvoiceFromOrder(Order $order, UserHosting $hosting): ?Invoice
+    protected function createInvoiceFromOrder(Order $order, UserHosting $hosting, string $category = 'VPS'): ?Invoice
     {
         try {
+            $label = match (strtoupper($category)) {
+                'DEDICATED'     => 'OVH Dedicated Server',
+                'WEB_HOSTING'   => 'OVH Web Hosting',
+                'PUBLIC_CLOUD'  => 'OVH Public Cloud',
+                'PRIVATE_CLOUD' => 'OVH Private Cloud',
+                'DOMAINS', 'DOMAIN' => 'OVH Domain',
+                default         => 'OVH VPS',
+            };
+
             return Invoice::create([
                 'user_id' => $order->user_id,
                 'order_id' => $order->id,
                 'invoice_type' => 'hosting',
-                'description' => $hosting->plan_name . ' - OVH VPS',
+                'description' => $hosting->plan_name . ' - ' . $label,
                 'amount' => $order->amount,
                 'tax_amount' => $order->gst_amount ?? 0,
                 'total_amount' => $order->amount,
@@ -274,7 +382,7 @@ class OvhProvisioningService
                 'line_items' => [
                     [
                         'item' => $hosting->plan_name,
-                        'description' => 'OVH VPS - ' . $hosting->billing_cycle,
+                        'description' => $label . ' - ' . $hosting->billing_cycle,
                         'quantity' => 1,
                         'price' => $order->amount,
                         'total' => $order->amount,

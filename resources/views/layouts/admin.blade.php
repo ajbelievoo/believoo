@@ -467,6 +467,9 @@
                 <a href="{{ route('admin.ovh-products.index') }}" class="nav-link {{ request()->routeIs('admin.ovh-products.*') ? 'active' : '' }}">
                     <i class="fas fa-cubes"></i><span>OVH Products</span>
                 </a>
+                <a href="{{ route('admin.ovh-pricing-rules.index') }}" class="nav-link {{ request()->routeIs('admin.ovh-pricing-rules.*') ? 'active' : '' }}">
+                    <i class="fas fa-sliders-h"></i><span>OVH Pricing Rules</span>
+                </a>
             </div>
 
             {{-- Projects Section --}}
