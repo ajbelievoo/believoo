@@ -26,6 +26,11 @@ class TestOvhCredentials extends Command
             $me = $service->get('/me');
 
             $this->info('Connected successfully!');
+            $currency = $me['currency'] ?? 'N/A';
+            if (is_array($currency)) {
+                $currency = $currency['code'] ?? ($currency['currencyCode'] ?? json_encode($currency));
+            }
+
             $this->table(
                 ['Field', 'Value'],
                 [
@@ -33,7 +38,7 @@ class TestOvhCredentials extends Command
                     ['Name', ($me['firstname'] ?? '') . ' ' . ($me['name'] ?? '')],
                     ['Email', $me['email'] ?? 'N/A'],
                     ['Country', $me['country'] ?? 'N/A'],
-                    ['Currency', $me['currency'] ?? 'N/A'],
+                    ['Currency', $currency],
                 ]
             );
 

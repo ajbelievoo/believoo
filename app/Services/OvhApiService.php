@@ -17,6 +17,12 @@ class OvhApiService
 
     protected array $config = [];
 
+    protected const PYTHON_BASE_URL = 'http://127.0.0.1:8000';
+
+    protected const PYTHON_SERVICE_KEY_CONFIG = 'ghc_admin_service_key';
+
+    protected ?string $pythonServiceKey = null;
+
     public function __construct()
     {
         $this->config = $this->loadConfig();
@@ -162,6 +168,8 @@ class OvhApiService
 
     /**
      * Execute a raw OVH API call with logging and error handling.
+     * Routes through the GHC Python backend because the PHP cURL/OpenSSL
+     * stack cannot handshake with OVH's TLS 1.3 endpoints.
      */
     protected function call(string $method, string $path, array $params = []): mixed
     {
@@ -169,6 +177,32 @@ class OvhApiService
             throw new \RuntimeException('OVH API is not configured or enabled');
         }
 
+        // Try GHC Python backend first (newer OpenSSL/cURL stack).
+        $serviceKey = $this->getPythonServiceKey();
+        if ($serviceKey !== null) {
+            try {
+                Log::info('OVH API call via GHC Python', [
+                    'method' => $method,
+                    'path'   => $path,
+                ]);
+
+                return $this->callThroughPython($method, $path, $params);
+            } catch (\Exception $e) {
+                // If the proxy returned a valid OVH API error (e.g. 403/500 from OVH),
+                // do not hide it behind a PHP TLS handshake failure.
+                if (str_starts_with($e->getMessage(), 'GHC Python OVH proxy returned HTTP')) {
+                    throw $e;
+                }
+
+                Log::warning('GHC Python OVH proxy failed, falling back to direct', [
+                    'method' => $method,
+                    'path'   => $path,
+                    'error'  => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Fallback: direct PHP OVH client (requires up-to-date cURL/OpenSSL).
         try {
             Log::info('OVH API call', [
                 'method' => $method,
@@ -199,6 +233,59 @@ class OvhApiService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Fetch the GHC admin service key from the GHC SQLite database.
+     */
+    protected function getPythonServiceKey(): ?string
+    {
+        if ($this->pythonServiceKey !== null) {
+            return $this->pythonServiceKey;
+        }
+
+        try {
+            $value = DB::connection('ghc')->table('admin_configs')
+                ->where('key', self::PYTHON_SERVICE_KEY_CONFIG)
+                ->value('value');
+
+            $this->pythonServiceKey = is_string($value) && $value !== '' ? $value : null;
+        } catch (\Exception $e) {
+            Log::warning('GHC service key lookup failed', ['error' => $e->getMessage()]);
+            $this->pythonServiceKey = null;
+        }
+
+        return $this->pythonServiceKey;
+    }
+
+    /**
+     * Call the GHC Python backend OVH proxy.
+     */
+    protected function callThroughPython(string $method, string $path, array $params = []): mixed
+    {
+        $key = $this->getPythonServiceKey();
+        if ($key === null) {
+            throw new \RuntimeException('GHC Python service key is not configured');
+        }
+
+        $response = Http::timeout(60)
+            ->withHeaders(['X-Service-Key' => $key])
+            ->post(self::PYTHON_BASE_URL . '/api/admin/ovh/proxy', [
+                'method' => $method,
+                'path'   => $path,
+                'params' => empty($params) ? (object) [] : $params,
+            ]);
+
+        if (!$response->successful()) {
+            $body = $response->body();
+            Log::error('GHC Python OVH proxy returned error', [
+                'status' => $response->status(),
+                'body'   => $body,
+            ]);
+            throw new \RuntimeException('GHC Python OVH proxy returned HTTP ' . $response->status() . ': ' . $body);
+        }
+
+        return $response->json();
     }
 
     // ------------------------------------------------------------------------
@@ -312,6 +399,32 @@ class OvhApiService
         }
     }
 
+    /**
+     * Check whether the OVH account has any usable payment method registered.
+     */
+    public function hasPaymentMeans(): bool
+    {
+        $means = $this->getAvailablePaymentMeans();
+        if (!empty($means)) {
+            return true;
+        }
+
+        try {
+            $auto = $this->get('/me/availableAutomaticPaymentMeans');
+            if (is_array($auto)) {
+                foreach ($auto as $value) {
+                    if ($value === true) {
+                        return true;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('OVH automatic payment means fetch failed', ['error' => $e->getMessage()]);
+        }
+
+        return false;
+    }
+
     // ------------------------------------------------------------------------
     // Catalog helpers
     // ------------------------------------------------------------------------
@@ -319,71 +432,87 @@ class OvhApiService
     /**
      * Get available VPS plans from OVH order catalog.
      * Returns an array of normalized plan objects.
+     *
+     * Uses the GHC Python backend catalog because the public OVH catalog is
+     * already filtered and parsed there (PHP's cart endpoint returns add-ons).
      */
     public function getVpsPlans(): array
     {
-        $subsidiary = $this->config['ovh_subsidiary'] ?? 'FR';
+        $response = Http::timeout(60)
+            ->get(self::PYTHON_BASE_URL . '/api/catalog/plans?category=VPS');
 
-        // Create a temporary cart to interrogate the VPS catalog.
-        $cart = $this->post('/order/cart', [
-            'ovhSubsidiary' => $subsidiary,
-            'description'   => 'Believoo catalog probe',
-        ]);
-
-        $cartId = $cart['cartId'] ?? null;
-        if (!$cartId) {
-            throw new \RuntimeException('OVH did not return a cartId');
+        if (!$response->successful()) {
+            throw new \RuntimeException('GHC catalog fetch failed: ' . $response->body());
         }
 
-        try {
-            // Ask for available VPS offers in this cart.
-            $offers = $this->get("/order/cart/{$cartId}/vps");
-            return $this->normalizeVpsOffers($offers ?: []);
-        } finally {
-            // Clean up the probe cart.
-            try {
-                $this->delete("/order/cart/{$cartId}");
-            } catch (\Exception $e) {
-                Log::warning('OVH cart cleanup failed', ['cartId' => $cartId, 'error' => $e->getMessage()]);
-            }
-        }
+        $plans = $response->json() ?? [];
+        return $this->normalizeVpsCatalog($plans);
     }
 
     /**
-     * Normalize raw OVH VPS offer data into a consistent structure.
+     * Normalize GHC Python catalog plans into the structure the sync job expects.
      */
-    protected function normalizeVpsOffers(array $offers): array
+    protected function normalizeVpsCatalog(array $plans): array
     {
-        $plans = [];
-        foreach ($offers as $offer) {
-            $planCode = $offer['planCode'] ?? null;
+        $normalized = [];
+        foreach ($plans as $plan) {
+            $planCode = $plan['plan_code'] ?? null;
             if (!$planCode) {
                 continue;
             }
 
-            $prices = $offer['prices'] ?? [];
-            $monthlyPrice = $this->extractMonthlyPrice($prices);
+            // Only base VPS plans; skip add-ons and options.
+            if (!str_starts_with(strtolower($planCode), 'vps-') && !str_starts_with(strtolower($planCode), 's')) {
+                continue;
+            }
+            if (str_contains(strtolower($planCode), 'option') || str_contains(strtolower($planCode), 'ftpbackup')) {
+                continue;
+            }
 
-            $specs = $this->extractVpsSpecsFromPlanCode($planCode);
+            $monthly = $this->extractMonthlyDurationPrice($plan['durations'] ?? []);
 
-            $plans[] = [
+            $normalized[] = [
                 'plan_code'     => $planCode,
-                'product_name'  => $offer['productName'] ?? $planCode,
-                'display_name'  => $offer['productName'] ?? $planCode,
-                'duration'      => $this->extractDuration($prices),
-                'pricing_mode'  => $offer['pricingMode'] ?? 'default',
-                'price_monthly' => $monthlyPrice,
-                'currency_code' => $offer['currencyCode'] ?? 'EUR',
-                'cpu_cores'     => $specs['cpu_cores'] ?? 1,
-                'memory_gb'     => $specs['memory_gb'] ?? 1,
-                'disk_gb'       => $specs['disk_gb'] ?? 20,
-                'disk_type'     => 'SSD',
+                'product_name'  => $plan['invoice_name'] ?? $planCode,
+                'display_name'  => $plan['invoice_name'] ?? $planCode,
+                'duration'      => 'P1M',
+                'pricing_mode'  => 'default',
+                'price_monthly' => $monthly['price'],
+                'currency_code' => $monthly['currency'] ?? ($plan['currency'] ?? 'EUR'),
+                'cpu_cores'     => $plan['cpu_cores'] ?? 1,
+                'memory_gb'     => $plan['ram_gb'] ?? 1,
+                'disk_gb'       => $plan['disk_gb'] ?? 20,
+                'disk_type'     => $plan['disk_type'] ?? 'SSD',
                 'bandwidth'     => 'Unlimited',
-                'raw'           => $offer,
+                'raw'           => $plan,
             ];
         }
 
-        return $plans;
+        return $normalized;
+    }
+
+    /**
+     * Pick the monthly (1 month) raw price from a list of GHC plan durations.
+     */
+    protected function extractMonthlyDurationPrice(array $durations): array
+    {
+        foreach ($durations as $duration) {
+            if (($duration['interval'] ?? 0) == 1 && ($duration['interval_unit'] ?? '') === 'month') {
+                return [
+                    'price'    => (float) ($duration['raw_price'] ?? 0),
+                    'currency' => $duration['currency'] ?? 'EUR',
+                ];
+            }
+        }
+
+        if (!empty($durations[0])) {
+            return [
+                'price'    => (float) ($durations[0]['raw_price'] ?? 0),
+                'currency' => $durations[0]['currency'] ?? 'EUR',
+            ];
+        }
+
+        return ['price' => null, 'currency' => 'EUR'];
     }
 
     /**
@@ -449,14 +578,29 @@ class OvhApiService
     // ------------------------------------------------------------------------
 
     /**
-     * Create an order cart for a given subsidiary.
+     * Create an order cart for a given subsidiary and assign it to the account.
      */
     public function createCart(string $description = 'Believoo order'): array
     {
-        return $this->post('/order/cart', [
+        $cart = $this->post('/order/cart', [
             'ovhSubsidiary' => $this->config['ovh_subsidiary'] ?? 'FR',
             'description'   => $description,
         ]);
+
+        $cartId = $cart['cartId'] ?? null;
+        if ($cartId) {
+            $this->assignCart($cartId);
+        }
+
+        return $cart;
+    }
+
+    /**
+     * Assign a cart to the authenticated OVH account.
+     */
+    public function assignCart(string $cartId): mixed
+    {
+        return $this->post("/order/cart/{$cartId}/assign");
     }
 
     /**
@@ -469,6 +613,17 @@ class OvhApiService
             'duration'    => $duration,
             'pricingMode' => 'default',
             'quantity'    => $quantity,
+        ]);
+    }
+
+    /**
+     * Add a configuration value to a cart item (datacenter, OS, etc.).
+     */
+    public function configureCartItem(string $cartId, string $itemId, string $label, string $value): array
+    {
+        return $this->post("/order/cart/{$cartId}/item/{$itemId}/configuration", [
+            'label' => $label,
+            'value' => $value,
         ]);
     }
 
@@ -498,40 +653,56 @@ class OvhApiService
     /**
      * Convenience: order a single VPS from OVH and pay with the OVH account wallet.
      */
-    public function orderVps(string $planCode, int $quantity = 1, string $duration = 'P1M'): OvhOrderResult
+    public function orderVps(string $planCode, int $quantity = 1, string $duration = 'P1M', string $os = 'Ubuntu 22.04'): OvhOrderResult
     {
         $cart = $this->createCart('Believoo VPS order');
         $cartId = $cart['cartId'];
 
-        $this->addVpsToCart($cartId, $planCode, $duration, $quantity);
-
-        // Create the sales-order without auto-pay so we can explicitly pay from the wallet.
-        $checkout = $this->checkoutCart($cartId, false);
-
-        $orderId = $checkout['orderId'] ?? null;
-        if (!$orderId) {
-            throw new \RuntimeException('OVH checkout did not return an orderId: ' . json_encode($checkout));
-        }
-
-        // Pay using the OVH prepaid account (wallet) for the configured subsidiary.
         try {
-            $this->payOrder($orderId, 'ovhAccount');
-        } catch (\Exception $e) {
-            Log::error('OVH wallet payment failed after order creation', [
-                'order_id' => $orderId,
-                'error'    => $e->getMessage(),
-            ]);
-            throw new \RuntimeException('OVH order created but wallet payment failed: ' . $e->getMessage());
-        }
+            $item = $this->addVpsToCart($cartId, $planCode, $duration, $quantity);
+            $itemId = $item['itemId'] ?? null;
 
-        return new OvhOrderResult(
-            orderId:   $orderId,
-            cartId:    $cartId,
-            url:       $checkout['url'] ?? null,
-            prices:    $checkout['prices'] ?? [],
-            contracts: $checkout['contracts'] ?? [],
-            raw:       $checkout,
-        );
+            if ($itemId) {
+                $this->configureCartItem($cartId, (string) $itemId, 'vps_datacenter', 'GRA');
+                $this->configureCartItem($cartId, (string) $itemId, 'vps_os', $os);
+            }
+
+            // Create the sales-order without auto-pay so we can explicitly pay from the wallet.
+            $checkout = $this->checkoutCart($cartId, false);
+
+            $orderId = $checkout['orderId'] ?? null;
+            if (!$orderId) {
+                throw new \RuntimeException('OVH checkout did not return an orderId: ' . json_encode($checkout));
+            }
+
+            // Pay using the OVH prepaid account (wallet) for the configured subsidiary.
+            try {
+                $this->payOrder($orderId, 'ovhAccount');
+            } catch (\Exception $e) {
+                Log::error('OVH wallet payment failed after order creation', [
+                    'order_id' => $orderId,
+                    'error'    => $e->getMessage(),
+                ]);
+                throw new \RuntimeException('OVH order created but wallet payment failed: ' . $e->getMessage());
+            }
+
+            return new OvhOrderResult(
+                orderId:   $orderId,
+                cartId:    $cartId,
+                url:       $checkout['url'] ?? null,
+                prices:    $checkout['prices'] ?? [],
+                contracts: $checkout['contracts'] ?? [],
+                raw:       $checkout,
+            );
+        } catch (\Exception $e) {
+            // Best-effort cleanup so we do not leave stale OVH carts behind.
+            try {
+                $this->delete('/order/cart/' . $cartId);
+            } catch (\Exception $cleanup) {
+                // Ignore cleanup errors.
+            }
+            throw $e;
+        }
     }
 }
 

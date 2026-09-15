@@ -24,6 +24,8 @@ Examples:
 - Test credentials: `ovh:test-credentials`.
 - OVH-linked VPS plans use the `ovh_plan_code` field. Orders for those plans are placed via OVH API after customer payment.
 - Non-OVH plans continue to be provisioned on the local Proxmox node.
+- Laravel routes OVH calls through the GHC Python backend (`/api/admin/ovh/proxy`) because PHP's cURL/OpenSSL stack is too old for OVH's TLS 1.3 endpoints.
+- OVH order checkout (`/order/cart/{cartId}/checkout`) returns `You are not allowed` when the account has no registered payment method and/or zero balance. Adding a payment method and/or prepaid balance in the OVH manager is required before real provisioning can succeed.
 
 ## Mail Server (believoo.com email hosting)
 

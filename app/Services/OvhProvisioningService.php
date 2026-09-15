@@ -78,6 +78,14 @@ class OvhProvisioningService
             return null;
         }
 
+        // A registered payment method is also required for OVH to accept an order.
+        if (!$ovhService->hasPaymentMeans()) {
+            Log::error('OVH provisioning failed: no registered payment means on OVH account', [
+                'order_id' => $order->id,
+            ]);
+            return null;
+        }
+
         try {
             return DB::transaction(function () use ($order, $plan, $ovhService, $metadata) {
                 // Idempotency check.
@@ -95,7 +103,8 @@ class OvhProvisioningService
                 $quantity = (int) ($metadata['quantity'] ?? 1);
 
                 // Place order with OVH.
-                $ovhOrder = $ovhService->orderVps($plan->ovh_plan_code, $quantity, $duration);
+                $os = $metadata['os'] ?? 'Ubuntu 22.04';
+                $ovhOrder = $ovhService->orderVps($plan->ovh_plan_code, $quantity, $duration, $os);
 
                 $ovhOrderId = $ovhOrder->orderId;
                 $ovhCost = $ovhOrder->getTotalWithTax();
