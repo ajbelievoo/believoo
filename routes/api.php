@@ -26,7 +26,8 @@ use Illuminate\Support\Facades\Route;
 |   server-imports:write, licenses:read, licenses:write,
 |   tickets:read, tickets:write, currencies:read, currencies:write,
 |   streaming:read, audio-mixer:read, audio-mixer:write,
-|   bconnect:read, bconnect:write
+|   bconnect:read, bconnect:write,
+|   churn:read
 |
 */
 
@@ -122,6 +123,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/{ticketId}', [SupportApiController::class, 'show'])->middleware('api.key:tickets:read');
             Route::post('/{ticketId}/messages', [SupportApiController::class, 'addMessage'])->middleware('api.key:tickets:write');
             Route::post('/{ticketId}/close', [SupportApiController::class, 'close'])->middleware('api.key:tickets:write');
+        });
+
+        // Churn risk
+        Route::prefix('churn-risk')->middleware('api.key:churn:read')->group(function () {
+            Route::get('/users', [\App\Http\Controllers\Api\V1\ChurnRiskController::class, 'users']);
+            Route::get('/companies', [\App\Http\Controllers\Api\V1\ChurnRiskController::class, 'companies']);
+            Route::get('/users/{user}', [\App\Http\Controllers\Api\V1\ChurnRiskController::class, 'showUser']);
+            Route::get('/companies/{company}', [\App\Http\Controllers\Api\V1\ChurnRiskController::class, 'showCompany']);
         });
 
         // B-Connect workspace

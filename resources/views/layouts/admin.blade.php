@@ -590,6 +590,9 @@
                 <a href="{{ route('admin.ai-messages.index') }}" class="nav-link {{ request()->routeIs('admin.ai-messages.*') ? 'active' : '' }}">
                     <i class="fas fa-robot"></i><span>AI Chat</span>
                 </a>
+                <a href="{{ route('admin.churn-risk.index') }}" class="nav-link {{ request()->routeIs('admin.churn-risk.*') ? 'active' : '' }}">
+                    <i class="fas fa-chart-line"></i><span>Churn Risk</span>
+                </a>
                 <a href="{{ route('admin.campaigns.index') }}" class="nav-link {{ request()->routeIs('admin.campaigns.*') ? 'active' : '' }}">
                     <i class="fas fa-envelope-open-text"></i><span>Email Campaigns</span>
                 </a>

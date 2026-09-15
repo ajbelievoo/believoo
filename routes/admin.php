@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\GhcController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\AiChatController;
+use App\Http\Controllers\Admin\ChurnRiskController;
 use App\Http\Controllers\Admin\EmailCampaignController;
 use App\Http\Controllers\Admin\ApiKeyController;
 
@@ -255,6 +256,9 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
     Route::get('ai-messages/{sessionId}', [AiChatController::class, 'show'])->name('ai-messages.show');
     Route::delete('ai-messages/{sessionId}', [AiChatController::class, 'destroy'])->name('ai-messages.destroy');
     Route::get('ai-feedback/{feedback}', [AiChatController::class, 'feedback'])->name('ai-messages.feedback');
+
+    // Predictive churn
+    Route::get('churn-risk', [ChurnRiskController::class, 'index'])->name('churn-risk.index');
 
     // API key management
     Route::resource('api-keys', ApiKeyController::class);

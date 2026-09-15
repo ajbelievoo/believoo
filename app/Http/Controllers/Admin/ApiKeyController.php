@@ -26,6 +26,7 @@ class ApiKeyController extends Controller
         'audio-mixer:write',
         'bconnect:read',
         'bconnect:write',
+        'churn:read',
         '*',
     ];
 
