@@ -5,11 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Models\Service;
+
 class OvhProduct extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'service_id',
         'category',
         'family',
         'plan_code',
@@ -64,6 +67,11 @@ class OvhProduct extends Model
     public function getFormattedMonthlyPriceAttribute(): string
     {
         return '₹' . number_format($this->price_monthly ?: 0, 0) . '/mo';
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
     }
 
     public function getCategoryLabelAttribute(): string

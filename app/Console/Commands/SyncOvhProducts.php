@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ExchangeRate;
 use App\Models\OvhProduct;
+use App\Models\Service;
 use App\Models\VpsPlan;
 use App\Services\OvhApiService;
 use App\Services\OvhPricingService;
@@ -237,11 +238,14 @@ class SyncOvhProducts extends Command
             } else {
                 if ($existing) {
                     $existing->update($payload);
+                    $product = $existing->refresh();
                     $updated++;
                 } else {
-                    OvhProduct::create($payload);
+                    $product = OvhProduct::create($payload);
                     $created++;
                 }
+
+                $this->syncServiceForProduct($product);
             }
 
             $synced++;
@@ -326,5 +330,53 @@ class SyncOvhProducts extends Command
     protected function slugify(string $planCode): string
     {
         return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $planCode));
+    }
+
+    /**
+     * Mirror an OvhProduct as a customer-facing Service so the existing
+     * site checkout flow can sell it.
+     */
+    protected function syncServiceForProduct(OvhProduct $product): void
+    {
+        // Skip categories that are not directly orderable through the generic cart flow.
+        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'LICENSE', 'IP_ADDON', 'CDN'])) {
+            return;
+        }
+
+        $features = [];
+        if ($product->cpu_cores) {
+            $features[] = $product->cpu_cores . ' vCores';
+        }
+        if ($product->ram_gb) {
+            $features[] = $product->ram_gb . ' GB RAM';
+        }
+        if ($product->disk_gb) {
+            $features[] = $product->disk_gb . ' GB ' . ($product->disk_type ?? 'SSD');
+        }
+        if ($product->bandwidth_mbps) {
+            $features[] = $product->bandwidth_mbps . ' Mbps';
+        }
+
+        $serviceData = [
+            'title'         => $product->display_name,
+            'slug'          => $this->slugify($product->plan_code),
+            'category'      => 'ovh_' . strtolower($product->category),
+            'description'   => $product->description ?: 'OVH ' . $product->category_label . ' plan',
+            'price'         => $product->price_monthly,
+            'price_label'   => 'per month',
+            'pricing_tiers' => [
+                ['name' => 'default', 'price' => $product->price_monthly],
+            ],
+            'billing_cycles' => Service::getDefaultBillingCycles(),
+            'features'      => $features,
+            'is_active'     => $product->is_active,
+        ];
+
+        $service = Service::updateOrCreate(
+            ['slug' => $serviceData['slug']],
+            $serviceData
+        );
+
+        $product->update(['service_id' => $service->id]);
     }
 }

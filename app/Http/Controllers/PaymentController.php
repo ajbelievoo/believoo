@@ -37,6 +37,22 @@ class PaymentController extends Controller
             }
         }
 
+        // If the selected Service is linked to an OvhProduct, use it.
+        if (empty($metadata['ovh_product_id']) && $service && $service->exists) {
+            $product = \App\Models\OvhProduct::where('service_id', $service->id)->first();
+            if ($product && $product->is_active) {
+                $metadata['ovh_product_id'] = $product->id;
+                $metadata['ovh_category']   = $product->category;
+                $metadata['cpu_cores']      = $product->cpu_cores;
+                $metadata['ram_gb']         = $product->ram_gb;
+                $metadata['disk_gb']        = $product->disk_gb;
+                $metadata['os']             = $request->input('os', session('ovh_selected_os', 'Ubuntu 22.04'));
+                $metadata['datacenter']     = $request->input('datacenter');
+                $metadata['domain']         = $request->input('domain');
+                $metadata['dns_zone']       = $request->input('dns_zone');
+            }
+        }
+
         $searchName = trim($request->tier_name ?? '');
 
         // If no tier_name but we have a service, try service title as fallback
