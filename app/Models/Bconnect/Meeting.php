@@ -8,4 +8,7 @@ class Meeting extends Model {
     public function company() { return $this->belongsTo(Company::class, 'company_id'); }
     public function project() { return $this->belongsTo(Project::class, 'project_id'); }
     public function creator() { return $this->belongsTo(Member::class, 'created_by'); }
+    public function transcripts() { return $this->hasMany(MeetingTranscript::class, 'meeting_id')->orderBy('starts_at'); }
+    public function notes() { return $this->hasMany(MeetingNote::class, 'meeting_id')->orderBy('created_at', 'desc'); }
+    public function latestNote() { return $this->hasOne(MeetingNote::class, 'meeting_id')->latest('created_at'); }
 }

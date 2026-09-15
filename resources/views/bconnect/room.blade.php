@@ -16,6 +16,10 @@
             @endif
             @if($canAi)
             <button id="transcriptBtn" class="px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30"><i class="fas fa-closed-captioning mr-1"></i>Captions</button>
+            <label id="audioUploadBtn" class="px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30 cursor-pointer hidden">
+                <i class="fas fa-upload mr-1"></i>Audio
+                <input type="file" id="audioUploadInput" accept="audio/*" class="hidden">
+            </label>
             @endif
         <button id="endMeetingBtn" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg font-bold hover:bg-red-500/30"><i class="fas fa-phone-slash mr-1"></i>End{{ $canAi ? ' & Summarize' : '' }}</button>
         </div>
@@ -24,9 +28,14 @@
         <div id="local-player" class="w-1/2 h-1/2 bg-slate-800 rounded-xl flex items-center justify-center relative"><span class="text-slate-500 text-sm">Loading camera...</span></div>
     </div>
     @if($canAi)
+    <div id="transcriptBox" class="hidden mt-4 p-4 bg-slate-900 border border-cyan-500/30 rounded-xl max-h-48 overflow-y-auto">
+        <h4 class="font-bold text-cyan-400 mb-2"><i class="fas fa-closed-captioning mr-1"></i>Live Transcript</h4>
+        <div id="transcriptFeed" class="text-sm text-slate-300 space-y-1"></div>
+    </div>
     <div id="summaryBox" class="hidden mt-4 p-4 bg-slate-900 border border-cyan-500/30 rounded-xl">
         <h4 class="font-bold text-cyan-400 mb-2"><i class="fas fa-robot mr-1"></i>AI Meeting Summary</h4>
         <div id="summaryText" class="text-sm text-slate-300 whitespace-pre-line"></div>
+        <a id="notesLink" href="{{ route('bconnect.meeting.notes', $room) }}" class="hidden mt-3 inline-block bc-btn bc-btn-primary py-1 px-3 text-xs">View full notes</a>
     </div>
     @endif
 </div>
@@ -148,6 +157,25 @@ let transcript = '';
 let recognition = null;
 let captionsOn = false;
 
+function appendTranscript(text) {
+    const feed = document.getElementById('transcriptFeed');
+    if (!feed) return;
+    const p = document.createElement('p');
+    p.textContent = text;
+    p.className = 'border-l-2 border-cyan-500 pl-2';
+    feed.appendChild(p);
+    feed.parentElement.scrollTop = feed.parentElement.scrollHeight;
+}
+
+function saveTranscriptSegment(text, startsAt = 0) {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fetch(`/meetings/${room}/transcript`, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+        body: JSON.stringify({ _token: csrf, text: text, starts_at: startsAt })
+    }).catch(e => console.warn('Transcript save failed', e));
+}
+
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return null;
@@ -158,7 +186,10 @@ function initSpeechRecognition() {
     r.onresult = (event) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
             if (event.results[i].isFinal) {
-                transcript += event.results[i][0].transcript + ' ';
+                const text = event.results[i][0].transcript + ' ';
+                transcript += text;
+                appendTranscript(text);
+                saveTranscriptSegment(text.trim(), Math.floor(Date.now() / 1000 - startTs));
             }
         }
     };
@@ -167,19 +198,55 @@ function initSpeechRecognition() {
     return r;
 }
 
+let startTs = Math.floor(Date.now() / 1000);
 const transcriptBtn = document.getElementById('transcriptBtn');
 if (transcriptBtn) {
     transcriptBtn.addEventListener('click', () => {
         if (!recognition) recognition = initSpeechRecognition();
         if (!recognition) { alert('Speech-to-text not supported in this browser.'); return; }
         captionsOn = !captionsOn;
+        const box = document.getElementById('transcriptBox');
         if (captionsOn) {
             try { recognition.start(); } catch(e){}
             transcriptBtn.className = 'px-3 py-2 bg-cyan-500 text-white rounded-lg font-bold';
             transcriptBtn.innerHTML = '<i class="fas fa-closed-captioning mr-1"></i>Stop';
+            if (box) box.classList.remove('hidden');
+            document.getElementById('audioUploadBtn')?.classList.remove('hidden');
         } else {
             try { recognition.stop(); } catch(e){}
             transcriptBtn.className = 'px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30';
+            transcriptBtn.innerHTML = '<i class="fas fa-closed-captioning mr-1"></i>Captions';
+        }
+    });
+}
+
+const audioInput = document.getElementById('audioUploadInput');
+if (audioInput) {
+    audioInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const form = new FormData();
+        form.append('audio', file);
+        form.append('_token', csrf);
+        try {
+            transcriptBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Transcribing...';
+            const r = await fetch(`/meetings/${room}/audio`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRF-TOKEN': csrf },
+                body: form
+            });
+            const data = await r.json();
+            if (data.success) {
+                alert('Audio transcribed. Refresh this page or open Notes to see the transcript.');
+            } else {
+                alert(data.error || 'Transcription failed.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Audio upload failed.');
+        } finally {
             transcriptBtn.innerHTML = '<i class="fas fa-closed-captioning mr-1"></i>Captions';
         }
     });
@@ -200,9 +267,24 @@ document.getElementById('endMeetingBtn').addEventListener('click', async () => {
         if (client) { client.leave(); localAudioTrack?.close(); localVideoTrack?.close(); }
         document.getElementById('video-grid').innerHTML = '<div class="p-4 text-slate-400 w-full text-center">Meeting ended</div>';
         const summaryBox = document.getElementById('summaryBox');
-        if (summaryBox) { summaryBox.classList.remove('hidden'); document.getElementById('summaryText').textContent = data.summary || 'No summary generated.'; }
+        if (summaryBox) {
+            summaryBox.classList.remove('hidden');
+            let html = '';
+            if (data.summary) html += '<p class="mb-2">' + escapeHtml(data.summary) + '</p>';
+            if (data.key_points?.length) html += '<p class="font-bold mt-2">Key points</p><ul>' + data.key_points.map(p => '<li>' + escapeHtml(p) + '</li>').join('') + '</ul>';
+            if (data.action_items?.length) html += '<p class="font-bold mt-2">Action items</p><ul>' + data.action_items.map(p => '<li>' + escapeHtml(p) + '</li>').join('') + '</ul>';
+            if (data.decisions?.length) html += '<p class="font-bold mt-2">Decisions</p><ul>' + data.decisions.map(p => '<li>' + escapeHtml(p) + '</li>').join('') + '</ul>';
+            document.getElementById('summaryText').innerHTML = html || 'No summary generated.';
+            document.getElementById('notesLink')?.classList.remove('hidden');
+        }
     } catch (e) { alert('Failed to end meeting.'); }
 });
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 initAgora();
 </script>

@@ -98,3 +98,14 @@ Examples:
 - New columns on `bconnect_tickets`: `position`, `sprint_id`, `parent_id`, `start_date`, `due_date`, `estimated_hours`.
 - New tables: `bconnect_time_entries`, `bconnect_sprints`.
 - REST API endpoints under `/api/v1/bconnect` with `bconnect:read` and `bconnect:write` scopes.
+
+## B-Connect AI meeting notes and transcription (Phase 5.4)
+
+- New tables: `bconnect_meeting_transcripts`, `bconnect_meeting_notes`; `bconnect_meetings` extended with `audio_path`, `transcript_status`, `notes_status`.
+- Models: `MeetingTranscript`, `MeetingNote` related to `Meeting`.
+- Services: `MeetingAiService` (Gemini summary/key points/action items/decisions) and `MeetingTranscriptionService` (OpenAI Whisper audio upload).
+- Browser SpeechRecognition captions are persisted segment-by-segment to `bconnect_meeting_transcripts`.
+- Audio file upload at `POST /meetings/{room}/audio` transcribes via Whisper and stores word-level segments.
+- End-of-meeting `POST /meetings/{room}/end` now stores the final transcript and triggers `MeetingAiService` for structured notes.
+- Notes view at `/meetings/{room}/notes` shows transcript and AI notes.
+- Requires `ai_gemini_api_key` (notes) and `ai_openai_api_key` (Whisper) in Settings; falls back gracefully if missing.

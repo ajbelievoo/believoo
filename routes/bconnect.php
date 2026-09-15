@@ -114,6 +114,10 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
         Route::post('/meetings/{room}/end', [\App\Http\Controllers\Bconnect\MeetingController::class, 'endMeeting'])->name('bconnect.meeting.end');
         Route::post('/meetings/{room}/record/start', [\App\Http\Controllers\Bconnect\AgoraCloudRecordingController::class, 'start'])->name('bconnect.meeting.record.start');
         Route::post('/meetings/{room}/record/stop', [\App\Http\Controllers\Bconnect\AgoraCloudRecordingController::class, 'stop'])->name('bconnect.meeting.record.stop');
+        Route::post('/meetings/{room}/transcript', [\App\Http\Controllers\Bconnect\MeetingTranscriptController::class, 'saveTranscript'])->name('bconnect.meeting.transcript.save');
+        Route::post('/meetings/{room}/audio', [\App\Http\Controllers\Bconnect\MeetingTranscriptController::class, 'uploadAudio'])->name('bconnect.meeting.audio.upload');
+        Route::post('/meetings/{room}/notes', [\App\Http\Controllers\Bconnect\MeetingTranscriptController::class, 'generateNotes'])->name('bconnect.meeting.notes.generate');
+        Route::get('/meetings/{room}/notes', [\App\Http\Controllers\Bconnect\MeetingTranscriptController::class, 'showNotes'])->name('bconnect.meeting.notes');
     });
 
     // Team leads / developers can edit whiteboards and delete their own files

@@ -29,8 +29,16 @@ $meetingUsage = \App\Models\Bconnect\Meeting::where('company_id', request()->inp
                     <td class="font-medium">{{ $m->title }}</td>
                     <td class="text-slate-400">{{ $m->scheduled_at?->format('M d, Y H:i') ?? 'Instant' }}</td>
                     <td class="text-slate-400">{{ $m->creator?->user?->name ?? '—' }}</td>
-                    <td><span class="bc-badge {{ $m->ended_at ? 'bc-badge-slate' : ($m->scheduled_at?->isFuture() ? 'bc-badge-cyan' : 'bc-badge-green') }}">{{ $m->ended_at ? 'Ended' : ($m->scheduled_at?->isFuture() ? 'Upcoming' : 'Live') }}</span></td>
-                    <td><a href="{{ route('bconnect.meeting.room', $m->room_id) }}" target="_blank" class="bc-btn bc-btn-primary py-1 px-2 text-xs">{{ $m->ended_at ? 'View' : 'Join' }}</a></td>
+                    <td>
+                        <span class="bc-badge {{ $m->ended_at ? 'bc-badge-slate' : ($m->scheduled_at?->isFuture() ? 'bc-badge-cyan' : 'bc-badge-green') }}">{{ $m->ended_at ? 'Ended' : ($m->scheduled_at?->isFuture() ? 'Upcoming' : 'Live') }}</span>
+                        @if($m->ended_at && $m->transcript_status === 'completed')<br><span class="text-xs text-cyan-400">Transcript</span>@endif
+                    </td>
+                    <td>
+                        <a href="{{ route('bconnect.meeting.room', $m->room_id) }}" target="_blank" class="bc-btn bc-btn-primary py-1 px-2 text-xs">{{ $m->ended_at ? 'View' : 'Join' }}</a>
+                        @if($m->ended_at)
+                        <a href="{{ route('bconnect.meeting.notes', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1">Notes</a>
+                        @endif
+                    </td>
                 </tr>
                 @empty
                 <tr><td colspan="5" class="bc-empty">No meetings yet.</td></tr>
