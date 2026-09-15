@@ -63,8 +63,9 @@
 
     <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" type="image/x-icon" href="{{ $faviconUrl }}">
-    <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <meta name="msapplication-TileImage" content="{{ $faviconUrl }}">
+    <link rel="apple-touch-icon" href="/images/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="msapplication-TileImage" content="/images/icon-192x192.png">
     <meta name="theme-color" content="#00B7FF">
 
     @if(!empty($settings['google_site_verification']))
@@ -2272,6 +2273,21 @@
                 el.remove();
             });
         })();
+    </script>
+
+    <!-- PWA service worker registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function (registration) {
+                        console.log('SW registered:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.log('SW registration failed:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>

@@ -587,8 +587,17 @@
                 <a href="{{ route('admin.announcements.index') }}" class="nav-link {{ request()->routeIs('admin.announcements.*') ? 'active' : '' }}">
                     <i class="fas fa-bullhorn"></i><span>Announcements</span>
                 </a>
+                <a href="{{ route('admin.campaigns.index') }}" class="nav-link {{ request()->routeIs('admin.campaigns.*') ? 'active' : '' }}">
+                    <i class="fas fa-envelope-open-text"></i><span>Email Campaigns</span>
+                </a>
+                <a href="{{ route('admin.api-keys.index') }}" class="nav-link {{ request()->routeIs('admin.api-keys.*') ? 'active' : '' }}">
+                    <i class="fas fa-key"></i><span>API Keys</span>
+                </a>
                 <a href="{{ route('admin.settings.index') }}" class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
                     <i class="fas fa-cog"></i><span>Settings</span>
+                </a>
+                <a href="{{ url('/panel') }}" class="nav-link" target="_blank" rel="noopener">
+                    <i class="fas fa-layer-group"></i><span>Advanced Tools (Filament)</span>
                 </a>
                 <a href="{{ route('admin.exchange-rates.index') }}" class="nav-link {{ request()->routeIs('admin.exchange-rates.*') ? 'active' : '' }}">
                     <i class="fas fa-exchange-alt"></i><span>Exchange Rates</span>

@@ -36,6 +36,13 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
     Route::get('/projects/{project}/edit', [\App\Http\Controllers\Bconnect\ProjectController::class, 'edit'])->name('bconnect.projects.edit');
     Route::get('/projects/{project}/chat', [\App\Http\Controllers\Bconnect\ChatController::class, 'project'])->name('bconnect.projects.chat');
     Route::get('/projects/{project}/whiteboard', [\App\Http\Controllers\Bconnect\WhiteboardController::class, 'show'])->name('bconnect.projects.whiteboard');
+    Route::get('/projects/{project}/kanban', [\App\Http\Controllers\Bconnect\KanbanController::class, 'index'])->name('bconnect.projects.kanban');
+    Route::get('/projects/{project}/time-tracking', [\App\Http\Controllers\Bconnect\TimeTrackingController::class, 'index'])->name('bconnect.projects.time_tracking');
+    Route::get('/projects/{project}/sprints', [\App\Http\Controllers\Bconnect\SprintController::class, 'index'])->name('bconnect.projects.sprints');
+    Route::get('/sprints', [\App\Http\Controllers\Bconnect\SprintController::class, 'index'])->name('bconnect.sprints.index');
+    Route::get('/sprints/{sprint}', [\App\Http\Controllers\Bconnect\SprintController::class, 'show'])->name('bconnect.sprints.show');
+    Route::get('/kanban', [\App\Http\Controllers\Bconnect\KanbanController::class, 'index'])->name('bconnect.kanban');
+    Route::get('/time-tracking', [\App\Http\Controllers\Bconnect\TimeTrackingController::class, 'index'])->name('bconnect.time_tracking');
     Route::get('/meetings', [\App\Http\Controllers\Bconnect\MeetingController::class, 'index'])->name('bconnect.meetings');
     Route::get('/meetings/{room}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'room'])->name('bconnect.meeting.room');
     Route::get('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'index'])->name('bconnect.tickets');
@@ -62,6 +69,8 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
     Route::post('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'store'])->name('bconnect.tickets.store');
     Route::post('/tickets/{ticket}/comments', [\App\Http\Controllers\Bconnect\TicketController::class, 'comment'])->name('bconnect.tickets.comment');
     Route::post('/files', [\App\Http\Controllers\Bconnect\FileManagerController::class, 'store'])->name('bconnect.files.store');
+    Route::post('/time-entries/start', [\App\Http\Controllers\Bconnect\TimeTrackingController::class, 'start'])->name('bconnect.time_entries.start');
+    Route::post('/time-entries/{entry}/stop', [\App\Http\Controllers\Bconnect\TimeTrackingController::class, 'stop'])->name('bconnect.time_entries.stop');
     Route::post('/remote/agent/request', [\App\Http\Controllers\Bconnect\AgentController::class, 'requestBeta'])->name('bconnect.remote.agent.request');
     Route::post('/remote/request', [\App\Http\Controllers\Bconnect\RemoteController::class, 'requestControl'])->name('bconnect.remote.request');
     Route::post('/remote/{session}/respond', [\App\Http\Controllers\Bconnect\RemoteController::class, 'respond'])->name('bconnect.remote.respond');
@@ -81,6 +90,9 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
         Route::post('/members', [\App\Http\Controllers\Bconnect\MemberController::class, 'store'])->name('bconnect.members.store');
         Route::put('/members/{member}', [\App\Http\Controllers\Bconnect\MemberController::class, 'update'])->name('bconnect.members.update');
         Route::delete('/members/{member}', [\App\Http\Controllers\Bconnect\MemberController::class, 'destroy'])->name('bconnect.members.destroy');
+        Route::post('/sprints', [\App\Http\Controllers\Bconnect\SprintController::class, 'store'])->name('bconnect.sprints.store');
+        Route::put('/sprints/{sprint}', [\App\Http\Controllers\Bconnect\SprintController::class, 'update'])->name('bconnect.sprints.update');
+        Route::delete('/sprints/{sprint}', [\App\Http\Controllers\Bconnect\SprintController::class, 'destroy'])->name('bconnect.sprints.destroy');
         Route::post('/invoices', [\App\Http\Controllers\Bconnect\BillingController::class, 'storeInvoice'])->name('bconnect.invoices.store');
         Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\Bconnect\BillingController::class, 'markPaid'])->name('bconnect.billing.markPaid');
         Route::post('/billing/upgrade', [\App\Http\Controllers\Bconnect\BillingController::class, 'processUpgrade'])->name('bconnect.billing.upgrade.process');
@@ -95,6 +107,9 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
         Route::put('/projects/{project}', [\App\Http\Controllers\Bconnect\ProjectController::class, 'update'])->name('bconnect.projects.update');
         Route::delete('/projects/{project}', [\App\Http\Controllers\Bconnect\ProjectController::class, 'destroy'])->name('bconnect.projects.destroy');
         Route::put('/tickets/{ticket}/status', [\App\Http\Controllers\Bconnect\TicketController::class, 'updateStatus'])->name('bconnect.tickets.status');
+        Route::post('/kanban/reorder', [\App\Http\Controllers\Bconnect\KanbanController::class, 'reorder'])->name('bconnect.kanban.reorder');
+        Route::post('/tickets/{ticket}/kanban-status', [\App\Http\Controllers\Bconnect\KanbanController::class, 'updateStatus'])->name('bconnect.tickets.kanban_status');
+        Route::post('/time-entries', [\App\Http\Controllers\Bconnect\TimeTrackingController::class, 'store'])->name('bconnect.time_entries.store');
         Route::post('/meetings', [\App\Http\Controllers\Bconnect\MeetingController::class, 'store'])->name('bconnect.meetings.store');
         Route::post('/meetings/{room}/end', [\App\Http\Controllers\Bconnect\MeetingController::class, 'endMeeting'])->name('bconnect.meeting.end');
         Route::post('/meetings/{room}/record/start', [\App\Http\Controllers\Bconnect\AgoraCloudRecordingController::class, 'start'])->name('bconnect.meeting.record.start');

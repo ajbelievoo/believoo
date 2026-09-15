@@ -1,31 +1,84 @@
-const CACHE = 'bconnect-v1';
-const ASSETS = [
+const CACHE_NAME = 'believoo-v1';
+const PRECACHE_ASSETS = [
     '/',
-    '/build/assets/app-CRfNc6w3.js',
-    '/build/assets/app-v7Zw7Qz3.css',
-    '/build/assets/lottie-DlXGThtN.js',
+    '/images/icon-192x192.png',
+    '/images/icon-512x512.png',
+    '/css/app.css',
+    '/js/app.js',
 ];
 
-self.addEventListener('install', (e) => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+const OFFLINE_PAGE = '/offline';
+
+// Install: pre-cache shell assets
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => cache.addAll(PRECACHE_ASSETS))
+            .then(() => self.skipWaiting())
+            .catch(() => self.skipWaiting())
+    );
 });
 
-self.addEventListener('activate', (e) => {
-    e.waitUntil(self.clients.claim());
+// Activate: clean up old caches
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((keys) =>
+            Promise.all(
+                keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+            )
+        ).then(() => self.clients.claim())
+    );
 });
 
-self.addEventListener('push', (e) => {
-    const data = e.data.json();
-    e.waitUntil(self.registration.showNotification(data.title || 'B-CONNECT', {
-        body: data.body,
-        icon: data.icon || '/favicon.ico',
-        badge: data.badge || '/favicon.ico',
-        data: data,
-        actions: data.actions || []
-    }));
-});
+// Fetch: stale-while-revalidate for navigations, network-first for dynamic requests
+self.addEventListener('fetch', (event) => {
+    const { request } = event;
+    const url = new URL(request.url);
 
-self.addEventListener('notificationclick', (e) => {
-    e.notification.close();
-    e.waitUntil(clients.openWindow(e.notification.data.url || '/'));
+    // Skip non-GET requests and external origins
+    if (request.method !== 'GET' || url.origin !== self.location.origin) {
+        return;
+    }
+
+    // Navigation requests: network-first with offline fallback
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+                    return response;
+                })
+                .catch(() =>
+                    caches.match(request).then((cached) =>
+                        cached || caches.match(OFFLINE_PAGE) || new Response('Offline', {
+                            status: 503,
+                            headers: { 'Content-Type': 'text/plain' },
+                        })
+                    )
+                )
+        );
+        return;
+    }
+
+    // Static assets: stale-while-revalidate
+    if (url.pathname.match(/\.(css|js|png|jpg|jpeg|webp|svg|ico|woff|woff2|ttf|eot)$/)) {
+        event.respondWith(
+            caches.match(request).then((cached) => {
+                const fetchPromise = fetch(request).then((networkResponse) => {
+                    if (networkResponse && networkResponse.status === 200) {
+                        const clone = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+                    }
+                    return networkResponse;
+                }).catch(() => cached);
+
+                return cached || fetchPromise;
+            })
+        );
+        return;
+    }
+
+    // API / dynamic: network only
+    event.respondWith(fetch(request).catch(() => caches.match(request)));
 });

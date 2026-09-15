@@ -23,6 +23,8 @@ use App\Http\Controllers\Admin\MailTestController;
 use App\Http\Controllers\Admin\GhcController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\EmailCampaignController;
+use App\Http\Controllers\Admin\ApiKeyController;
 
 Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name('admin.')->group(function () {
 
@@ -242,6 +244,14 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
     Route::post('announcements/{announcement}/send', [AnnouncementController::class, 'send'])->name('announcements.send');
     Route::post('announcements/test', [AnnouncementController::class, 'testSend'])->name('announcements.test');
     Route::post('announcements/preview', [AnnouncementController::class, 'preview'])->name('announcements.preview');
+
+    // Email marketing campaigns
+    Route::resource('campaigns', EmailCampaignController::class);
+    Route::patch('campaigns/{campaign}/send', [EmailCampaignController::class, 'send'])->name('campaigns.send');
+
+    // API key management
+    Route::resource('api-keys', ApiKeyController::class);
+    Route::patch('api-keys/{api_key}/regenerate', [ApiKeyController::class, 'regenerate'])->name('api-keys.regenerate');
     Route::get('announcements/audience-count', [AnnouncementController::class, 'audienceCount'])->name('announcements.audience-count');
     Route::get('announcement-templates/{template}/load', [AnnouncementController::class, 'loadTemplate'])->name('announcements.template.load');
     Route::resource('announcement-templates', \App\Http\Controllers\Admin\AnnouncementTemplateController::class)->except(['show']);

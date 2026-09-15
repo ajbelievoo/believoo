@@ -42,7 +42,10 @@
         <a href="{{ route('bconnect.dashboard') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.dashboard') ? 'active' : '' }}"><i class="fas fa-home"></i>Dashboard</a>
         <a href="{{ route('bconnect.projects.index') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.projects.*') ? 'active' : '' }}"><i class="fas fa-folder"></i>Projects</a>
         <a href="{{ route('bconnect.meetings') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.meeting*') ? 'active' : '' }}"><i class="fas fa-video"></i>Meetings</a>
+        <a href="{{ route('bconnect.kanban') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.kanban*') || request()->routeIs('bconnect.projects.kanban') ? 'active' : '' }}"><i class="fas fa-columns"></i>Kanban</a>
         <a href="{{ route('bconnect.tickets') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.tickets*') ? 'active' : '' }}"><i class="fas fa-bug"></i>Tickets</a>
+        <a href="{{ route('bconnect.sprints.index') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.sprints*') || request()->routeIs('bconnect.projects.sprints') ? 'active' : '' }}"><i class="fas fa-running"></i>Sprints</a>
+        <a href="{{ route('bconnect.time_tracking') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.time_tracking*') || request()->routeIs('bconnect.projects.time_tracking') ? 'active' : '' }}"><i class="fas fa-clock"></i>Time</a>
         @if(in_array($bconnectCompany?->plan ?? 'free', ['pro','enterprise']))
         <a href="{{ route('bconnect.remote') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.remote*') && !request()->routeIs('bconnect.remote.agent') ? 'active' : '' }}"><i class="fas fa-desktop"></i>Remote</a>
         @endif

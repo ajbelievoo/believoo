@@ -188,3 +188,20 @@ body {
 }
 .bc-plan-ring.expired::before { background: var(--bc-danger); box-shadow: 0 0 8px var(--bc-danger); }
 .bc-plan-ring.grace::before { background: var(--bc-warning); box-shadow: 0 0 8px var(--bc-warning); }
+
+/* Kanban board */
+.bc-kanban { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; }
+.bc-kanban-column { min-width: 280px; max-width: 320px; flex: 1; display: flex; flex-direction: column; }
+.bc-kanban-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; font-weight: 700; font-size: 0.85rem; border-bottom: 1px solid var(--bc-border); }
+.bc-kanban-list { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 16px; min-height: 140px; }
+.bc-kanban-card { padding: 14px; border: 1px solid var(--bc-border); border-radius: 12px; background: var(--bc-panel); cursor: grab; transition: transform 0.15s, box-shadow 0.15s; }
+.bc-kanban-card:hover { border-color: rgba(0,183,255,0.25); box-shadow: 0 8px 24px rgba(0,183,255,0.08); }
+.bc-kanban-card.dragging { opacity: 0.4; cursor: grabbing; }
+.bc-kanban-card.over { border-style: dashed; border-color: var(--bc-cyan); }
+.bc-kanban-dropzone { min-height: 40px; border-radius: 10px; border: 2px dashed transparent; }
+.bc-kanban-dropzone.over { border-color: rgba(0,183,255,0.3); background: rgba(0,183,255,0.05); }
+
+/* Time tracking */
+.bc-timer-ring { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: rgba(34,197,94,0.12); color: var(--bc-success); font-weight: 700; }
+.bc-timer-ring.active::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--bc-success); box-shadow: 0 0 8px var(--bc-success); animation: bc-pulse 1.5s infinite; }
+@keyframes bc-pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }

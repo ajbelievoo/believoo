@@ -18,6 +18,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\RequireTwoFactor;
 
 class AdminPanelProvider extends PanelProvider
@@ -28,8 +29,8 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('panel')
-            ->brandName('B Hosting')
-            ->brandLogo(fn () => '<div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center"><span class="text-black font-black text-lg">B</span></div><span class="font-black text-lg tracking-tight">HOSTING</span></div>')
+            ->brandName('Believoo Admin')
+            ->brandLogo(fn () => '<div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center"><span class="text-black font-black text-lg">B</span></div><span class="font-black text-lg tracking-tight">ADMIN</span></div>')
             ->brandLogoHeight('2.5rem')
             ->favicon(fn () => asset('favicon.ico'))
             ->login()
@@ -151,6 +152,10 @@ class AdminPanelProvider extends PanelProvider
                 ',
             )
             ->renderHook(
+                'panels::topbar.start',
+                fn (): string => '<a href="' . route('admin.dashboard') . '" class="fi-btn fi-btn-size-md fi-color-primary fi-btn-outlined hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg border border-custom-500 text-custom-600 hover:bg-custom-50 dark:text-custom-400 dark:border-custom-400 dark:hover:bg-custom-900/30 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg> Back to Custom Admin</a>'
+            )
+            ->renderHook(
                 'panels::body.start',
                 fn (): string => '<div style="display:none">' . \Illuminate\Support\Facades\Blade::render("@livewire('navbar-notifications')") . '</div>'
             )
@@ -186,6 +191,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                AdminMiddleware::class,
                 RequireTwoFactor::class,
             ]);
     }

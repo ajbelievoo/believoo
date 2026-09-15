@@ -49,6 +49,10 @@ Route::get('auth/twitter/callback', [SocialLoginController::class, 'handleTwitte
 Route::post('/newsletter/subscribe', [\App\Http\Controllers\NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');
 Route::get('/newsletter/unsubscribe/{token}', [\App\Http\Controllers\NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 
+// Email campaign tracking (public, no auth)
+Route::get('/campaign/pixel/{token}', [\App\Http\Controllers\CampaignTrackingController::class, 'pixel'])->name('campaign.pixel');
+Route::get('/campaign/click/{token}', [\App\Http\Controllers\CampaignTrackingController::class, 'click'])->name('campaign.click');
+
 // ── Support Agent Portal (subdomain: agent.believoo.com) ────────────
 Route::domain('agent.believoo.com')->group(function () {
     Route::get('/', [\App\Http\Controllers\AgentAuthController::class, 'showLogin']);
@@ -68,6 +72,7 @@ Route::get('/resubscribe/announcements', [\App\Http\Controllers\AnnouncementTrac
 Route::get('/announcements/rss.xml', [\App\Http\Controllers\AnnouncementFeedController::class, 'rss'])->name('announcements.rss');
 Route::get('/announcements.json', [\App\Http\Controllers\AnnouncementFeedController::class, 'json'])->name('announcements.json');
 Route::post('/push/subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.subscribe');
+Route::view('/offline', 'offline')->name('offline');
 
 Route::get('/', function () {
     $services = Service::where('is_active', true)->whereNotIn('slug', [

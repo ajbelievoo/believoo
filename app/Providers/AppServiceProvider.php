@@ -11,10 +11,12 @@ use App\Models\Bconnect\Project;
 use App\Models\Bconnect\RemoteSession;
 use App\Models\Bconnect\Ticket;
 use App\Models\Bconnect\TicketComment;
+use App\Guards\ApiKeyGuard;
 use App\Services\AuditService;
 use App\Services\BconnectMail;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
@@ -224,6 +226,14 @@ class AppServiceProvider extends ServiceProvider
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Audit logout failed: ' . $e->getMessage());
             }
+        });
+
+        // Register stateless API key guard for the public REST API.
+        Auth::extend('api_key', function ($app, $name, array $config) {
+            return new ApiKeyGuard(
+                $app['request'],
+                Auth::createUserProvider($config['provider'] ?? 'users')
+            );
         });
     }
 

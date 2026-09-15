@@ -64,3 +64,37 @@ Examples:
 - Markdown mail theme: `resources/views/vendor/mail/html/themes/believoo.css`.
 - Custom Mailables updated: `LowBalanceWarning`, `ServiceSuspendedAlert`, `WalletDebitReceipt`, `WalletTopupSuccess`.
 - `WelcomeEmail`/`NewsletterSubscribed`/`newsletter-update-html` already used `emails.layout`.
+
+## Marketing automation (email campaigns)
+
+- Admin UI: `/admin/campaigns` custom panel (`EmailCampaignController`, views in `resources/views/admin/campaigns/`).
+- Models: `EmailCampaign` + `CampaignRecipient` with morph-to recipient (`User` or `NewsletterSubscriber`).
+- Segments: `all`, `clients`, `active`, `newsletter`.
+- Delivery is via queued `SendCampaignEmails` job using the existing SMTP/branded `emails.layout` template.
+- Tracking: open pixel `/campaign/pixel/{token}` and link redirects `/campaign/click/{token}?url=...` update recipient status and counters.
+- Unsubscribe: newsletter subscribers get their signed unsubscribe link; the footer always includes the main site link.
+- Test mode: set `test_email` on a campaign to send to only that address (safe for testing before real dispatch).
+- Public tracking routes are in `routes/web.php` and do not require authentication.
+- Queue worker (`queue:work`) runs as `www` and will pick up campaign dispatch jobs.
+
+## Public REST API & API keys
+
+- Routes live in `routes/api.php` under `/api/*` (auto `api/` prefix).
+- Authentication: `Authorization: Bearer <token>` or `X-API-Key: <token>`.
+- Custom stateless guard `api` using `App\Guards\ApiKeyGuard` and `App\Http\Middleware\ApiKeyAuth`.
+- Tokens are stored hashed (`key_hash`); only the prefix (`key_prefix`) is displayed in the UI.
+- Scopes: `user:read`, `servers:read`, `servers:control`, `server-imports:read`, `server-imports:write`, `licenses:read`, `licenses:write`, `tickets:read`, `tickets:write`, `currencies:read`, `currencies:write`, `streaming:read`, `audio-mixer:read`, `audio-mixer:write`, `*`.
+- Per-key rate limiting via `RateLimiter` (cache store), default 60 req/min, configurable per key.
+- IP allow-listing supports single IPs and IPv4 CIDR notation.
+- Admin UI at `/admin/api-keys` for create, regenerate, edit, revoke and view usage.
+- Interactive docs at `/api/docs` (Swagger UI) and OpenAPI JSON at `/api/docs/openapi.json`.
+- Legacy `auth:sanctum` references removed; no Sanctum dependency required.
+
+## B-Connect (Phase 4 enhancements)
+
+- Kanban board at `/kanban` and `/projects/{project}/kanban` with drag-and-drop status columns (`open`, `in_progress`, `testing`, `resolved`, `closed`), inline reordering via `POST /kanban/reorder`.
+- Sprint planning at `/sprints` and `/projects/{project}/sprints`; sprint progress tracked from linked tickets.
+- Time tracking at `/time-tracking` and `/projects/{project}/time-tracking` with live start/stop timer, manual entries, billable hours, and `billed_amount` auto-calculation.
+- New columns on `bconnect_tickets`: `position`, `sprint_id`, `parent_id`, `start_date`, `due_date`, `estimated_hours`.
+- New tables: `bconnect_time_entries`, `bconnect_sprints`.
+- REST API endpoints under `/api/v1/bconnect` with `bconnect:read` and `bconnect:write` scopes.
