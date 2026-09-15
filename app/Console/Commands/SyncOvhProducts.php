@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\ExchangeRate;
+use App\Models\OvhProduct;
 use App\Models\VpsPlan;
 use App\Services\OvhApiService;
 use Illuminate\Console\Command;
@@ -11,10 +12,18 @@ use Illuminate\Support\Facades\Log;
 class SyncOvhProducts extends Command
 {
     protected $signature = 'ovh:sync-products
-                            {--type=vps : Product type to sync (vps|hosting|domain|license)}
+                            {--type=all : Product type to sync (all|vps|dedicated|hosting|domain|public_cloud|private_cloud|license)}
                             {--dry-run : Show what would change without saving}';
 
     protected $description = 'Sync OVHcloud product catalog into local pricing tables';
+
+    protected const CATEGORIES = [
+        'dedicated'     => 'DEDICATED',
+        'hosting'       => 'WEB_HOSTING',
+        'domain'        => 'DOMAINS',
+        'public_cloud'  => 'PUBLIC_CLOUD',
+        'private_cloud' => 'PRIVATE_CLOUD',
+    ];
 
     public function handle(): int
     {
@@ -29,13 +38,25 @@ class SyncOvhProducts extends Command
         $dryRun = $this->option('dry-run');
 
         try {
-            match ($type) {
-                'vps'     => $this->syncVps($service, $dryRun),
-                'hosting' => $this->warn('OVH hosting sync not implemented yet.'),
-                'domain'  => $this->warn('OVH domain sync not implemented yet.'),
-                'license' => $this->warn('OVH license sync not implemented yet.'),
-                default   => throw new \InvalidArgumentException("Unknown type: {$type}"),
-            };
+            if ($type === 'all' || $type === 'vps') {
+                $this->syncVps($service, $dryRun);
+            }
+
+            if ($type === 'all') {
+                foreach (self::CATEGORIES as $slug => $category) {
+                    $this->syncOvhProductCategory($service, $category, $slug, $dryRun);
+                }
+            } elseif (isset(self::CATEGORIES[$type])) {
+                $this->syncOvhProductCategory($service, self::CATEGORIES[$type], $type, $dryRun);
+            } elseif ($type === 'license') {
+                $this->warn('OVH license products are not exposed through the public catalog API for this account.');
+            } elseif ($type !== 'all' && $type !== 'vps') {
+                throw new \InvalidArgumentException("Unknown type: {$type}");
+            }
+
+            if ($type === 'all') {
+                $this->info('Full OVH catalog sync complete.');
+            }
         } catch (\Exception $e) {
             Log::error('OVH sync failed', ['type' => $type, 'error' => $e->getMessage()]);
             $this->error('Sync failed: ' . $e->getMessage());
@@ -69,10 +90,7 @@ class SyncOvhProducts extends Command
                 continue;
             }
 
-            // Convert OVH cost to INR.
             $costInInr = $this->convertToInr($ovhMonthly, $ovhCurrency);
-
-            // Apply commission markup.
             $saleInInr = $costInInr * (1 + $commission / 100);
 
             $ovhConfig = [
@@ -138,6 +156,117 @@ class SyncOvhProducts extends Command
         Log::info('OVH VPS sync complete', ['synced' => $synced, 'created' => $created, 'updated' => $updated]);
     }
 
+    protected function syncOvhProductCategory(OvhApiService $service, string $category, string $slug, bool $dryRun): void
+    {
+        $this->info("Fetching OVH {$category} catalog...");
+
+        try {
+            $plans = $service->getCatalogPlans($category);
+        } catch (\Exception $e) {
+            $this->warn("{$category} catalog fetch failed: " . $e->getMessage());
+            Log::warning('OVH catalog fetch failed', ['category' => $category, 'error' => $e->getMessage()]);
+            return;
+        }
+
+        if (empty($plans)) {
+            $this->warn("No {$category} plans returned from OVH.");
+            return;
+        }
+
+        $commission = (float) config('ovh.commission_percent', 25.0);
+        $synced = 0;
+        $created = 0;
+        $updated = 0;
+
+        foreach ($plans as $plan) {
+            $planCode = $plan['plan_code'] ?? null;
+            if (!$planCode) {
+                continue;
+            }
+
+            $monthly = $this->extractMonthlyDurationPrice($plan['durations'] ?? []);
+
+            if ($monthly['price'] === null) {
+                $this->warn("Skipping {$planCode}: no monthly price found.");
+                continue;
+            }
+
+            $costInInr = $this->convertToInr($monthly['price'], $monthly['currency'] ?? ($plan['currency'] ?? 'EUR'));
+            $saleInInr = $costInInr * (1 + $commission / 100);
+
+            $payload = [
+                'category'          => $category,
+                'family'            => $plan['family'] ?? $slug,
+                'plan_code'         => $planCode,
+                'invoice_name'      => $plan['invoice_name'] ?? $planCode,
+                'description'       => $plan['description'] ?? null,
+                'cpu_cores'         => $plan['cpu_cores'] ?? null,
+                'ram_gb'            => $plan['ram_gb'] ?? null,
+                'disk_gb'           => $plan['disk_gb'] ?? null,
+                'disk_type'         => $plan['disk_type'] ?? null,
+                'bandwidth_mbps'    => $plan['bandwidth_mbps'] ?? null,
+                'currency'          => 'INR',
+                'price_monthly'     => round($saleInInr, 2),
+                'cost_price'        => round($costInInr, 2),
+                'sale_price'        => round($saleInInr, 2),
+                'commission_percent'=> $commission,
+                'durations'         => $plan['durations'] ?? [],
+                'ovh_config'        => [
+                    'plan_code'    => $planCode,
+                    'ovh_currency' => $monthly['currency'] ?? ($plan['currency'] ?? 'EUR'),
+                    'ovh_price'    => $monthly['price'],
+                    'commission'   => $commission,
+                    'raw'          => $plan,
+                ],
+                'is_active'         => true,
+                'sort_order'        => 0,
+            ];
+
+            $existing = OvhProduct::where('plan_code', $planCode)->first();
+
+            if ($dryRun) {
+                $this->info('[DRY-RUN] ' . ($existing ? 'Would update' : 'Would create') . ' [' . $category . '] ' . $planCode . ' @ ₹' . number_format($saleInInr, 2));
+            } else {
+                if ($existing) {
+                    $existing->update($payload);
+                    $updated++;
+                } else {
+                    OvhProduct::create($payload);
+                    $created++;
+                }
+            }
+
+            $synced++;
+        }
+
+        $this->info("{$category} sync complete: {$synced} plans processed ({$created} created, {$updated} updated).");
+        Log::info('OVH catalog sync complete', ['category' => $category, 'synced' => $synced, 'created' => $created, 'updated' => $updated]);
+    }
+
+    /**
+     * Pick the monthly (1 month) raw price from a list of GHC plan durations.
+     */
+    protected function extractMonthlyDurationPrice(array $durations): array
+    {
+        foreach ($durations as $duration) {
+            if (($duration['interval'] ?? 0) == 1 && ($duration['interval_unit'] ?? '') === 'month') {
+                return [
+                    'price'    => (float) ($duration['raw_price'] ?? 0),
+                    'currency' => $duration['currency'] ?? 'EUR',
+                ];
+            }
+        }
+
+        if (!empty($durations[0])) {
+            return [
+                'price'    => (float) ($durations[0]['raw_price'] ?? 0),
+                'currency' => $durations[0]['currency'] ?? 'EUR',
+            ];
+        }
+
+        return ['price' => null, 'currency' => 'EUR'];
+    }
+
     /**
      * Convert an OVH price into INR.
      */
@@ -149,13 +278,11 @@ class SyncOvhProducts extends Command
             return $amount;
         }
 
-        // Try direct rate first.
         $direct = ExchangeRate::getRate($currency, 'INR');
         if ($direct) {
             return $amount * $direct;
         }
 
-        // Fallback: convert via USD.
         $toUsd = ExchangeRate::getRate($currency, 'USD') ?? $this->fallbackCrossRate($currency, 'USD');
         $usdToInr = ExchangeRate::getUsdToInrRate();
 

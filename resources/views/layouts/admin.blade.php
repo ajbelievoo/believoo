@@ -464,6 +464,9 @@
                     <i class="fas fa-cloud"></i><span>GHC</span>
                     <span class="nav-badge new">NEW</span>
                 </a>
+                <a href="{{ route('admin.ovh-products.index') }}" class="nav-link {{ request()->routeIs('admin.ovh-products.*') ? 'active' : '' }}">
+                    <i class="fas fa-cubes"></i><span>OVH Products</span>
+                </a>
             </div>
 
             {{-- Projects Section --}}

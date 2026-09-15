@@ -212,6 +212,13 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
         Route::post('/bulk-price-update', [App\Http\Controllers\Admin\VpsPlanController::class, 'bulkPriceUpdate'])->name('bulk-price-update');
     });
 
+    // OVH Product Catalog
+    Route::prefix('ovh-products')->name('ovh-products.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\OvhProductController::class, 'index'])->name('index');
+        Route::get('/{ovhProduct}', [App\Http\Controllers\Admin\OvhProductController::class, 'show'])->name('show');
+        Route::patch('/{ovhProduct}/toggle-active', [App\Http\Controllers\Admin\OvhProductController::class, 'toggleActive'])->name('toggle-active');
+    });
+
     // Datacenter / Proxmox Nodes Management
     Route::prefix('datacenter')->name('datacenter.')->group(function () {
         Route::get('/', [App\Http\Controllers\Admin\DatacenterController::class, 'index'])->name('index');

@@ -28,6 +28,8 @@ Examples:
 - OVH order checkout (`/order/cart/{cartId}/checkout`) returns `You are not allowed` when the account has no registered payment method and/or zero balance. Adding a payment method and/or prepaid balance in the OVH manager is required before real provisioning can succeed.
 - Order delivery status is polled from `/me/order/{orderId}/status` (the status is not included in the main order object).
 - The VPS service name is extracted from an order detail line whose `domain` matches `^vps-[a-z0-9]+\.vps\.ovh\.[a-z]+$`. Option/backup lines append `-linux`, `-autobackup`, etc. and are ignored.
+- Unified OVH catalog products are stored in `ovh_products` and managed from the custom admin panel at `/admin/ovh-products`.
+- License, IP add-on, and CDN products are **not exposed** by OVH's public catalog API for this account (`/order/catalog/public/{license,ip,cdn}` all return `Got an invalid (or empty) URL`). These are server add-ons, not standalone catalog categories, so they are not synced or presented as sellable products.
 
 ## Mail Server (believoo.com email hosting)
 

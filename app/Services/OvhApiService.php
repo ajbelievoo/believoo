@@ -450,6 +450,21 @@ class OvhApiService
     }
 
     /**
+     * Get OVH catalog plans for any supported category from the GHC Python backend.
+     */
+    public function getCatalogPlans(string $category): array
+    {
+        $response = Http::timeout(120)
+            ->get(self::PYTHON_BASE_URL . '/api/catalog/plans?category=' . urlencode($category));
+
+        if (!$response->successful()) {
+            throw new \RuntimeException('GHC catalog fetch failed for ' . $category . ': ' . $response->body());
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
      * Probe a VPS plan's required cart configuration (OS list, datacenters, etc.).
      * Creates a temporary cart, fetches /requiredConfiguration, then deletes it.
      */
