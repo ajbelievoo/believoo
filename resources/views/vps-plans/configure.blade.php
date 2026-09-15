@@ -5,7 +5,7 @@
     $isOvh = !empty($vpsPlan->ovh_plan_code);
     $ovhRegion = $ovhConfig['raw_offer']['region'] ?? $ovhConfig['raw_offer']['location'] ?? null;
     $datacenter = $ovhRegion ?? 'GHC Cloud European Network';
-    $osList = $ovhConfig['os_list'] ?? ['Ubuntu 22.04', 'Debian 12', 'Rocky Linux 9', 'AlmaLinux 9', 'Windows Server'];
+    $osList = $ovhConfig['os_list'] ?? ['Ubuntu 22.04', 'Ubuntu 24.04', 'Debian 12', 'Rocky Linux 9', 'Rocky Linux 8', 'AlmaLinux 9', 'AlmaLinux 8', 'Debian 11'];
     $selectedOs = session('vps_selected_os', $osList[0] ?? 'Ubuntu 22.04');
 @endphp
 

@@ -44,9 +44,8 @@ class PollOvhServiceDelivery implements ShouldQueue
         }
 
         try {
-            // 1. Check order status.
-            $order = $ovh->get("/me/order/{$this->ovhOrderId}");
-            $status = $order['status'] ?? 'unknown';
+            // 1. Check order status (OVH keeps this in a dedicated sub-route).
+            $status = $ovh->get("/me/order/{$this->ovhOrderId}/status") ?? 'unknown';
 
             Log::info('OVH order status poll', [
                 'hosting_id' => $this->hostingId,
@@ -85,7 +84,7 @@ class PollOvhServiceDelivery implements ShouldQueue
                 return;
             }
 
-            if (in_array($status, ['cancelled', 'notPaid', 'expired'])) {
+            if (in_array($status, ['cancelled', 'notPaid', 'expired', 'documentsRequested'])) {
                 $hosting->update([
                     'status' => 'failed',
                     'admin_notes' => ($hosting->admin_notes ?? '') . "\nOVH order status: {$status}",
@@ -114,15 +113,19 @@ class PollOvhServiceDelivery implements ShouldQueue
         try {
             $details = $ovh->get("/me/order/{$ovhOrderId}/details");
 
-            foreach ($details as $detail) {
-                $detailId = $detail['detailId'] ?? null;
+            foreach ($details as $detailId) {
+                $detailId = is_array($detailId) ? ($detailId['detailId'] ?? null) : $detailId;
                 if (!$detailId) {
                     continue;
                 }
 
                 $detailInfo = $ovh->get("/me/order/{$ovhOrderId}/details/{$detailId}");
                 $domain = $detailInfo['domain'] ?? null;
-                if ($domain) {
+
+                // VPS order lines expose the service name as a vps-xxxx.vps.ovh.<tld> domain.
+                // Option/backup lines append suffixes like "-linux" or "-autobackup".
+                // Other products use placeholders like "*001.001".
+                if ($domain && preg_match('/^vps-[a-z0-9]+\.vps\.ovh\.[a-z]+$/', $domain)) {
                     return $domain;
                 }
             }

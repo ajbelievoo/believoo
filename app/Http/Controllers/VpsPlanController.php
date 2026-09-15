@@ -111,7 +111,14 @@ class VpsPlanController extends Controller
      */
     public function setOs(VpsPlan $vpsPlan, Request $request)
     {
+        $ovhConfig = $vpsPlan->ovh_config ?? [];
+        $osList = $ovhConfig['os_list'] ?? ['Ubuntu 22.04', 'Ubuntu 24.04', 'Debian 12', 'Rocky Linux 9', 'Rocky Linux 8', 'AlmaLinux 9', 'AlmaLinux 8', 'Debian 11'];
         $os = $request->input('os', 'Ubuntu 22.04');
+
+        if (!in_array($os, $osList, true)) {
+            return response()->json(['success' => false, 'message' => 'Selected OS is not available for this plan.'], 422);
+        }
+
         session(['vps_selected_os' => $os]);
 
         if ($request->wantsJson()) {

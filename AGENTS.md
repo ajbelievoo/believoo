@@ -26,6 +26,8 @@ Examples:
 - Non-OVH plans continue to be provisioned on the local Proxmox node.
 - Laravel routes OVH calls through the GHC Python backend (`/api/admin/ovh/proxy`) because PHP's cURL/OpenSSL stack is too old for OVH's TLS 1.3 endpoints.
 - OVH order checkout (`/order/cart/{cartId}/checkout`) returns `You are not allowed` when the account has no registered payment method and/or zero balance. Adding a payment method and/or prepaid balance in the OVH manager is required before real provisioning can succeed.
+- Order delivery status is polled from `/me/order/{orderId}/status` (the status is not included in the main order object).
+- The VPS service name is extracted from an order detail line whose `domain` matches `^vps-[a-z0-9]+\.vps\.ovh\.[a-z]+$`. Option/backup lines append `-linux`, `-autobackup`, etc. and are ignored.
 
 ## Mail Server (believoo.com email hosting)
 

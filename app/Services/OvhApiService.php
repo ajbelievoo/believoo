@@ -450,6 +450,47 @@ class OvhApiService
     }
 
     /**
+     * Probe a VPS plan's required cart configuration (OS list, datacenters, etc.).
+     * Creates a temporary cart, fetches /requiredConfiguration, then deletes it.
+     */
+    public function getVpsPlanConfigOptions(string $planCode, string $duration = 'P1M'): array
+    {
+        $cart = $this->createCart('Believoo plan config probe');
+        $cartId = $cart['cartId'];
+
+        try {
+            $item = $this->addVpsToCart($cartId, $planCode, $duration);
+            $itemId = $item['itemId'] ?? null;
+
+            if (!$itemId) {
+                throw new \RuntimeException('OVH did not return an itemId for plan config probe: ' . $planCode);
+            }
+
+            $configs = $this->get("/order/cart/{$cartId}/item/{$itemId}/requiredConfiguration") ?: [];
+
+            $options = [];
+            foreach ($configs as $config) {
+                $label = $config['label'] ?? null;
+                if ($label) {
+                    $options[$label] = [
+                        'required'      => $config['required'] ?? false,
+                        'type'          => $config['type'] ?? null,
+                        'allowedValues' => $config['allowedValues'] ?? null,
+                    ];
+                }
+            }
+
+            return $options;
+        } finally {
+            try {
+                $this->delete("/order/cart/{$cartId}");
+            } catch (\Exception $e) {
+                Log::warning('OVH plan config probe cart cleanup failed', ['cartId' => $cartId, 'error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    /**
      * Normalize GHC Python catalog plans into the structure the sync job expects.
      */
     protected function normalizeVpsCatalog(array $plans): array
@@ -641,6 +682,22 @@ class OvhApiService
     }
 
     /**
+     * Get the payment means available for a specific order.
+     */
+    public function getAvailableOrderPaymentMeans(string $orderId): array
+    {
+        try {
+            return $this->get("/me/order/{$orderId}/availableRegisteredPaymentMean") ?: [];
+        } catch (\Exception $e) {
+            Log::warning('Could not fetch order payment means', [
+                'order_id' => $orderId,
+                'error'    => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
      * Pay an existing order with a registered payment mean (fidelityAccount/ovhAccount).
      */
     public function payOrder(string $orderId, string $paymentMean = 'ovhAccount'): array
@@ -648,6 +705,25 @@ class OvhApiService
         return $this->post("/me/order/{$orderId}/payWithRegisteredPaymentMean", [
             'paymentMean' => $paymentMean,
         ]);
+    }
+
+    /**
+     * Pay an order using the first payment mean OVH allows for it.
+     */
+    public function payOrderWithFirstAvailableMean(string $orderId): array
+    {
+        $means = $this->getAvailableOrderPaymentMeans($orderId);
+
+        if (empty($means)) {
+            throw new \RuntimeException('No registered payment mean available for OVH order ' . $orderId);
+        }
+
+        // Prefer the OVH account wallet if it is allowed.
+        if (in_array('ovhAccount', $means, true)) {
+            return $this->payOrder($orderId, 'ovhAccount');
+        }
+
+        return $this->payOrder($orderId, (string) $means[0]);
     }
 
     /**
@@ -675,15 +751,15 @@ class OvhApiService
                 throw new \RuntimeException('OVH checkout did not return an orderId: ' . json_encode($checkout));
             }
 
-            // Pay using the OVH prepaid account (wallet) for the configured subsidiary.
+            // Pay using whichever registered payment mean OVH allows for this order.
             try {
-                $this->payOrder($orderId, 'ovhAccount');
+                $this->payOrderWithFirstAvailableMean($orderId);
             } catch (\Exception $e) {
-                Log::error('OVH wallet payment failed after order creation', [
+                Log::error('OVH payment failed after order creation', [
                     'order_id' => $orderId,
                     'error'    => $e->getMessage(),
                 ]);
-                throw new \RuntimeException('OVH order created but wallet payment failed: ' . $e->getMessage());
+                throw new \RuntimeException('OVH order created but payment failed: ' . $e->getMessage());
             }
 
             return new OvhOrderResult(

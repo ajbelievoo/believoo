@@ -120,16 +120,15 @@ class SyncOvhProducts extends Command
 
             if ($dryRun) {
                 $this->info('[DRY-RUN] ' . ($existing ? 'Would update' : 'Would create') . ' ' . $plan['plan_code'] . ' @ ₹' . number_format($saleInInr, 2));
-                continue;
-            }
-
-            if ($existing) {
-                $existing->update($payload);
-                $updated++;
             } else {
-                $payload['sort_order'] = VpsPlan::max('sort_order') + 1;
-                VpsPlan::create($payload);
-                $created++;
+                if ($existing) {
+                    $existing->update($payload);
+                    $updated++;
+                } else {
+                    $payload['sort_order'] = VpsPlan::max('sort_order') + 1;
+                    VpsPlan::create($payload);
+                    $created++;
+                }
             }
 
             $synced++;
