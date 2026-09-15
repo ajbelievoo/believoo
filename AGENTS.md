@@ -103,6 +103,12 @@ Examples:
 - New tables: `bconnect_time_entries`, `bconnect_sprints`.
 - REST API endpoints under `/api/v1/bconnect` with `bconnect:read` and `bconnect:write` scopes.
 
+## Operations
+
+- Daily DB backups run via `/etc/cron.d/believoo-ecosystem`.
+- Believoo MySQL backup: `/www/wwwroot/ops/backup-believoo.sh`.
+- Hourly health checks: `/www/wwwroot/ops/health-check.sh`.
+
 ## B-Connect AI meeting notes and transcription (Phase 5.4)
 
 - New tables: `bconnect_meeting_transcripts`, `bconnect_meeting_notes`; `bconnect_meetings` extended with `audio_path`, `transcript_status`, `notes_status`.
