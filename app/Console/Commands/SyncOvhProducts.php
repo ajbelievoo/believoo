@@ -363,7 +363,8 @@ class SyncOvhProducts extends Command
     protected function syncServiceForProduct(OvhProduct $product): void
     {
         // Skip categories that are not directly orderable through the generic cart flow.
-        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'LICENSE', 'IP_ADDON', 'CDN'])) {
+        // Domain registration is handled on the GHC portal (ghc.believoo.com/domain).
+        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'DOMAINS', 'DOMAIN', 'LICENSE', 'IP_ADDON', 'CDN'])) {
             return;
         }
 
@@ -383,27 +384,17 @@ class SyncOvhProducts extends Command
 
         $priceUsd = $this->convertToUsd((float) $product->price_monthly, 'INR');
 
-        if (in_array(strtoupper($product->category), ['DOMAINS', 'DOMAIN'])) {
-            $billingCycles = [
-                ['months' => 12, 'label' => '1 Year', 'discount_percent' => 0, 'recommended' => true],
-            ];
-            $priceLabel = 'per year';
-        } else {
-            $billingCycles = Service::getDefaultBillingCycles();
-            $priceLabel = 'per month';
-        }
-
         $serviceData = [
             'title'         => $product->display_name,
             'slug'          => $this->slugify($product->plan_code),
             'category'      => 'ovh_' . strtolower($product->category),
             'description'   => $product->description ?: 'OVH ' . $product->category_label . ' plan',
             'price'         => $priceUsd,
-            'price_label'   => $priceLabel,
+            'price_label'   => 'per month',
             'pricing_tiers' => [
                 ['name' => 'default', 'price' => $priceUsd],
             ],
-            'billing_cycles' => $billingCycles,
+            'billing_cycles' => Service::getDefaultBillingCycles(),
             'features'      => $features,
             'is_active'     => $product->is_active,
         ];
