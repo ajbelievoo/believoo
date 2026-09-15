@@ -177,6 +177,16 @@ Route::get('/audio-mixer/ffmpeg-check', [AudioMixerController::class, 'checkFFmp
 Route::get('/audio-mixer/health', [AudioMixerController::class, 'health'])
     ->name('api.audio-mixer.health.public');
 
+// Public chatbot
+Route::post('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'message'])
+    ->name('api.chatbot.message')
+    ->middleware('throttle:30,1');
+Route::get('/chatbot/history', [\App\Http\Controllers\ChatbotController::class, 'history'])
+    ->name('api.chatbot.history');
+Route::post('/chatbot/feedback', [\App\Http\Controllers\ChatbotController::class, 'feedback'])
+    ->name('api.chatbot.feedback')
+    ->middleware('throttle:10,1');
+
 // Public API documentation
 Route::get('/docs', [DocsController::class, 'index'])
     ->name('api.docs');

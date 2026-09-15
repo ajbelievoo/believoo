@@ -587,6 +587,9 @@
                 <a href="{{ route('admin.announcements.index') }}" class="nav-link {{ request()->routeIs('admin.announcements.*') ? 'active' : '' }}">
                     <i class="fas fa-bullhorn"></i><span>Announcements</span>
                 </a>
+                <a href="{{ route('admin.ai-messages.index') }}" class="nav-link {{ request()->routeIs('admin.ai-messages.*') ? 'active' : '' }}">
+                    <i class="fas fa-robot"></i><span>AI Chat</span>
+                </a>
                 <a href="{{ route('admin.campaigns.index') }}" class="nav-link {{ request()->routeIs('admin.campaigns.*') ? 'active' : '' }}">
                     <i class="fas fa-envelope-open-text"></i><span>Email Campaigns</span>
                 </a>

@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\MailTestController;
 use App\Http\Controllers\Admin\GhcController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\AiChatController;
 use App\Http\Controllers\Admin\EmailCampaignController;
 use App\Http\Controllers\Admin\ApiKeyController;
 
@@ -248,6 +249,12 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
     // Email marketing campaigns
     Route::resource('campaigns', EmailCampaignController::class);
     Route::patch('campaigns/{campaign}/send', [EmailCampaignController::class, 'send'])->name('campaigns.send');
+
+    // AI chatbot conversations
+    Route::get('ai-messages', [AiChatController::class, 'index'])->name('ai-messages.index');
+    Route::get('ai-messages/{sessionId}', [AiChatController::class, 'show'])->name('ai-messages.show');
+    Route::delete('ai-messages/{sessionId}', [AiChatController::class, 'destroy'])->name('ai-messages.destroy');
+    Route::get('ai-feedback/{feedback}', [AiChatController::class, 'feedback'])->name('ai-messages.feedback');
 
     // API key management
     Route::resource('api-keys', ApiKeyController::class);
