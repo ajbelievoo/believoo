@@ -96,9 +96,13 @@
                 <div class="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-amber-500 rounded-full opacity-20 blur-3xl"></div>
                 <div class="absolute bottom-0 left-0 -mb-10 -ml-10 w-64 h-64 bg-amber-500 rounded-full opacity-10 blur-3xl"></div>
 
+                @php
+                    $rate = \App\Models\ExchangeRate::getUsdToInrRate();
+                    $displayPrice = (strtoupper($currentCurrency ?? 'USD') === 'INR') ? $service->price * $rate : $service->price;
+                @endphp
                 <div class="relative z-10">
                     <div class="text-5xl md:text-6xl font-bold text-white mb-4">
-                        <span class="text-amber-500">{{ $currencySymbol }}</span>{{ number_format($service->price, 2) }}
+                        <span class="text-amber-500">{{ $currencySymbol }}</span>{{ number_format($displayPrice, 2) }}
                     </div>
                     @if($service->ovhProduct && $service->ovhProduct->is_active)
                         <p class="text-slate-300 mb-8 max-w-xl mx-auto">Instant provisioning through {{ $service->ovhProduct->category }} after payment.</p>
@@ -130,9 +134,13 @@
                 <div class="grid md:grid-cols-3 gap-6 mt-12">
                     @foreach($service->pricing_tiers as $tier)
                         <div class="p-8 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:border-amber-300 dark:hover:border-amber-500 hover:shadow-lg transition-all">
+                            @php
+                                $tierPrice = $tier['price'] ?? $service->price;
+                                $displayTierPrice = (strtoupper($currentCurrency ?? 'USD') === 'INR') ? $tierPrice * $rate : $tierPrice;
+                            @endphp
                             <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{{ $tier['name'] ?? 'Tier' }}</h3>
                             <p class="text-slate-500 dark:text-slate-400 text-sm mb-4">{{ $tier['description'] ?? '' }}</p>
-                            <div class="text-3xl font-bold text-amber-600 mb-6">{{ $currencySymbol }}{{ number_format($tier['price'] ?? $service->price, 2) }}</div>
+                            <div class="text-3xl font-bold text-amber-600 mb-6">{{ $currencySymbol }}{{ number_format($displayTierPrice, 2) }}</div>
                             <a href="{{ route('checkout', ['service' => $service->slug, 'tier' => $tier['name'] ?? null]) }}" class="inline-flex items-center justify-center w-full px-6 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-amber-500 hover:text-white hover:border-amber-500 dark:hover:text-white transition">
                                 Choose Plan
                             </a>

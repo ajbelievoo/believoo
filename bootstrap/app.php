@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\CurrencyMiddleware::class,
             \App\Http\Middleware\BlockIp::class,
+            \App\Http\Middleware\ResellerMiddleware::class,
         ]);
 
         // Exclude payment webhooks + external service webhooks from CSRF

@@ -21,8 +21,12 @@
                         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-amber-600 transition-colors">{{ $service->title }}</h3>
                         <p class="text-slate-500 dark:text-slate-300 leading-relaxed mb-6 line-clamp-3">{!! strip_tags($service->description) !!}</p>
                     </a>
+                    @php
+                        $rate = \App\Models\ExchangeRate::getUsdToInrRate();
+                        $displayPrice = (strtoupper($currentCurrency ?? 'USD') === 'INR') ? $service->price * $rate : $service->price;
+                    @endphp
                     <div class="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-slate-700">
-                        <span class="text-amber-600 font-bold">{{ $currencySymbol }}{{ number_format($service->price, 2) }}</span>
+                        <span class="text-amber-600 font-bold">{{ $currencySymbol }}{{ number_format($displayPrice, 2) }}</span>
                         <div class="flex items-center gap-3">
                             <a href="{{ route('services.show', $service->slug) }}" class="inline-flex items-center gap-2 text-amber-600 font-semibold text-sm group-hover:gap-3 transition-all">
                                 Learn more <i class="fas fa-arrow-right text-xs"></i>

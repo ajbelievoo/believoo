@@ -70,3 +70,10 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
 });
+
+// SSO
+Route::prefix('sso')->name('sso.')->group(function () {
+    Route::get('{slug}/redirect', [App\Http\Controllers\Auth\SsoController::class, 'redirect'])->name('redirect');
+    Route::get('{slug}/callback', [App\Http\Controllers\Auth\SsoController::class, 'callback'])->name('callback');
+    Route::get('{slug}/metadata', [App\Http\Controllers\Auth\SsoController::class, 'metadata'])->name('metadata');
+});

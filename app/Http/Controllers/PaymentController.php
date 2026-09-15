@@ -88,6 +88,38 @@ class PaymentController extends Controller
         return $metadata;
     }
 
+    /**
+     * Resolve the final customer-facing amount server-side for an OVH-backed product.
+     * Falls back to the frontend-supplied amount for non-OVH services.
+     */
+    protected function resolveOrderAmountInInr(Request $request, Service $service): float
+    {
+        $metadata = $this->buildOrderMetadata($request, $service);
+        $billingMonths = (int) ($request->billing_months ?? 1);
+        $quantity = (int) ($request->quantity ?? 1);
+
+        if (!empty($metadata['ovh_product_id'])) {
+            $priceUsd = $service->getPriceForCycle($billingMonths, $request->tier_name);
+            return round($priceUsd * \App\Models\ExchangeRate::getUsdToInrRate() * 1.18 * $quantity, 2);
+        }
+
+        return floatval($request->amount);
+    }
+
+    protected function resolveOrderAmountInUsd(Request $request, Service $service): float
+    {
+        $metadata = $this->buildOrderMetadata($request, $service);
+        $billingMonths = (int) ($request->billing_months ?? 1);
+        $quantity = (int) ($request->quantity ?? 1);
+
+        if (!empty($metadata['ovh_product_id'])) {
+            $priceUsd = $service->getPriceForCycle($billingMonths, $request->tier_name);
+            return round($priceUsd * 1.18 * $quantity, 2);
+        }
+
+        return floatval($request->amount);
+    }
+
     private function getCashfreeConfig(): array
     {
         $settings = Setting::where('group', 'Payment')->pluck('value', 'key');
@@ -194,8 +226,10 @@ class PaymentController extends Controller
 
         $config = $this->getCashfreeConfig();
 
-        // Amount is already in INR (sent from frontend as totalWithGst * 83)
-        $totalAmountInINR = round(floatval($request->amount), 2);
+        $service = Service::findOrFail($request->service_id);
+
+        // Resolve amount server-side for OVH-backed products.
+        $totalAmountInINR = $this->resolveOrderAmountInInr($request, $service);
 
         if (!$config['enabled']) {
             return response()->json(['error' => 'Cashfree payment gateway is disabled'], 400);
@@ -479,6 +513,7 @@ class PaymentController extends Controller
             'tier_name' => 'nullable|string',
             'amount' => 'required|numeric|min:1',
             'billing_months' => 'required|integer|min:1',
+            'quantity' => 'nullable|integer|min:1|max:10',
         ]);
 
         $config = $this->getRazorpayConfig();
@@ -494,8 +529,8 @@ class PaymentController extends Controller
         $service = Service::findOrFail($request->service_id);
         $user = Auth::user();
 
-        // Amount already includes GST from frontend
-        $totalAmount = floatval($request->amount);
+        // Resolve amount server-side for OVH-backed products (INR, GST inclusive).
+        $totalAmount = $this->resolveOrderAmountInInr($request, $service);
 
         // Calculate GST (18%) - amount includes GST so we calculate backwards
         $gstRate = 0.18;
@@ -643,6 +678,7 @@ class PaymentController extends Controller
             'tier_name' => 'nullable|string',
             'amount' => 'required|numeric|min:1',
             'billing_months' => 'required|integer|min:1',
+            'quantity' => 'nullable|integer|min:1|max:10',
         ]);
 
         $config = $this->getPaypalConfig();
@@ -658,8 +694,8 @@ class PaymentController extends Controller
         $service = Service::findOrFail($request->service_id);
         $user = Auth::user();
 
-        // Amount already includes GST from frontend
-        $totalAmount = floatval($request->amount);
+        // Resolve amount server-side for OVH-backed products (USD, GST inclusive).
+        $totalAmount = $this->resolveOrderAmountInUsd($request, $service);
 
         // Calculate GST (18%) - amount includes GST so we calculate backwards
         $gstRate = 0.18;
@@ -876,6 +912,7 @@ class PaymentController extends Controller
             'tier_name' => 'nullable|string',
             'amount' => 'required|numeric|min:1',
             'billing_months' => 'required|integer|min:1',
+            'quantity' => 'nullable|integer|min:1|max:10',
         ]);
 
         $config = $this->getPayuConfig();
@@ -891,16 +928,25 @@ class PaymentController extends Controller
         $service = Service::findOrFail($request->service_id);
         $user = Auth::user();
 
-        // Amount already includes GST from frontend
-        $totalAmount = floatval($request->amount);
+        // Resolve amount server-side for OVH-backed products (INR, GST inclusive).
+        $metadata = $this->buildOrderMetadata($request, $service);
+        $billingMonths = (int) ($request->billing_months ?? 1);
+        $quantity = (int) ($request->quantity ?? 1);
+        if (!empty($metadata['ovh_product_id'])) {
+            $product = \App\Models\OvhProduct::find($metadata['ovh_product_id']);
+            if ($product && $product->is_active) {
+                $totalAmountInINR = round((float) $product->sale_price * $billingMonths * $quantity * 1.18, 2);
+            } else {
+                $totalAmountInINR = floatval($request->amount) * 83;
+            }
+        } else {
+            $totalAmountInINR = floatval($request->amount) * 83;
+        }
 
         // Calculate GST (18%) - amount includes GST so we calculate backwards
         $gstRate = 0.18;
-        $subtotal = round($totalAmount / (1 + $gstRate), 2);
-        $gstAmount = round($totalAmount - $subtotal, 2);
-
-        // Convert to INR
-        $totalAmountInINR = $totalAmount * 83;
+        $subtotal = round($totalAmountInINR / (1 + $gstRate), 2);
+        $gstAmount = round($totalAmountInINR - $subtotal, 2);
 
         // Create order in database with GST breakdown
         $order = Order::create([
@@ -909,8 +955,8 @@ class PaymentController extends Controller
             'service_name' => $service->title,
             'tier_name' => $request->tier_name,
             'billing_months' => $request->billing_months ?? 1,
-            'subtotal' => $subtotal * 83,
-            'gst_amount' => $gstAmount * 83,
+            'subtotal' => $subtotal,
+            'gst_amount' => $gstAmount,
             'gst_rate' => $gstRate,
             'amount' => $totalAmountInINR,
             'currency' => 'INR',

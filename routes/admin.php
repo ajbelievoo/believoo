@@ -222,6 +222,13 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
     // OVH Dynamic Pricing Rules
     Route::resource('ovh-pricing-rules', App\Http\Controllers\Admin\OvhPricingRuleController::class)->names('ovh-pricing-rules');
 
+    // SSO Providers
+    Route::resource('sso-providers', App\Http\Controllers\Admin\SsoProviderController::class)->names('sso-providers');
+
+    // Resellers
+    Route::resource('resellers', App\Http\Controllers\Admin\ResellerController::class)->names('resellers');
+    Route::patch('resellers/{reseller}/approve', [App\Http\Controllers\Admin\ResellerController::class, 'approve'])->name('resellers.approve');
+
     // Datacenter / Proxmox Nodes Management
     Route::prefix('datacenter')->name('datacenter.')->group(function () {
         Route::get('/', [App\Http\Controllers\Admin\DatacenterController::class, 'index'])->name('index');
