@@ -251,7 +251,7 @@ class SyncOvhProducts extends Command
                     'commission'   => $commission,
                     'raw'          => $plan,
                 ],
-                'is_active'         => true,
+                'is_active'         => $category !== 'PRIVATE_CLOUD' && ($category !== 'PUBLIC_CLOUD' || $saleInInr > 0),
                 'sort_order'        => 0,
             ];
 
@@ -267,6 +267,19 @@ class SyncOvhProducts extends Command
                 } else {
                     $product = OvhProduct::create($payload);
                     $created++;
+                }
+
+                // Some catalog plan codes (e.g. legacy web-hosting-*-ovh) are not accepted
+                // by the OVH cart endpoint. Skip those from the storefront.
+                if (strtoupper($category) === 'WEB_HOSTING' && !$this->isPlanOrderable($service, $category, $planCode)) {
+                    $this->warn("{$planCode} is not orderable; deactivating.");
+                    $product->update(['is_active' => false]);
+                    if ($product->service_id) {
+                        Service::where('id', $product->service_id)->delete();
+                        $product->update(['service_id' => null]);
+                    }
+                    $synced--;
+                    continue;
                 }
 
                 $this->syncServiceForProduct($product);
@@ -364,7 +377,7 @@ class SyncOvhProducts extends Command
     {
         // Skip categories that are not directly orderable through the generic cart flow.
         // Domain registration is handled on the GHC portal (ghc.believoo.com/domain).
-        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'DOMAINS', 'DOMAIN', 'LICENSE', 'IP_ADDON', 'CDN'])) {
+        if (in_array(strtoupper($product->category), ['PRIVATE_CLOUD', 'PUBLIC_CLOUD', 'DOMAINS', 'DOMAIN', 'LICENSE', 'IP_ADDON', 'CDN'])) {
             return;
         }
 
@@ -405,5 +418,30 @@ class SyncOvhProducts extends Command
         );
 
         $product->update(['service_id' => $service->id]);
+    }
+
+    /**
+     * Probe whether a plan code is accepted by the OVH cart endpoint.
+     */
+    protected function isPlanOrderable(OvhApiService $ovh, string $category, string $planCode): bool
+    {
+        $cart = [];
+        try {
+            $cart = $ovh->createCart('Plan code probe ' . $planCode);
+            $cartId = $cart['cartId'];
+            $result = $ovh->addItemToCart($cartId, $category, $planCode, 'P1M', 1, null);
+            return !empty($result['itemId']);
+        } catch (\Exception $e) {
+            Log::info('Plan code not orderable', ['category' => $category, 'plan_code' => $planCode, 'error' => $e->getMessage()]);
+            return false;
+        } finally {
+            if (!empty($cart['cartId'])) {
+                try {
+                    $ovh->delete('/order/cart/' . $cart['cartId']);
+                } catch (\Exception $e) {
+                    // ignore cleanup failure
+                }
+            }
+        }
     }
 }

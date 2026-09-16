@@ -823,9 +823,9 @@ class OvhApiService
                 'enable-backup'        => $overrides['enable_backup'] ?? 'false',
             ],
             'WEB_HOSTING' => [
-                'district'     => $overrides['datacenter'] ?? 'gra3',
+                'district'     => $overrides['datacenter'] ?? null,
                 'dns_zone'     => $overrides['dns_zone'] ?? 'NO_CHANGE',
-                'legacy_domain' => $overrides['legacy_domain'] ?? '',
+                'legacy_domain' => $overrides['legacy_domain'] ?? $overrides['domain'] ?? null,
             ],
             'PUBLIC_CLOUD' => [
                 'infrastructure' => $overrides['infrastructure'] ?? 'production',
@@ -843,10 +843,20 @@ class OvhApiService
                 continue;
             }
 
+            // Skip domain/hosting fields that would be set to an empty string.
+            if (in_array($label, ['legacy_domain', 'webhosting_domain'], true) && trim((string) $value) === '') {
+                continue;
+            }
+
             $allowed = $required[$label]['allowedValues'] ?? null;
             if (is_array($allowed) && !in_array((string) $value, array_map('strval', $allowed), true)) {
                 // Fall back to the first allowed value if the default is not accepted.
                 $value = $allowed[0] ?? $value;
+            }
+
+            // Drop null values for optional labels; OVH rejects 'null' strings for some fields.
+            if ($value === null || $value === '') {
+                continue;
             }
 
             $this->configureCartItem($cartId, $itemId, $label, (string) $value);
@@ -855,14 +865,79 @@ class OvhApiService
 
     /**
      * Place a generic OVH catalog product order.
+     *
+     * For dedicated servers we try each allowed datacenter in turn, because a
+     * specific hardware configuration may not be available in every region.
      */
     public function orderProduct(string $category, string $planCode, int $quantity = 1, string $duration = 'P1M', array $config = []): OvhOrderResult
+    {
+        $domain = $config['domain'] ?? null;
+
+        // Dedicated servers need a datacenter; find the allowed values if none supplied.
+        $datacenters = null;
+        if (strtoupper($category) === 'DEDICATED' && empty($config['datacenter'])) {
+            $datacenters = $this->getAllowedDedicatedDatacenters($planCode, $duration, $quantity, $domain);
+        }
+
+        // If we don't have a datacenter list, use the one from config or a safe default.
+        $datacenters = $datacenters ?: [($config['datacenter'] ?? 'bhs')];
+
+        $lastError = null;
+        foreach ($datacenters as $datacenter) {
+            try {
+                return $this->doOrderProduct(
+                    $category,
+                    $planCode,
+                    $quantity,
+                    $duration,
+                    array_merge($config, ['datacenter' => $datacenter]),
+                    $domain
+                );
+            } catch (\Exception $e) {
+                // If this datacenter is simply out of stock, try the next one.
+                $message = $e->getMessage();
+                if (str_contains($message, 'is not available in') || str_contains($message, 'not available in')) {
+                    $lastError = $e;
+                    continue;
+                }
+                throw $e;
+            }
+        }
+
+        throw $lastError ?: new \RuntimeException('Could not place OVH dedicated order for ' . $planCode);
+    }
+
+    /**
+     * Probe the allowed dedicated datacenters for a plan without completing an order.
+     */
+    protected function getAllowedDedicatedDatacenters(string $planCode, string $duration, int $quantity, ?string $domain): array
+    {
+        $cart = $this->createCart('Datacenter probe');
+        $cartId = $cart['cartId'];
+
+        try {
+            $item = $this->addItemToCart($cartId, 'DEDICATED', $planCode, $duration, $quantity, $domain);
+            $required = $this->getRequiredCartConfiguration($cartId, (string) $item['itemId']);
+
+            return $required['dedicated_datacenter']['allowedValues'] ?? ['bhs', 'fra', 'sbg'];
+        } finally {
+            try {
+                $this->delete('/order/cart/' . $cartId);
+            } catch (\Exception $e) {
+                // ignore cleanup failure
+            }
+        }
+    }
+
+    /**
+     * Single cart attempt for a generic OVH catalog product order.
+     */
+    protected function doOrderProduct(string $category, string $planCode, int $quantity, string $duration, array $config, ?string $domain): OvhOrderResult
     {
         $cart = $this->createCart('Believoo ' . $category . ' order');
         $cartId = $cart['cartId'];
 
         try {
-            $domain = $config['domain'] ?? null;
             $item = $this->addItemToCart($cartId, $category, $planCode, $duration, $quantity, $domain);
             $itemId = $item['itemId'] ?? null;
 
@@ -914,11 +989,22 @@ class OvhApiService
      */
     protected function extractTotalFromCheckout(array $checkout): float
     {
-        foreach ($checkout['prices'] ?? [] as $price) {
-            if (($price['label'] ?? '') === 'TOTAL') {
+        $prices = $checkout['prices'] ?? [];
+
+        if (isset($prices['withTax']['value'])) {
+            return (float) $prices['withTax']['value'];
+        }
+
+        if (isset($prices['withoutTax']['value'])) {
+            return (float) $prices['withoutTax']['value'];
+        }
+
+        foreach ($prices as $price) {
+            if (is_array($price) && ($price['label'] ?? '') === 'TOTAL') {
                 return (float) ($price['price']['value'] ?? 0);
             }
         }
+
         return 0.0;
     }
 
@@ -953,11 +1039,20 @@ class OvhOrderResult
      */
     public function getTotalWithTax(): ?float
     {
+        if (isset($this->prices['withTax']['value'])) {
+            return (float) $this->prices['withTax']['value'];
+        }
+
+        if (isset($this->prices['withoutTax']['value'])) {
+            return (float) $this->prices['withoutTax']['value'];
+        }
+
         foreach ($this->prices as $price) {
-            if (($price['label'] ?? '') === 'TOTAL') {
-                return (float) ($price['priceInUcents'] ?? 0) / 100_000_000;
+            if (is_array($price) && ($price['label'] ?? '') === 'TOTAL') {
+                return (float) ($price['price']['value'] ?? $price['priceInUcents'] ?? 0) / 100_000_000;
             }
         }
+
         return null;
     }
 }

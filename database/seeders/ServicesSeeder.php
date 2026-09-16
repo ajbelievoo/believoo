@@ -163,7 +163,7 @@ class ServicesSeeder extends Seeder
         $existing = [
             'app-development' => ['price' => 999.00, 'category' => 'Development', 'price_label' => 'Starting From'],
             'seo-digital-growth' => ['price' => 199.00, 'category' => 'Growth', 'price_label' => 'Starting From'],
-            'play-storeapp-store-publishing' => ['price' => 79.00, 'category' => 'Publishing', 'price_label' => 'Starting From'],
+            'play-store-app-store-publishing' => ['price' => 79.00, 'category' => 'Publishing', 'price_label' => 'Starting From'],
             'adsense-approval-service' => ['price' => 149.00, 'category' => 'Growth', 'price_label' => 'Starting From'],
             'managed-vps-cloud' => ['price' => 49.00, 'category' => 'Infrastructure', 'price_label' => 'Starting From'],
             'streaming-addon' => ['price' => 29.00, 'category' => 'Infrastructure', 'price_label' => 'Starting From'],

@@ -82,7 +82,7 @@
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', '{{ $settings['google_analytics'] }}');
+            gtag('config', @json($settings['google_analytics']));
         </script>
     @endif
 
@@ -392,6 +392,7 @@
         }
         html.light .gradient-text-dark {
             background: linear-gradient(135deg, #0ea5e9 0%, #8b5cf6 100%) !important;
+            background-clip: text !important;
             -webkit-background-clip: text !important;
             -webkit-text-fill-color: transparent !important;
         }
@@ -739,100 +740,6 @@
         }
     </style>
     <style>
-        /* ===== Preloader ===== */
-        #bel-preloader {
-            position: fixed;
-            inset: 0;
-            z-index: 2147483647;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #050505;
-            transition: opacity .45s ease, visibility .45s ease;
-        }
-        html.light #bel-preloader { background: #f8fafc; }
-        #bel-preloader.bel-preloader-hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
-        .bel-preloader-inner {
-            position: relative;
-            width: 110px;
-            height: 110px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .bel-spinner-track {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 2px solid rgba(0,183,255,.12);
-        }
-        html.light .bel-spinner-track { border-color: rgba(0,0,0,.08); }
-        .bel-spinner {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            background: conic-gradient(from 0deg, rgba(0,183,255,0) 0deg, #00B7FF 200deg, #f59e0b 320deg, rgba(245,158,11,0) 360deg);
-            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-            mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-            animation: bel-spin .9s linear infinite;
-        }
-        .bel-preloader-logo {
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            animation: bel-pulse 1.6s ease-in-out infinite;
-        }
-        .bel-preloader-logo img {
-            max-width: 60px;
-            max-height: 60px;
-            object-fit: contain;
-        }
-        .bel-preloader-logo span { font-size: 1.25rem; }
-        @keyframes bel-spin { to { transform: rotate(360deg); } }
-        @keyframes bel-pulse {
-            0%, 100% { transform: scale(1); opacity: .85; }
-            50% { transform: scale(1.06); opacity: 1; }
-        }
-
-        /* ===== Cursor follower ===== */
-        .bel-cursor-dot,
-        .bel-cursor-ring {
-            position: fixed;
-            top: 0;
-            left: 0;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 2147483646;
-            opacity: 0;
-        }
-        .bel-cursor-dot {
-            width: 6px;
-            height: 6px;
-            background: #00B7FF;
-            transition: opacity .25s ease;
-        }
-        .bel-cursor-ring {
-            width: 36px;
-            height: 36px;
-            border: 2px solid rgba(0,183,255,.55);
-            transition: width .25s ease, height .25s ease, border-color .25s ease, background .25s ease, opacity .25s ease;
-        }
-        .bel-cursor-ring.bel-cursor-hover {
-            width: 56px;
-            height: 56px;
-            border-color: rgba(245,158,11,.85);
-            background: rgba(0,183,255,.08);
-        }
-        @media (pointer: coarse) {
-            .bel-cursor-dot, .bel-cursor-ring { display: none !important; }
-        }
-
         /* ===== Scroll progress bar ===== */
         #bel-progress {
             position: fixed;
@@ -853,17 +760,6 @@
             inset: 0;
             z-index: 0;
             pointer-events: none;
-        }
-
-        /* ===== Reveal on scroll ===== */
-        .bel-reveal {
-            opacity: 0;
-            transform: translateY(28px);
-            transition: opacity .7s ease, transform .7s cubic-bezier(.22,.61,.36,1);
-        }
-        .bel-reveal.bel-revealed {
-            opacity: 1;
-            transform: none;
         }
 
         /* ===== Back to top ===== */
@@ -1089,7 +985,6 @@
         html { scroll-behavior: smooth; }
         @media (prefers-reduced-motion: reduce) {
             html { scroll-behavior: auto; }
-            .bel-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
             #bel-top { transition: none !important; }
             #bel-announce { animation: none !important; }
             .bel-typed-caret { animation: none !important; }
@@ -1224,21 +1119,6 @@
     </script>
 </head>
 <body class="font-sans antialiased selection:bg-amber-500 selection:text-dark transition-colors duration-300 bg-slate-50 text-slate-900 dark:bg-dark dark:text-gray-200">
-
-    <!-- Preloader -->
-    <div id="bel-preloader" aria-hidden="true">
-        <div class="bel-preloader-inner">
-            <div class="bel-spinner-track"></div>
-            <div class="bel-spinner"></div>
-            <div class="bel-preloader-logo">
-                <x-site-logo :settings="$settings" class="h-10 w-auto" />
-            </div>
-        </div>
-    </div>
-
-    <!-- Cursor follower -->
-    <div class="bel-cursor-ring" aria-hidden="true"></div>
-    <div class="bel-cursor-dot" aria-hidden="true"></div>
 
     <!-- Scroll progress bar -->
     <div id="bel-progress" aria-hidden="true"></div>
@@ -1661,7 +1541,7 @@
                 </div>
             </div>
         </nav>
-    </header>
+    </div>
     @endif
     @endif
 
@@ -1937,73 +1817,6 @@
         }" @notification-received.window="playNotification()" @play-notification-sound.window="playNotification()" @play-ping-sound.window="playNotification()"></div>
 
     <script>
-        // ===== Preloader =====
-        (function () {
-            var preloader = document.getElementById('bel-preloader');
-            if (!preloader) return;
-            var hidden = false;
-            var start = Date.now();
-            function hidePreloader() {
-                if (hidden) return;
-                hidden = true;
-                var wait = Math.max(0, 350 - (Date.now() - start));
-                setTimeout(function () {
-                    preloader.classList.add('bel-preloader-hidden');
-                    setTimeout(function () { preloader.remove(); }, 600);
-                }, wait);
-            }
-            if (document.readyState === 'complete') {
-                hidePreloader();
-            } else {
-                window.addEventListener('load', hidePreloader);
-                setTimeout(hidePreloader, 4000);
-            }
-        })();
-
-        // ===== Cursor follower =====
-        (function () {
-            if (!window.matchMedia('(pointer: fine)').matches) return;
-            var ring = document.querySelector('.bel-cursor-ring');
-            var dot = document.querySelector('.bel-cursor-dot');
-            if (!ring || !dot) return;
-
-            var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            var ease = reduce ? 1 : 0.18;
-            var mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
-            var ringX = mouseX, ringY = mouseY, visible = false;
-
-            document.addEventListener('mousemove', function (e) {
-                mouseX = e.clientX;
-                mouseY = e.clientY;
-                if (!visible) {
-                    visible = true;
-                    ring.style.opacity = '1';
-                    dot.style.opacity = '1';
-                }
-                dot.style.transform = 'translate3d(' + mouseX + 'px,' + mouseY + 'px,0) translate(-50%,-50%)';
-            });
-            document.addEventListener('mouseleave', function () {
-                visible = false;
-                ring.style.opacity = '0';
-                dot.style.opacity = '0';
-            });
-
-            (function loop() {
-                ringX += (mouseX - ringX) * ease;
-                ringY += (mouseY - ringY) * ease;
-                ring.style.transform = 'translate3d(' + ringX + 'px,' + ringY + 'px,0) translate(-50%,-50%)';
-                requestAnimationFrame(loop);
-            })();
-
-            var hoverSel = 'a, button, [role="button"], input, select, textarea, label, .cursor-pointer';
-            document.addEventListener('mouseover', function (e) {
-                if (e.target.closest(hoverSel)) ring.classList.add('bel-cursor-hover');
-            });
-            document.addEventListener('mouseout', function (e) {
-                if (e.target.closest(hoverSel)) ring.classList.remove('bel-cursor-hover');
-            });
-        })();
-
         // ===== Scroll progress + back to top =====
         (function () {
             var bar = document.getElementById('bel-progress');
@@ -2022,26 +1835,6 @@
             }
             window.addEventListener('scroll', onScroll, { passive: true });
             onScroll();
-        })();
-
-        // ===== Reveal on scroll =====
-        (function () {
-            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-            if (!('IntersectionObserver' in window)) return;
-            var targets = document.querySelectorAll('main > section, main > div > section');
-            if (!targets.length) return;
-            var io = new IntersectionObserver(function (entries) {
-                entries.forEach(function (entry) {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('bel-revealed');
-                        io.unobserve(entry.target);
-                    }
-                });
-            }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
-            targets.forEach(function (el) {
-                el.classList.add('bel-reveal');
-                io.observe(el);
-            });
         })();
 
         // ===== Starfield (dark mode only) =====

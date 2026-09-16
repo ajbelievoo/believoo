@@ -4,7 +4,7 @@
         <div class="absolute inset-0 z-0 pointer-events-none opacity-40" style="background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 32px 32px;"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
             <div class="grid lg:grid-cols-2 gap-12 items-center">
-                <div x-data="{ shown: false }" x-init="setTimeout(() => shown = true, 100)" x-show="shown" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0 translate-y-6" x-transition:enter-end="opacity-100 translate-y-0">
+                <div>
                     <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 text-amber-700 text-sm font-semibold mb-6">
                         <i class="fas fa-crown text-xs"></i>
                         Growth Scale Partner
@@ -51,7 +51,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="relative" x-data="{ shown: false }" x-init="setTimeout(() => shown = true, 300)" x-show="shown" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0 translate-x-6" x-transition:enter-end="opacity-100 translate-x-0">
+                <div class="relative">
                     <div class="relative aspect-square max-w-lg mx-auto">
                         <div class="absolute inset-0 rounded-[3rem] bg-gradient-to-br from-amber-100 to-slate-100"></div>
                         <div class="absolute inset-4 rounded-[2.5rem] bg-white shadow-2xl p-8 flex flex-col justify-center gap-4">
@@ -109,8 +109,8 @@
     </section>
 
     <!-- Marquee -->
-    <section class="py-8 bg-slate-900 overflow-hidden" x-data="{ shown: false }" x-intersect.once="shown = true">
-        <div class="marquee-track flex whitespace-nowrap" :class="shown ? 'opacity-100' : 'opacity-0'" class="transition-opacity duration-700">
+    <section class="py-8 bg-slate-900 overflow-hidden">
+        <div class="marquee-track flex whitespace-nowrap transition-opacity duration-700">
             <div class="marquee-content flex items-center gap-12 pr-12 text-white/80 text-lg font-semibold uppercase tracking-wider">
                 <span>App Development</span>
                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -194,9 +194,8 @@
     </section>
 
     <!-- Our Businesses -->
-    <section id="businesses" class="py-24 bg-white" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section id="businesses" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-16">
                 <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm">Our Businesses</span>
@@ -204,7 +203,7 @@
                 <p class="text-slate-500 mt-4 max-w-2xl mx-auto">Believoo is a full-scale technology partner, bringing together everything your business needs to grow.</p>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <a href="{{ route('services.show', 'play-storeapp-store-publishing') }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
+                <a href="{{ route('services.show', 'play-store-app-store-publishing') }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
                     <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors">
                         <i class="fab fa-google-play text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
                     </div>
@@ -237,9 +236,8 @@
     </section>
 
     <!-- Services Section -->
-    <section id="services" class="py-24 bg-slate-50" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section id="services" class="py-24 bg-slate-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-16">
                 <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm">Our Expertise</span>
@@ -273,7 +271,7 @@
     <section class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid lg:grid-cols-2 gap-16 items-center">
-                <div x-data="{ shown: false }" x-init="setTimeout(() => shown = true, 100)" x-show="shown" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0 -translate-x-6" x-transition:enter-end="opacity-100 translate-x-0">
+                <div>
                     <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm">Why Believoo</span>
                     <h2 class="text-3xl md:text-4xl font-bold text-slate-900 mt-2 mb-6">Meet the All-in-One Technology Partner</h2>
                     <p class="text-slate-500 text-lg leading-relaxed mb-8">
@@ -309,7 +307,7 @@
                         </div>
                     </div>
                 </div>
-                <div x-data="{ shown: false }" x-init="setTimeout(() => shown = true, 300)" x-show="shown" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0 translate-x-6" x-transition:enter-end="opacity-100 translate-x-0">
+                <div>
                     <div class="relative rounded-3xl overflow-hidden bg-slate-100 aspect-[4/3] flex items-center justify-center">
                         <div class="absolute inset-0 grid grid-cols-6 gap-1 p-4 opacity-20">
                             @for($i=0;$i<24;$i++)
@@ -335,9 +333,8 @@
     </section>
 
     <!-- Portfolio Section -->
-    <section id="portfolio" class="py-24 bg-slate-50" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section id="portfolio" class="py-24 bg-slate-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
                 <div>
@@ -368,9 +365,8 @@
     </section>
 
     <!-- Our Brands -->
-    <section id="brands" class="py-24 bg-white" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section id="brands" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-16">
                 <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm">Our Brands</span>
@@ -447,9 +443,8 @@
     </section>
 
     <!-- B-CONNECT SaaS Section -->
-    <section id="bconnect" class="py-24 bg-slate-900" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section id="bconnect" class="py-24 bg-slate-900">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-16">
                 <span class="text-cyan-400 font-semibold tracking-wider uppercase text-sm">SaaS Platform</span>
@@ -502,9 +497,8 @@
         $testimonials = \App\Models\Testimonial::where('is_visible', true)->orderBy('sort_order')->latest()->get();
     @endphp
     @if($testimonials->count())
-    <section class="py-24 bg-white overflow-hidden" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section class="py-24 bg-white overflow-hidden">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-12">
                 <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm">Testimonials</span>
@@ -578,9 +572,8 @@
             ->unique('question')->take(8)->values();
     @endphp
     @if($belFaqs->count())
-    <section id="faq" class="py-24 bg-slate-50" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section id="faq" class="py-24 bg-slate-50">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-12">
                 <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm">FAQ</span>
@@ -611,9 +604,8 @@
     <!-- Latest Blog Posts -->
     @php $latestPosts = \App\Models\Post::published()->latest('published_at')->take(3)->get(); @endphp
     @if($latestPosts->count())
-    <section class="py-24 bg-white" x-data="{ shown: false }" x-intersect.once="shown = true">
+    <section class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-             :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
              class="transition-all duration-700 ease-out">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
                 <div>
