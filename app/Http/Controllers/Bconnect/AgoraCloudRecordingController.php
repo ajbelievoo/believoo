@@ -76,7 +76,20 @@ class AgoraCloudRecordingController extends Controller {
                 'uid' => '0',
                 'clientRequest' => (object)[]
             ]);
-        $meeting->update(['recording_status' => 'stopped']);
-        return response()->json(['success' => true, 'data' => $resp->json()]);
+        $files = $resp->json('serverResponse.fileList') ?: [];
+        $region = $settings['agora_recording_region'] ?? '';
+        $bucket = $settings['agora_recording_bucket'] ?? '';
+
+        if (is_array($files) && $bucket) {
+            foreach ($files as $k => $file) {
+                $fileName = $file['fileName'] ?? ($file['filename'] ?? null);
+                if ($fileName) {
+                    $files[$k]['url'] = 'https://s3.' . $region . '.amazonaws.com/' . $bucket . '/' . ltrim($fileName, '/');
+                }
+            }
+        }
+
+        $meeting->update(['recording_status' => 'stopped', 'recording_file_list' => $files ?: null]);
+        return response()->json(['success' => true, 'data' => $resp->json(), 'files' => $files]);
     }
 }

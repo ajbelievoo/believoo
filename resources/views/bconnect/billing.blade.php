@@ -1,7 +1,7 @@
 @extends('bconnect.layout')
 @section('title', 'Billing')
 @section('content')
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
     <div class="bc-card p-5">
         <div class="text-2xl font-black text-green-400">₹{{ number_format($invoices->where('status','paid')->sum('amount'), 2) }}</div>
         <div class="text-slate-400 text-sm">Paid</div>
@@ -14,6 +14,10 @@
         <div class="text-2xl font-black text-cyan-400">{{ $invoices->count() }}</div>
         <div class="text-slate-400 text-sm">Total Invoices</div>
     </div>
+    <a href="{{ route('bconnect.billing.billable_time') }}" class="bc-card p-5 block bc-card-hover">
+        <div class="text-2xl font-black text-pink-400">₹{{ number_format($unbilledTotal, 2) }}</div>
+        <div class="text-slate-400 text-sm">Unbilled Time</div>
+    </a>
     <div class="bc-card p-5">
         <div class="text-2xl font-black {{ $status == 'expired' ? 'text-red-400' : ($status == 'grace-period' ? 'text-amber-400' : 'text-green-400') }}">{{ ucfirst($company->plan) }}</div>
         <div class="text-slate-400 text-sm">{{ $days !== null ? $days . ' days left' : 'No expiry' }}</div>

@@ -8,6 +8,8 @@ use App\Models\Bconnect\Company;
 use App\Models\Bconnect\Invoice;
 use App\Models\Bconnect\Member;
 use App\Models\Bconnect\Notification;
+use App\Models\Bconnect\Project;
+use App\Models\Bconnect\TimeEntry;
 use App\Models\Setting;
 use App\Services\BconnectInvoicePdfService;
 use App\Services\BconnectSubscriptionService;
@@ -32,7 +34,78 @@ class BillingController extends Controller
         $invoices = Invoice::where('company_id', $company->id)->latest()->paginate(20);
         $status = BconnectSubscriptionService::status($company);
         $days = BconnectSubscriptionService::daysUntilExpiry($company);
-        return view('bconnect.billing', compact('company', 'invoices', 'status', 'days'));
+        $unbilledTotal = TimeEntry::where('company_id', $company->id)
+            ->where('is_billable', true)
+            ->whereNull('invoice_id')
+            ->where('billed_amount', '>', 0)
+            ->sum('billed_amount');
+        return view('bconnect.billing', compact('company', 'invoices', 'status', 'days', 'unbilledTotal'));
+    }
+
+    public function billableTime(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $entries = TimeEntry::with('project.client.user', 'member.user', 'ticket')
+            ->where('company_id', $companyId)
+            ->where('is_billable', true)
+            ->whereNull('invoice_id')
+            ->where('billed_amount', '>', 0)
+            ->latest()
+            ->get()
+            ->groupBy('project_id');
+        return view('bconnect.billing.billable-time', compact('entries'));
+    }
+
+    public function invoiceFromTime(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $data = $r->validate([
+            'time_entry_ids' => 'required|array|min:1',
+            'time_entry_ids.*' => 'exists:bconnect_time_entries,id',
+        ]);
+
+        $entries = TimeEntry::with('project')
+            ->where('company_id', $companyId)
+            ->whereIn('id', $data['time_entry_ids'])
+            ->whereNull('invoice_id')
+            ->where('is_billable', true)
+            ->where('billed_amount', '>', 0)
+            ->get();
+
+        if ($entries->isEmpty()) {
+            return back()->with('error', 'No valid billable entries selected.');
+        }
+
+        $clientId = $entries->first()->project?->client_id;
+        if (!$clientId) {
+            return back()->with('error', 'Selected project has no client assigned. Set a client in the project first.');
+        }
+
+        $amount = $entries->sum('billed_amount');
+        $lineItems = $entries->map(fn ($e) => ($e->description ?: 'Work') . ' — ' . $e->duration_hours . 'h @ ₹' . number_format($e->hourly_rate, 2))->implode("\n");
+
+        $invoice = Invoice::create([
+            'company_id' => $companyId,
+            'client_id' => $clientId,
+            'invoice_number' => 'BCI-' . strtoupper(uniqid()),
+            'amount' => $amount,
+            'currency' => 'INR',
+            'status' => 'pending',
+            'due_at' => now()->addDays(7),
+            'description' => "Billable time entries\n" . $lineItems,
+            'metadata' => ['time_entry_ids' => $entries->pluck('id')->toArray()],
+        ]);
+
+        TimeEntry::whereIn('id', $entries->pluck('id'))->update(['invoice_id' => $invoice->id]);
+
+        try {
+            $client = Member::with('user')->findOrFail($clientId);
+            if ($client->user?->email) {
+                Mail::to($client->user->email)->send(new BconnectInvoiceMail($invoice, 'created'));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('B-Connect time invoice email failed: ' . $e->getMessage());
+        }
+
+        return redirect()->route('bconnect.billing.pay', $invoice->id)->with('success', 'Invoice #' . $invoice->invoice_number . ' created for ₹' . number_format($amount, 2));
     }
 
     public function upgrade(Request $r) {

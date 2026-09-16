@@ -21,6 +21,8 @@ class KanbanController extends Controller
     {
         $companyId = $request->input('bconnect_company_id');
         $projects = Project::where('company_id', $companyId)->get();
+        $sprints = \App\Models\Bconnect\Sprint::where('company_id', $companyId)->orderBy('start_date', 'desc')->get();
+        $members = \App\Models\Bconnect\Member::with('user')->where('company_id', $companyId)->where('is_active', true)->get();
 
         if ($request->filled('project')) {
             $project = Project::where('id', $request->input('project'))->where('company_id', $companyId)->first();
@@ -37,9 +39,25 @@ class KanbanController extends Controller
             $query->where('project_id', $project->id);
         }
 
+        if ($request->filled('assignee_id')) {
+            if ($request->assignee_id === 'unassigned') {
+                $query->whereNull('assignee_id');
+            } else {
+                $query->where('assignee_id', $request->assignee_id);
+            }
+        }
+
+        if ($request->filled('sprint_id')) {
+            $query->where('sprint_id', $request->sprint_id);
+        }
+
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
         $tickets = $query->get()->groupBy('status');
 
-        return view('bconnect.kanban', compact('project', 'projects', 'tickets'));
+        return view('bconnect.kanban', compact('project', 'projects', 'sprints', 'members', 'tickets'));
     }
 
     public function updateStatus(Request $request, Ticket $ticket)

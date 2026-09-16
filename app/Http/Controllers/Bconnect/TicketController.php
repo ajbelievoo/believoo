@@ -14,32 +14,51 @@ use Illuminate\Validation\Rule;
 
 class TicketController extends Controller {
     public function index(Request $r) {
-        $tickets = Ticket::with('project', 'reporter.user', 'assignee.user')
-            ->where('company_id', $r->input('bconnect_company_id'))
+        $companyId = $r->input('bconnect_company_id');
+        $tickets = Ticket::with('project', 'reporter.user', 'assignee.user', 'sprint')
+            ->where('company_id', $companyId)
             ->when($r->input('bconnect_role') === 'client', function($q) use ($r) {
                 $projectIds = \App\Models\Bconnect\Project::where('client_id', $r->input('bconnect_member')->id)->pluck('id');
                 $q->whereIn('project_id', $projectIds);
             })
             ->when($r->status, fn($q) => $q->where('status', $r->status))
             ->when($r->project_id, fn($q) => $q->where('project_id', $r->project_id))
+            ->when($r->assignee_id, function($q) use ($r) {
+                if ($r->assignee_id === 'unassigned') {
+                    $q->whereNull('assignee_id');
+                } else {
+                    $q->where('assignee_id', $r->assignee_id);
+                }
+            })
+            ->when($r->sprint_id, fn($q) => $q->where('sprint_id', $r->sprint_id))
+            ->when($r->priority, fn($q) => $q->where('priority', $r->priority))
             ->latest()->paginate(20);
-        $projects = Project::where('company_id', $r->input('bconnect_company_id'))->get();
-        $canCreate = \App\Services\BconnectPlanService::canCreateTicket($r->input('bconnect_company_id'));
-        $ticketUsage = \App\Models\Bconnect\Ticket::where('company_id', $r->input('bconnect_company_id'))->count();
-        $ticketLimit = \App\Services\BconnectPlanService::check($r->input('bconnect_company_id'), 'tickets');
-        return view('bconnect.tickets', compact('tickets', 'projects', 'canCreate', 'ticketUsage', 'ticketLimit'));
+        $projects = Project::where('company_id', $companyId)->get();
+        $sprints = \App\Models\Bconnect\Sprint::where('company_id', $companyId)->orderBy('start_date', 'desc')->get();
+        $members = \App\Models\Bconnect\Member::with('user')->where('company_id', $companyId)->where('is_active', true)->get();
+        $canCreate = \App\Services\BconnectPlanService::canCreateTicket($companyId);
+        $ticketUsage = \App\Models\Bconnect\Ticket::where('company_id', $companyId)->count();
+        $ticketLimit = \App\Services\BconnectPlanService::check($companyId, 'tickets');
+        return view('bconnect.tickets', compact('tickets', 'projects', 'sprints', 'members', 'canCreate', 'ticketUsage', 'ticketLimit'));
     }
 
     public function store(Request $r) {
         if (!\App\Services\BconnectPlanService::canCreateTicket($r->input('bconnect_company_id'))) {
             return back()->with('error', 'Ticket limit reached for your plan. Upgrade to Pro/Enterprise.');
         }
+        $companyId = $r->input('bconnect_company_id');
         $data = $r->validate([
-            'project_id' => ['required', Rule::exists('bconnect_projects', 'id')->where('company_id', $r->input('bconnect_company_id'))],
+            'project_id' => ['required', Rule::exists('bconnect_projects', 'id')->where('company_id', $companyId)],
             'title' => 'required',
             'description' => 'required',
             'type' => 'required|in:bug,feature,task,question,support',
             'priority' => 'required|in:low,medium,high,critical',
+            'assignee_id' => ['nullable', Rule::exists('bconnect_members', 'id')->where('company_id', $companyId)],
+            'sprint_id' => ['nullable', Rule::exists('bconnect_sprints', 'id')->where('company_id', $companyId)],
+            'parent_id' => ['nullable', Rule::exists('bconnect_tickets', 'id')->where('company_id', $companyId)],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'estimated_hours' => ['nullable', 'numeric', 'min:0'],
         ]);
         $attachments = [];
         if ($r->hasFile('attachments')) {
@@ -78,19 +97,25 @@ class TicketController extends Controller {
         }
 
         $ticket = Ticket::create([
-            'company_id' => $r->input('bconnect_company_id'),
+            'company_id' => $companyId,
             'project_id' => $data['project_id'],
             'reporter_id' => $r->input('bconnect_member')->id,
-            'assignee_id' => null,
+            'assignee_id' => $data['assignee_id'] ?? null,
+            'sprint_id' => $data['sprint_id'] ?? null,
+            'parent_id' => $data['parent_id'] ?? null,
             'title' => $data['title'],
             'description' => $data['description'],
             'type' => $data['type'],
             'status' => 'open',
             'priority' => $data['priority'],
+            'start_date' => $data['start_date'] ?? null,
+            'due_date' => $data['due_date'] ?? null,
+            'estimated_hours' => $data['estimated_hours'] ?? null,
             'ai_suggested_priority' => $aiPriority,
             'ai_tags' => $aiTags,
             'ai_summary' => $aiSummary,
             'attachments' => $attachments,
+            'position' => 0,
         ]);
 
         Notification::create([
@@ -125,6 +150,7 @@ class TicketController extends Controller {
 
     public function show(Request $r, Ticket $ticket) {
         if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
+        $ticket->load('project', 'reporter.user', 'assignee.user', 'sprint', 'parent', 'children', 'timeEntries');
         $comments = TicketComment::with('member.user')->where('ticket_id', $ticket->id)->latest()->get();
         return view('bconnect.ticket', compact('ticket', 'comments'));
     }
@@ -159,8 +185,81 @@ class TicketController extends Controller {
 
     public function updateStatus(Request $r, Ticket $ticket) {
         if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
-        $ticket->update($r->validate(['status' => 'required|in:open,in_progress,resolved,closed,reopened']));
+        $ticket->update($r->validate(['status' => 'required|in:open,in_progress,testing,resolved,closed']));
         if ($ticket->status == 'resolved') $ticket->update(['resolved_at' => now()]);
+        else $ticket->update(['resolved_at' => null]);
         return back()->with('success', 'Status updated');
+    }
+
+    public function edit(Request $r, Ticket $ticket) {
+        if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
+        $companyId = $r->input('bconnect_company_id');
+        $projects = Project::where('company_id', $companyId)->get();
+        $sprints = \App\Models\Bconnect\Sprint::where('company_id', $companyId)->orderBy('start_date', 'desc')->get();
+        $members = \App\Models\Bconnect\Member::with('user')->where('company_id', $companyId)->where('is_active', true)->get();
+        return view('bconnect.tickets.edit', compact('ticket', 'projects', 'sprints', 'members'));
+    }
+
+    public function update(Request $r, Ticket $ticket) {
+        if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
+        $companyId = $r->input('bconnect_company_id');
+        $data = $r->validate([
+            'project_id' => ['required', Rule::exists('bconnect_projects', 'id')->where('company_id', $companyId)],
+            'title' => 'required',
+            'description' => 'required',
+            'type' => 'required|in:bug,feature,task,question,support',
+            'priority' => 'required|in:low,medium,high,critical',
+            'status' => 'required|in:open,in_progress,testing,resolved,closed',
+            'assignee_id' => ['nullable', Rule::exists('bconnect_members', 'id')->where('company_id', $companyId)],
+            'sprint_id' => ['nullable', Rule::exists('bconnect_sprints', 'id')->where('company_id', $companyId)],
+            'parent_id' => ['nullable', Rule::exists('bconnect_tickets', 'id')->where('company_id', $companyId), 'different:ticket'],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'estimated_hours' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        if ($data['status'] == 'resolved') $data['resolved_at'] = now();
+        else $data['resolved_at'] = null;
+
+        $attachments = $ticket->attachments ?? [];
+        if ($r->hasFile('attachments')) {
+            foreach ($r->file('attachments') as $file) {
+                $attachments[] = $file->store('bconnect/tickets', 'public');
+            }
+        }
+
+        if ($r->has('remove_attachments') && is_array($r->remove_attachments)) {
+            foreach ($r->remove_attachments as $path) {
+                if (in_array($path, $attachments, true)) {
+                    Storage::disk('public')->delete($path);
+                    $attachments = array_values(array_diff($attachments, [$path]));
+                }
+            }
+        }
+
+        $data['attachments'] = $attachments;
+        $ticket->update($data);
+
+        if ($ticket->assignee_id) {
+            \App\Models\Bconnect\Notification::create([
+                'company_id' => $companyId,
+                'member_id' => $ticket->assignee_id,
+                'type' => 'ticket',
+                'title' => 'Ticket assigned: ' . $ticket->title,
+                'message' => 'You have been assigned to ticket #' . $ticket->id,
+                'url' => route('bconnect.tickets.show', $ticket->id),
+            ]);
+        }
+
+        return redirect()->route('bconnect.tickets.show', $ticket->id)->with('success', 'Ticket updated');
+    }
+
+    public function destroy(Request $r, Ticket $ticket) {
+        if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
+        if (!empty($ticket->attachments)) {
+            foreach ($ticket->attachments as $path) Storage::disk('public')->delete($path);
+        }
+        $ticket->delete();
+        return redirect()->route('bconnect.tickets')->with('success', 'Ticket deleted');
     }
 }

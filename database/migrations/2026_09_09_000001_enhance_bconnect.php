@@ -17,7 +17,7 @@ return new class extends Migration {
 
         Schema::table('bconnect_tickets', function (Blueprint $t) {
             if (!Schema::hasColumn('bconnect_tickets', 'ai_tags')) $t->json('ai_tags')->nullable();
-            if (!Schema::hasColumn('bconnect_tickets', ' ai_suggested_priority')) $t->string('ai_suggested_priority')->nullable();
+            if (!Schema::hasColumn('bconnect_tickets', 'ai_suggested_priority')) $t->string('ai_suggested_priority')->nullable();
         });
     }
 

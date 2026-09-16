@@ -49,8 +49,18 @@ class TimeEntry extends Model
         return $this->belongsTo(Ticket::class, 'ticket_id');
     }
 
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id');
+    }
+
     public function getDurationHoursAttribute(): float
     {
         return round($this->duration_seconds / 3600, 2);
+    }
+
+    public function getBilledAttribute(): bool
+    {
+        return !is_null($this->invoice_id);
     }
 }

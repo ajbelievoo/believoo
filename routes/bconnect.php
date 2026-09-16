@@ -44,14 +44,18 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
     Route::get('/kanban', [\App\Http\Controllers\Bconnect\KanbanController::class, 'index'])->name('bconnect.kanban');
     Route::get('/time-tracking', [\App\Http\Controllers\Bconnect\TimeTrackingController::class, 'index'])->name('bconnect.time_tracking');
     Route::get('/meetings', [\App\Http\Controllers\Bconnect\MeetingController::class, 'index'])->name('bconnect.meetings');
+    Route::get('/calendar', [\App\Http\Controllers\Bconnect\CalendarController::class, 'index'])->name('bconnect.calendar');
     Route::get('/meetings/{room}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'room'])->name('bconnect.meeting.room');
+    Route::get('/meetings/{room}/recording', [\App\Http\Controllers\Bconnect\MeetingController::class, 'recording'])->name('bconnect.meeting.recording');
     Route::get('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'index'])->name('bconnect.tickets');
+    Route::get('/tickets/{ticket}/edit', [\App\Http\Controllers\Bconnect\TicketController::class, 'edit'])->name('bconnect.tickets.edit')->middleware('bconnect.role:company_admin|manager');
     Route::get('/tickets/{ticket}', [\App\Http\Controllers\Bconnect\TicketController::class, 'show'])->name('bconnect.tickets.show');
     Route::get('/files', [\App\Http\Controllers\Bconnect\FileManagerController::class, 'index'])->name('bconnect.files');
     Route::get('/files/{file}/download', [\App\Http\Controllers\Bconnect\FileManagerController::class, 'download'])->name('bconnect.files.download');
     Route::get('/notifications', [\App\Http\Controllers\Bconnect\NotificationController::class, 'index'])->name('bconnect.notifications');
     Route::get('/audit-logs', [\App\Http\Controllers\Bconnect\AuditController::class, 'index'])->name('bconnect.audit');
     Route::get('/support', [\App\Http\Controllers\Bconnect\SupportController::class, 'index'])->name('bconnect.support');
+    Route::get('/reports', [\App\Http\Controllers\Bconnect\ReportsController::class, 'index'])->name('bconnect.reports');
     Route::get('/settings', [\App\Http\Controllers\Bconnect\SettingsController::class, 'index'])->name('bconnect.settings');
     Route::get('/remote', [\App\Http\Controllers\Bconnect\RemoteController::class, 'index'])->name('bconnect.remote');
     Route::get('/remote/agent', [\App\Http\Controllers\Bconnect\AgentController::class, 'index'])->name('bconnect.remote.agent');
@@ -94,6 +98,8 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
         Route::put('/sprints/{sprint}', [\App\Http\Controllers\Bconnect\SprintController::class, 'update'])->name('bconnect.sprints.update');
         Route::delete('/sprints/{sprint}', [\App\Http\Controllers\Bconnect\SprintController::class, 'destroy'])->name('bconnect.sprints.destroy');
         Route::post('/invoices', [\App\Http\Controllers\Bconnect\BillingController::class, 'storeInvoice'])->name('bconnect.invoices.store');
+        Route::get('/billing/billable-time', [\App\Http\Controllers\Bconnect\BillingController::class, 'billableTime'])->name('bconnect.billing.billable_time');
+        Route::post('/billing/invoices/from-time', [\App\Http\Controllers\Bconnect\BillingController::class, 'invoiceFromTime'])->name('bconnect.billing.invoice_from_time');
         Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\Bconnect\BillingController::class, 'markPaid'])->name('bconnect.billing.markPaid');
         Route::post('/billing/upgrade', [\App\Http\Controllers\Bconnect\BillingController::class, 'processUpgrade'])->name('bconnect.billing.upgrade.process');
         Route::post('/billing/cancel', [\App\Http\Controllers\Bconnect\BillingController::class, 'cancelSubscription'])->name('bconnect.billing.cancel');
@@ -106,6 +112,8 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
         Route::post('/projects', [\App\Http\Controllers\Bconnect\ProjectController::class, 'store'])->name('bconnect.projects.store');
         Route::put('/projects/{project}', [\App\Http\Controllers\Bconnect\ProjectController::class, 'update'])->name('bconnect.projects.update');
         Route::delete('/projects/{project}', [\App\Http\Controllers\Bconnect\ProjectController::class, 'destroy'])->name('bconnect.projects.destroy');
+        Route::put('/tickets/{ticket}', [\App\Http\Controllers\Bconnect\TicketController::class, 'update'])->name('bconnect.tickets.update');
+        Route::delete('/tickets/{ticket}', [\App\Http\Controllers\Bconnect\TicketController::class, 'destroy'])->name('bconnect.tickets.destroy');
         Route::put('/tickets/{ticket}/status', [\App\Http\Controllers\Bconnect\TicketController::class, 'updateStatus'])->name('bconnect.tickets.status');
         Route::post('/kanban/reorder', [\App\Http\Controllers\Bconnect\KanbanController::class, 'reorder'])->name('bconnect.kanban.reorder');
         Route::post('/tickets/{ticket}/kanban-status', [\App\Http\Controllers\Bconnect\KanbanController::class, 'updateStatus'])->name('bconnect.tickets.kanban_status');

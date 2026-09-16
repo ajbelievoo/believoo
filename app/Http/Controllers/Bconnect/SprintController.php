@@ -38,7 +38,7 @@ class SprintController extends Controller
             abort(403);
         }
 
-        $sprint->load('tickets.project', 'tickets.reporter.user', 'tickets.assignee.user');
+        $sprint->load('tickets.project', 'tickets.reporter.user', 'tickets.assignee.user', 'tickets.timeEntries');
 
         return view('bconnect.sprint', compact('sprint'));
     }

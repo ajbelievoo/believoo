@@ -38,6 +38,9 @@ $meetingUsage = \App\Models\Bconnect\Meeting::where('company_id', request()->inp
                         @if($m->ended_at)
                         <a href="{{ route('bconnect.meeting.notes', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1">Notes</a>
                         @endif
+                        @if($m->recording_status)
+                        <a href="{{ route('bconnect.meeting.recording', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1"><i class="fas fa-circle text-pink-400 mr-1"></i>Recording</a>
+                        @endif
                     </td>
                 </tr>
                 @empty

@@ -53,6 +53,11 @@ class MeetingController extends Controller {
         return view('bconnect.room', compact('room', 'meeting', 'canRecord', 'canAi'));
     }
 
+    public function recording(Request $r, $room) {
+        $meeting = Meeting::where('company_id', $r->input('bconnect_company_id'))->where('room_id', $room)->firstOrFail();
+        return view('bconnect.meeting_recording', compact('meeting'));
+    }
+
     public function endMeeting(Request $r, $room) {
         $meeting = Meeting::where('company_id', $r->input('bconnect_company_id'))->where('room_id', $room)->firstOrFail();
         $transcript = $r->input('transcript', '');
