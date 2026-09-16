@@ -59,6 +59,8 @@ class BconnectPermissionService
                 'meetings.view', 'meetings.create',
                 'chat.use',
                 'settings.view',
+                'billing.view', 'invoices.view',
+                'whiteboard.use',
             ],
             default => [],
         };
