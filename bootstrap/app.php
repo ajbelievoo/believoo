@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'block.ip' => \App\Http\Middleware\BlockIp::class,
             'bconnect' => \App\Http\Middleware\BconnectAuth::class,
             'bconnect.role' => \App\Http\Middleware\BconnectRole::class,
+            'bconnect.permission' => \App\Http\Middleware\BconnectPermission::class,
             'bconnect.audit' => \App\Http\Middleware\BconnectAudit::class,
             '2fa' => \App\Http\Middleware\RequireTwoFactor::class,
             'log.admin' => \App\Http\Middleware\LogAdminActions::class,

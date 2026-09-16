@@ -96,6 +96,15 @@ class BillingController extends Controller
 
         TimeEntry::whereIn('id', $entries->pluck('id'))->update(['invoice_id' => $invoice->id]);
 
+        \App\Services\BconnectNotificationService::send($client, 'invoice', 'Invoice created from time entries', 'Invoice #' . $invoice->invoice_number . ' for ₹' . number_format($amount, 2), route('bconnect.billing'), $invoice->company_id);
+
+        \App\Services\BconnectWebhookService::dispatch($invoice->company_id, 'invoice.created', [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'amount' => $invoice->amount,
+            'status' => $invoice->status,
+        ]);
+
         try {
             $client = Member::with('user')->findOrFail($clientId);
             if ($client->user?->email) {
@@ -186,6 +195,15 @@ class BillingController extends Controller
         } catch (\Throwable $e) {
             Log::warning('B-Connect invoice creation email failed: ' . $e->getMessage());
         }
+
+        \App\Services\BconnectNotificationService::send($client, 'invoice', 'Invoice created', 'Invoice #' . $inv->invoice_number . ' for ₹' . number_format($inv->amount, 2), route('bconnect.billing'), $inv->company_id);
+
+        \App\Services\BconnectWebhookService::dispatch($inv->company_id, 'invoice.created', [
+            'invoice_id' => $inv->id,
+            'invoice_number' => $inv->invoice_number,
+            'amount' => $inv->amount,
+            'status' => $inv->status,
+        ]);
 
         return redirect()->route('bconnect.billing')->with('success', 'Invoice #' . $inv->invoice_number . ' created');
     }
@@ -401,6 +419,13 @@ class BillingController extends Controller
             'title' => $message,
             'message' => 'Invoice ' . $invoice->invoice_number . ' paid ₹' . $invoice->amount,
             'url' => route('bconnect.billing'),
+        ]);
+
+        \App\Services\BconnectWebhookService::dispatch($invoice->company_id, 'invoice.paid', [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'amount' => $invoice->amount,
+            'status' => $invoice->status,
         ]);
     }
 }

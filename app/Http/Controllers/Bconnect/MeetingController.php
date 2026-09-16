@@ -42,6 +42,17 @@ class MeetingController extends Controller {
             'started_at' => $data['scheduled_at'] ? null : now(),
             'duration_minutes' => $data['duration_minutes'] ?? null,
         ]);
+
+        // Notify project members about scheduled meeting
+        if ($meeting->scheduled_at && $meeting->scheduled_at->isFuture() && $meeting->project_id) {
+            $projectMembers = \App\Models\Bconnect\Member::where('company_id', $meeting->company_id)
+                ->where('is_active', true)
+                ->get();
+            foreach ($projectMembers as $m) {
+                \App\Services\BconnectNotificationService::send($m, 'meeting', 'Meeting scheduled', $meeting->title . ' at ' . $meeting->scheduled_at->format('M d, Y H:i'), route('bconnect.meeting.room', $room), $meeting->company_id);
+            }
+        }
+
         return redirect()->route('bconnect.meeting.room', $room)->with('success', 'Meeting room created');
     }
 

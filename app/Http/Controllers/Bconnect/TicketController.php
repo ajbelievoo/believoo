@@ -145,6 +145,13 @@ class TicketController extends Controller {
             'View Ticket'
         );
 
+        \App\Services\BconnectWebhookService::dispatch($companyId, 'ticket.created', [
+            'ticket_id' => $ticket->id,
+            'title' => $ticket->title,
+            'status' => $ticket->status,
+            'priority' => $ticket->priority,
+        ]);
+
         return redirect()->route('bconnect.tickets.show', $ticket->id)->with('success', 'Ticket created. AI suggestions applied.');
     }
 
@@ -164,6 +171,8 @@ class TicketController extends Controller {
         }
         $comment = TicketComment::create(['ticket_id' => $ticket->id, 'member_id' => $r->input('bconnect_member')->id, 'message' => $data['message'], 'attachments' => $attachments]);
 
+        \App\Services\BconnectSlaTracker::recordFirstResponse($ticket);
+
         // Notify ticket participants
         $commenter = $r->input('bconnect_member');
         $ticketUrl = route('bconnect.tickets.show', $ticket->id, false);
@@ -178,6 +187,7 @@ class TicketController extends Controller {
                 url('https://bc.believoo.com' . $ticketUrl),
                 'View Ticket'
             );
+            \App\Services\BconnectNotificationService::send($member, 'ticket_comment', 'New comment', $commenter->user->name . ' commented on ' . $ticket->title, url('https://bc.believoo.com' . $ticketUrl), $ticket->company_id);
         }
 
         return back()->with('success', 'Comment added');
@@ -185,9 +195,28 @@ class TicketController extends Controller {
 
     public function updateStatus(Request $r, Ticket $ticket) {
         if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
-        $ticket->update($r->validate(['status' => 'required|in:open,in_progress,testing,resolved,closed']));
+        $old = $ticket->status;
+        $data = $r->validate(['status' => 'required|in:open,in_progress,testing,resolved,closed']);
+        $ticket->update($data);
         if ($ticket->status == 'resolved') $ticket->update(['resolved_at' => now()]);
         else $ticket->update(['resolved_at' => null]);
+
+        if ($old !== $ticket->status) {
+            $url = route('bconnect.tickets.show', $ticket->id);
+            $actor = $r->input('bconnect_member')->user->name;
+            $recipients = collect([$ticket->reporter, $ticket->assignee])->filter()->unique('id')->where('id', '!=', $r->input('bconnect_member')->id);
+            foreach ($recipients as $member) {
+                \App\Services\BconnectNotificationService::send($member, 'ticket_status', 'Ticket status changed', "{$actor} changed status of {$ticket->title} from {$old} to {$ticket->status}", $url, $ticket->company_id);
+            }
+        }
+
+        \App\Services\BconnectWebhookService::dispatch($ticket->company_id, 'ticket.status_changed', [
+            'ticket_id' => $ticket->id,
+            'title' => $ticket->title,
+            'old_status' => $old,
+            'new_status' => $ticket->status,
+        ]);
+
         return back()->with('success', 'Status updated');
     }
 
@@ -250,6 +279,13 @@ class TicketController extends Controller {
                 'url' => route('bconnect.tickets.show', $ticket->id),
             ]);
         }
+
+        \App\Services\BconnectWebhookService::dispatch($companyId, 'ticket.updated', [
+            'ticket_id' => $ticket->id,
+            'title' => $ticket->title,
+            'status' => $ticket->status,
+            'priority' => $ticket->priority,
+        ]);
 
         return redirect()->route('bconnect.tickets.show', $ticket->id)->with('success', 'Ticket updated');
     }

@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Events;
+
 use App\Models\Bconnect\Message;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -33,6 +35,8 @@ class BconnectMessageSent implements ShouldBroadcast
             'attachments' => $this->message->attachments ?? [],
             'member_id' => $this->message->member_id,
             'member' => ['name' => $this->message->member->user->name],
+            'parent_id' => $this->message->parent_id,
+            'mentions' => $this->message->mentions ?? [],
             'created_at' => $this->message->created_at->format('H:i'),
         ];
     }

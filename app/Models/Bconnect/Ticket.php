@@ -13,9 +13,11 @@ class Ticket extends Model
         'attachments' => 'array',
         'ai_tags' => 'array',
         'resolved_at' => 'datetime',
+        'first_response_at' => 'datetime',
         'start_date' => 'date',
         'due_date' => 'date',
         'estimated_hours' => 'decimal:2',
+        'sla_breached' => 'boolean',
     ];
 
     public function company()
@@ -61,6 +63,11 @@ class Ticket extends Model
     public function timeEntries()
     {
         return $this->hasMany(TimeEntry::class, 'ticket_id');
+    }
+
+    public function slaPolicy()
+    {
+        return $this->belongsTo(BconnectSlaPolicy::class, 'sla_policy_id');
     }
 
     public function scopeKanban($query)
