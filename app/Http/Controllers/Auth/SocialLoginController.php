@@ -18,6 +18,7 @@ class SocialLoginController extends Controller
         // Set config from database
         $clientId = Setting::getValue('google_client_id');
         $clientSecret = Setting::getValue('google_client_secret');
+        $redirectUrl = Setting::getValue('google_redirect_url') ?: config('services.google.redirect', 'https://believoo.com/auth/google/callback');
 
         if ($clientId) {
             Config::set('services.google.client_id', $clientId);
@@ -26,7 +27,10 @@ class SocialLoginController extends Controller
             Config::set('services.google.client_secret', $clientSecret);
         }
 
-        return Socialite::driver('google')->stateless()->redirect();
+        return Socialite::driver('google')
+            ->redirectUrl($redirectUrl)
+            ->stateless()
+            ->redirect();
     }
 
     public function handleGoogleCallback()
@@ -35,6 +39,7 @@ class SocialLoginController extends Controller
             // Set config from database
             $clientId = Setting::getValue('google_client_id');
             $clientSecret = Setting::getValue('google_client_secret');
+            $redirectUrl = Setting::getValue('google_redirect_url') ?: config('services.google.redirect', 'https://believoo.com/auth/google/callback');
 
             if ($clientId) {
                 Config::set('services.google.client_id', $clientId);
@@ -43,7 +48,10 @@ class SocialLoginController extends Controller
                 Config::set('services.google.client_secret', $clientSecret);
             }
 
-            $user = Socialite::driver('google')->stateless()->user();
+            $user = Socialite::driver('google')
+                ->redirectUrl($redirectUrl)
+                ->stateless()
+                ->user();
             $finduser = User::where('google_id', $user->id)->orWhere('email', $user->email)->first();
 
             if($finduser){

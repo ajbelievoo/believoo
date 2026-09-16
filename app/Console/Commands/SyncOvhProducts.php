@@ -269,9 +269,10 @@ class SyncOvhProducts extends Command
                     $created++;
                 }
 
-                // Some catalog plan codes (e.g. legacy web-hosting-*-ovh) are not accepted
-                // by the OVH cart endpoint. Skip those from the storefront.
-                if (strtoupper($category) === 'WEB_HOSTING' && !$this->isPlanOrderable($service, $category, $planCode)) {
+                // Some catalog plan codes (e.g. legacy web-hosting-*-ovh or dedicated
+                // SKUs that are out of stock in every region) are not accepted by the
+                // OVH cart endpoint. Skip those from the storefront.
+                if (in_array(strtoupper($category), ['WEB_HOSTING', 'DEDICATED']) && !$this->isPlanOrderable($service, $category, $planCode)) {
                     $this->warn("{$planCode} is not orderable; deactivating.");
                     $product->update(['is_active' => false]);
                     if ($product->service_id) {
@@ -425,23 +426,6 @@ class SyncOvhProducts extends Command
      */
     protected function isPlanOrderable(OvhApiService $ovh, string $category, string $planCode): bool
     {
-        $cart = [];
-        try {
-            $cart = $ovh->createCart('Plan code probe ' . $planCode);
-            $cartId = $cart['cartId'];
-            $result = $ovh->addItemToCart($cartId, $category, $planCode, 'P1M', 1, null);
-            return !empty($result['itemId']);
-        } catch (\Exception $e) {
-            Log::info('Plan code not orderable', ['category' => $category, 'plan_code' => $planCode, 'error' => $e->getMessage()]);
-            return false;
-        } finally {
-            if (!empty($cart['cartId'])) {
-                try {
-                    $ovh->delete('/order/cart/' . $cart['cartId']);
-                } catch (\Exception $e) {
-                    // ignore cleanup failure
-                }
-            }
-        }
+        return $ovh->isOrderable($category, $planCode, 'P1M', 1, null);
     }
 }

@@ -697,6 +697,124 @@ class OvhApiService
     }
 
     /**
+     * Dry-run checkout. Validates the cart and configuration without creating an order.
+     */
+    public function dryRunCheckout(string $cartId): array
+    {
+        return $this->get("/order/cart/{$cartId}/checkout");
+    }
+
+    /**
+     * Probe whether a plan can reach the checkout stage for any allowed datacenter.
+     * Uses dry-run checkout so no real order is created.
+     */
+    public function isOrderable(string $category, string $planCode, string $duration = 'P1M', int $quantity = 1, ?string $domain = null): bool
+    {
+        $category = strtoupper($category);
+
+        // Single dry-run is enough for VPS, web hosting and domains.
+        if (in_array($category, ['VPS', 'WEB_HOSTING', 'DOMAINS', 'DOMAIN'])) {
+            $cart = $this->createCart('Orderability probe ' . $planCode);
+            $cartId = $cart['cartId'];
+
+            try {
+                $item = $this->addItemToCart($cartId, $category, $planCode, $duration, $quantity, $domain);
+                $itemId = $item['itemId'] ?? null;
+
+                if ($itemId) {
+                    $this->autoConfigureCartItem($cartId, (string) $itemId, $category, ['domain' => $domain]);
+                }
+
+                $this->dryRunCheckout($cartId);
+                return true;
+            } catch (\Exception $e) {
+                Log::info('Plan not orderable', [
+                    'category' => $category,
+                    'plan_code' => $planCode,
+                    'error' => $e->getMessage(),
+                ]);
+                return false;
+            } finally {
+                try {
+                    $this->delete('/order/cart/' . $cartId);
+                } catch (\Exception $e) {
+                    // ignore cleanup failure
+                }
+            }
+        }
+
+        // Dedicated: try each allowed datacenter because stock varies by region.
+        if ($category === 'DEDICATED') {
+            // Plans whose code ends with a 3-letter region code (e.g. -syd, -mum, -sgp)
+            // are only available in that datacenter. This account only has access to
+            // the bhs/fra/sbg/lon/rbx datacenters, so those plans can be rejected quickly.
+            if (preg_match('/-([a-z]{3})$/', $planCode, $m) && !in_array($m[1], ['bhs', 'fra', 'sbg', 'lon', 'rbx'], true)) {
+                return false;
+            }
+
+            $cart = $this->createCart('Datacenter probe ' . $planCode);
+            $cartId = $cart['cartId'];
+            $datacenters = [];
+
+            try {
+                $item = $this->addItemToCart($cartId, $category, $planCode, $duration, $quantity, $domain);
+                $required = $this->getRequiredCartConfiguration($cartId, (string) $item['itemId']);
+                $datacenters = $required['dedicated_datacenter']['allowedValues'] ?? ['bhs', 'fra', 'sbg', 'lon', 'rbx'];
+
+                // Prefer datacenters likely to have stock for this account.
+                $preferred = ['bhs', 'fra', 'sbg', 'lon', 'rbx'];
+                usort($datacenters, fn ($a, $b) => (
+                    (array_search($a, $preferred, true) ?: 99) <=> (array_search($b, $preferred, true) ?: 99)
+                ));
+            } catch (\Exception $e) {
+                return false;
+            }
+
+            $first = true;
+            foreach ($datacenters as $datacenter) {
+                if (!$first) {
+                    $cart = $this->createCart('Orderability probe ' . $planCode . ' ' . $datacenter);
+                    $cartId = $cart['cartId'];
+
+                    try {
+                        $item = $this->addItemToCart($cartId, $category, $planCode, $duration, $quantity, $domain);
+                    } catch (\Exception $e) {
+                        break;
+                    }
+                }
+                $first = false;
+
+                try {
+                    $itemId = $item['itemId'] ?? null;
+
+                    if ($itemId) {
+                        $this->autoConfigureCartItem($cartId, (string) $itemId, $category, ['datacenter' => $datacenter]);
+                    }
+
+                    $this->dryRunCheckout($cartId);
+                    return true;
+                } catch (\Exception $e) {
+                    Log::info('Dedicated plan not orderable in datacenter', [
+                        'plan_code' => $planCode,
+                        'datacenter' => $datacenter,
+                        'error' => $e->getMessage(),
+                    ]);
+                } finally {
+                    try {
+                        $this->delete('/order/cart/' . $cartId);
+                    } catch (\Exception $e) {
+                        // ignore cleanup failure
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
      * Get the payment means available for a specific order.
      */
     public function getAvailableOrderPaymentMeans(string $orderId): array

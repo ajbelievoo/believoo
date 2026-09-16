@@ -77,7 +77,12 @@ Route::view('/offline', 'offline')->name('offline');
 Route::get('/', function () {
     $services = Service::where('is_active', true)
         ->whereNotIn('category', ['ovh_dedicated', 'ovh_web_hosting', 'ovh_vps'])
-        ->whereNotIn('slug', ['managed-vps-cloud', 'web-hosting-vps', 'streaming-addon'])
+        ->whereNotIn('slug', [
+            'managed-vps-cloud',
+            'streaming-addon',
+            'app-development',
+            'adsense-approval-service',
+        ])
         ->get();
     $portfolios = Portfolio::where('is_visible', true)->limit(3)->get();
     $settings = Setting::pluck('value', 'key');

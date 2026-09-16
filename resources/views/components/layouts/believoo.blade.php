@@ -1132,12 +1132,17 @@
     </button>
 
     @php
-        $services = \App\Models\Service::where('is_active', true)->whereNotIn('slug', [
-            'managed-vps-cloud',
-            'vps-1', 'vps-2', 'vps-3', 'vps-4', 'vps-5', 'vps-6',
-            'web-hosting-starter', 'web-hosting-business', 'web-hosting-pro',
-            'streaming-addon',
-        ])->get();
+        $services = \App\Models\Service::where('is_active', true)
+            ->whereNotIn('category', ['ovh_dedicated', 'ovh_web_hosting', 'ovh_vps'])
+            ->whereNotIn('slug', [
+                'managed-vps-cloud',
+                'vps-1', 'vps-2', 'vps-3', 'vps-4', 'vps-5', 'vps-6',
+                'web-hosting-starter', 'web-hosting-business', 'web-hosting-pro',
+                'streaming-addon',
+                'app-development',
+                'adsense-approval-service',
+            ])
+            ->get();
         $isHostingPage = request()->routeIs('hosting') || request()->routeIs('web-hosting') || request()->routeIs('vps-hosting') || request()->routeIs('vps-plans.*') || request()->routeIs('services.streaming') || request()->routeIs('streaming.*') || request()->is('services/streaming*') || request()->routeIs('client.domains.search') || request()->routeIs('domains.search') || request()->is('domains*');
         $isActive = fn(string $route) => request()->routeIs($route) ? 'text-amber-600' : 'text-slate-600 hover:text-amber-600';
         $hostingActive = fn(string $route) => request()->routeIs($route) ? 'text-cyan-400' : 'text-gray-300 hover:text-white';

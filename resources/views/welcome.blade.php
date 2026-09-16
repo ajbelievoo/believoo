@@ -202,35 +202,33 @@
                 <h2 class="text-3xl md:text-4xl font-bold text-slate-900 mt-2">One Group. Many Capabilities.</h2>
                 <p class="text-slate-500 mt-4 max-w-2xl mx-auto">Believoo is a full-scale technology partner, bringing together everything your business needs to grow.</p>
             </div>
+            @php
+                $businessSlugs = [
+                    'play-store-app-store-publishing',
+                    'web-application-development',
+                    'domain-registration-dns',
+                    'seo-digital-growth',
+                ];
+                $businesses = $services->whereIn('slug', $businessSlugs)
+                    ->sortBy(fn($s) => array_search($s->slug, $businessSlugs))
+                    ->values();
+            @endphp
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <a href="{{ route('services.show', 'play-store-app-store-publishing') }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-                    <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors">
-                        <i class="fab fa-google-play text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 mb-2">App Publishing</h3>
-                    <p class="text-sm text-slate-500 leading-relaxed">Play Store, App Store submission and management for your apps.</p>
-                </a>
-                <a href="{{ route('services.show', 'app-development') }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-                    <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors">
-                        <i class="fas fa-code text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 mb-2">Software Engineering</h3>
-                    <p class="text-sm text-slate-500 leading-relaxed">Web, mobile, and custom applications built with modern technology.</p>
-                </a>
-                <a href="{{ route('client.domains.search') }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-                    <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors">
-                        <i class="fas fa-globe text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 mb-2">Domain Services</h3>
-                    <p class="text-sm text-slate-500 leading-relaxed">Search, register, and manage domains with full control.</p>
-                </a>
-                <a href="{{ route('services.show', 'seo-digital-growth') }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-                    <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors">
-                        <i class="fas fa-chart-line text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 mb-2">Digital Growth</h3>
-                    <p class="text-sm text-slate-500 leading-relaxed">SEO, AdSense, and app publishing to scale your digital reach.</p>
-                </a>
+                @forelse($businesses as $service)
+                    <a href="{{ route('services.show', $service->slug) }}" class="bel-tilt group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-amber-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
+                        <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors">
+                            <i class="{{ $service->icon ?? 'fas fa-layer-group' }} text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ $service->title }}</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed mb-3">{!! strip_tags($service->description) !!}</p>
+                        <div class="mt-auto">
+                            <span class="text-xs text-slate-400 font-medium">{{ $service->price_label ?: 'Starting from' }}</span>
+                            <div class="text-2xl font-bold text-amber-600">${{ number_format($service->price, 2) }}</div>
+                        </div>
+                    </a>
+                @empty
+                    <p class="text-slate-500 col-span-full text-center">No services available.</p>
+                @endforelse
             </div>
         </div>
     </section>
@@ -251,12 +249,17 @@
                             <i class="{{ $service->icon ?? 'fas fa-layer-group' }} text-2xl text-amber-600 group-hover:text-white transition-colors"></i>
                         </div>
                         <h3 class="text-xl font-bold text-slate-900 mb-3">{{ $service->title }}</h3>
-                        <p class="text-slate-500 leading-relaxed mb-6 line-clamp-3">{!! strip_tags($service->description) !!}</p>
+                        <p class="text-slate-500 leading-relaxed mb-4 line-clamp-3">{!! strip_tags($service->description) !!}</p>
+                        <div class="flex items-baseline justify-between mb-4">
+                            <span class="text-sm text-slate-400">{{ $service->price_label ?: 'Starting from' }}</span>
+                            <span class="text-xl font-bold text-amber-600">${{ number_format($service->price, 2) }}</span>
+                        </div>
                         <span class="inline-flex items-center gap-2 text-amber-600 font-semibold text-sm group-hover:gap-3 transition-all">
                             Learn more <i class="fas fa-arrow-right text-xs"></i>
                         </span>
                     </a>
                 @empty
+                    <p class="text-slate-500 col-span-full text-center">No services available.</p>
                 @endforelse
             </div>
             <div class="text-center mt-12">
