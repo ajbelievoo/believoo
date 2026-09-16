@@ -75,12 +75,10 @@ Route::post('/push/subscribe', [\App\Http\Controllers\PushSubscriptionController
 Route::view('/offline', 'offline')->name('offline');
 
 Route::get('/', function () {
-    $services = Service::where('is_active', true)->whereNotIn('slug', [
-        'managed-vps-cloud',
-        'vps-1', 'vps-2', 'vps-3', 'vps-4', 'vps-5', 'vps-6',
-        'web-hosting-starter', 'web-hosting-business', 'web-hosting-pro',
-        'streaming-addon',
-    ])->get();
+    $services = Service::where('is_active', true)
+        ->whereNotIn('category', ['ovh_dedicated', 'ovh_web_hosting', 'ovh_vps'])
+        ->whereNotIn('slug', ['managed-vps-cloud', 'web-hosting-vps', 'streaming-addon'])
+        ->get();
     $portfolios = Portfolio::where('is_visible', true)->limit(3)->get();
     $settings = Setting::pluck('value', 'key');
     $content = PageContent::where('page_name', 'home')->pluck('value', 'key');
