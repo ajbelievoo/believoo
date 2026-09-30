@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Bconnect;
 use App\Http\Controllers\Controller;
 use App\Mail\BconnectWelcome;
 use App\Models\User;
+use App\Models\Setting;
 use App\Models\Bconnect\Company;
 use App\Models\Bconnect\Member;
 use App\Notifications\BconnectResetPassword;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -48,13 +50,27 @@ class AuthController extends Controller {
         return redirect()->route('bconnect.dashboard');
     }
 
+    protected function configureGoogle(): string
+    {
+        $clientId = Setting::getValue('google_client_id') ?: config('services.google.client_id');
+        $clientSecret = Setting::getValue('google_client_secret') ?: config('services.google.client_secret');
+        $redirectUrl = Setting::getValue('google_redirect_url_bconnect') ?: config('services.google.redirect_bconnect', 'https://bc.believoo.com/auth/google/callback');
+
+        if ($clientId) Config::set('services.google.client_id', $clientId);
+        if ($clientSecret) Config::set('services.google.client_secret', $clientSecret);
+
+        return $redirectUrl;
+    }
+
     public function redirectToGoogle() {
-        return Socialite::driver('google')->redirectUrl(config('services.google.redirect_bconnect', 'https://bc.believoo.com/auth/google/callback'))->redirect();
+        $redirectUrl = $this->configureGoogle();
+        return Socialite::driver('google')->redirectUrl($redirectUrl)->stateless()->redirect();
     }
 
     public function handleGoogleCallback() {
         try {
-            $google = Socialite::driver('google')->redirectUrl(config('services.google.redirect_bconnect', 'https://bc.believoo.com/auth/google/callback'))->user();
+            $redirectUrl = $this->configureGoogle();
+            $google = Socialite::driver('google')->redirectUrl($redirectUrl)->stateless()->user();
             $user = User::where('email', $google->email)->first();
             $newUser = false;
             if (!$user) {
