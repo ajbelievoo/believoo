@@ -342,6 +342,29 @@
                 }
             });
         }
+
+        // Bootstrap-style tab polyfill (used by some admin views)
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetSelector = trigger.getAttribute('data-bs-target');
+                if (!targetSelector) return;
+                const pane = document.querySelector(targetSelector);
+                const group = trigger.closest('[role="tablist"]') || trigger.closest('.nav');
+                if (group) {
+                    group.querySelectorAll('[data-bs-toggle="tab"]').forEach(t => {
+                        t.classList.remove('active');
+                        t.setAttribute('aria-selected', 'false');
+                    });
+                }
+                trigger.classList.add('active');
+                trigger.setAttribute('aria-selected', 'true');
+                if (pane) {
+                    pane.closest('.tab-content')?.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active', 'show'));
+                    pane.classList.add('active', 'show');
+                }
+            });
+        });
     </script>
 
     @stack('scripts')
