@@ -255,9 +255,31 @@ searchForm.addEventListener('submit', async (e) => {
 
 // Echo / polling
 const channelName = `company.{{ request()->input('bconnect_company_id') }}.chat.${channelType === 'project' ? 'Project' : 'Ticket'}.${channelId}`;
+const pollUrl = `/chat/poll?channel_type=${channelType}&channel_id=${channelId}`;
+let lastMessageId = Math.max(...Array.from(document.querySelectorAll('.chat-msg')).map(el => parseInt(el.dataset.id) || 0));
+let pollInterval = null;
+
+async function fetchNewMessages() {
+    try {
+        const r = await fetch(`${pollUrl}&after_id=${lastMessageId}`, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (!data.messages || !data.messages.length) return;
+        data.messages.forEach(m => {
+            if (document.querySelector(`.chat-msg[data-id="${m.id}"]`)) return;
+            appendMessage(m);
+            if (m.id > lastMessageId) lastMessageId = m.id;
+        });
+    } catch (err) {
+        console.warn('[B-CONNECT Chat] Poll failed', err);
+    }
+}
+
 if (window.Echo && window.Echo.connector) {
     window.Echo.channel(channelName)
-        .listen('.BconnectMessageSent', (e) => appendMessage(e))
+        .listen('.BconnectMessageSent', (e) => {
+            if (e.id > lastMessageId) lastMessageId = e.id;
+            appendMessage(e);
+        })
         .listen('.BconnectTyping', (e) => {
             if (e.member_id !== currentMemberId) {
                 document.getElementById('typingName').textContent = e.member_name;
@@ -267,8 +289,10 @@ if (window.Echo && window.Echo.connector) {
         });
 } else {
     console.warn('[B-CONNECT Chat] Reverb not connected, falling back to polling');
-    setInterval(() => location.reload(), 15000);
 }
+
+// Always use lightweight polling as a fallback / sync layer
+pollInterval = setInterval(fetchNewMessages, 8000);
 
 chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();

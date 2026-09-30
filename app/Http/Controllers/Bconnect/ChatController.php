@@ -173,6 +173,46 @@ class ChatController extends Controller {
         return response()->json(['success' => true]);
     }
 
+    public function poll(Request $r) {
+        $data = $r->validate(['channel_type' => 'required|in:project,ticket', 'channel_id' => 'required|integer', 'after_id' => 'nullable|integer']);
+        $model = $data['channel_type'] === 'project' ? Project::class : Ticket::class;
+        $channel = $model::where('company_id', $r->input('bconnect_company_id'))->findOrFail($data['channel_id']);
+        $memberId = $r->input('bconnect_member')->id;
+
+        $query = Message::where('channel_type', $model)
+            ->where('channel_id', $channel->id)
+            ->whereNull('parent_id')
+            ->with(['member.user', 'replies.member.user'])
+            ->orderBy('id');
+
+        if (!empty($data['after_id'])) {
+            $query->where('id', '>', $data['after_id']);
+        }
+
+        $messages = $query->limit(50)->get();
+
+        foreach ($messages as $m) {
+            $m->is_read = $m->isReadBy($memberId);
+        }
+
+        return response()->json(['messages' => $messages->map(fn ($m) => [
+            'id' => $m->id,
+            'message' => $m->message,
+            'attachments' => $m->attachments ?? [],
+            'member_id' => $m->member_id,
+            'member' => ['name' => $m->member->user->name],
+            'parent_id' => $m->parent_id,
+            'mentions' => $m->mentions ?? [],
+            'created_at' => $m->created_at->format('H:i'),
+            'replies' => $m->replies->map(fn ($reply) => [
+                'id' => $reply->id,
+                'message' => $reply->message,
+                'member' => ['name' => $reply->member->user->name],
+                'created_at' => $reply->created_at->format('H:i'),
+            ])->values(),
+        ])]);
+    }
+
     protected function parseMentions(string $text, int $companyId): array
     {
         preg_match_all('/@([a-zA-Z0-9_\-\.\s]+?)@|@([a-zA-Z0-9_\-]+)/', $text, $matches);

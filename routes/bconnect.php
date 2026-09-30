@@ -72,6 +72,7 @@ Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audi
     Route::post('/chat/messages/{message}/read', [\App\Http\Controllers\Bconnect\ChatController::class, 'markRead'])->name('bconnect.chat.read');
     Route::post('/chat/search', [\App\Http\Controllers\Bconnect\ChatController::class, 'search'])->name('bconnect.chat.search');
     Route::post('/chat/typing', [\App\Http\Controllers\Bconnect\ChatController::class, 'typing'])->name('bconnect.chat.typing');
+    Route::get('/chat/poll', [\App\Http\Controllers\Bconnect\ChatController::class, 'poll'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat.poll');
     Route::post('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'store'])->middleware('bconnect.permission:tickets.create')->name('bconnect.tickets.store');
     Route::post('/tickets/{ticket}/comments', [\App\Http\Controllers\Bconnect\TicketController::class, 'comment'])->middleware('bconnect.permission:tickets.view')->name('bconnect.tickets.comment');
     Route::post('/files', [\App\Http\Controllers\Bconnect\FileManagerController::class, 'store'])->middleware('bconnect.permission:files.upload')->name('bconnect.files.store');
