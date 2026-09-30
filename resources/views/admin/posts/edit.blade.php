@@ -7,8 +7,8 @@
     <h1 class="page-title">Edit Blog Post</h1>
 </div>
 
-<div class="data-table">
-    <div style="padding: 24px;">
+<div class="card">
+    <div class="card-body">
         <form action="{{ route('admin.posts.update', $post) }}" method="POST" enctype="multipart/form-data">
             @csrf
             @method('PUT')

@@ -8,11 +8,12 @@
     <p class="page-subtitle">Manage annual maintenance contracts</p>
 </div>
 
-<div class="data-table">
-    <div class="table-header">
+<div class="card">
+    <div class="card-header">
         <h3 class="table-title">All Subscriptions</h3>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Subscription #</th>
@@ -53,6 +54,7 @@
             @endforelse
         </tbody>
     </table>
+    </div></div>
 
     @if($subscriptions->hasPages())
     <div style="padding: 20px 24px; border-top: 1px solid var(--border-color);">

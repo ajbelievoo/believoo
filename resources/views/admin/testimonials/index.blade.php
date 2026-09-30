@@ -13,8 +13,8 @@
     </p>
 </div>
 
-<div class="data-table">
-    <div class="table-header">
+<div class="card">
+    <div class="card-header">
         <h3 class="table-title">All Testimonials</h3>
         <div class="table-actions">
             <a href="{{ route('admin.testimonials.create') }}" class="btn btn-primary">
@@ -22,7 +22,8 @@
             </a>
         </div>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Client</th>
@@ -93,6 +94,7 @@
             @endforelse
         </tbody>
     </table>
+    </div></div>
     @if($testimonials->hasPages())
     <div style="padding: 16px;">{{ $testimonials->links() }}</div>
     @endif

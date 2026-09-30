@@ -32,11 +32,12 @@
 </div>
 @endif
 
-<div class="data-table">
+<div class="card">
     <div class="table-header">
         <h3 class="table-title">All Email Accounts</h3>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Email Address</th>

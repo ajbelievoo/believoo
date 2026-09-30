@@ -33,13 +33,14 @@
 </div>
 @endif
 
-<div class="data-table">
+<div class="card">
     <div class="table-header">
         <h3 class="table-title"><i class="fas fa-server" style="margin-right: 10px; color: #00b7ff;"></i>Active Providers</h3>
         <span style="font-size: 0.85rem; color: #8b9bb4;">{{ $providers->where('is_active', true)->count() }} active of {{ $providers->count() }} total</span>
     </div>
 
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Provider</th>

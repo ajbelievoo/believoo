@@ -3,11 +3,11 @@
 @section('title', 'Streaming Plans')
 
 @section('content')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">Streaming Plans</h1>
+<div>
+    <div>
+        <div>
+            <div class="page-header">
+                <div><h1 class="page-title">Streaming Plans</h1><p class="page-subtitle">Manage streaming products and capacity</p></div>
                 <a href="{{ route('admin.streaming-plans.create') }}" class="btn btn-primary">
                     <i class="fas fa-plus me-2"></i>Create Plan
                 </a>
@@ -52,7 +52,7 @@
                     <div class="card">
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="data-table">
                                     <thead>
                                         <tr>
                                             <th>Name</th>

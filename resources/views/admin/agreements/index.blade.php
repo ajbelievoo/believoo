@@ -13,11 +13,12 @@
     </a>
 </div>
 
-<div class="data-table">
-    <div class="table-header">
+<div class="card">
+    <div class="card-header">
         <h3 class="table-title">All Agreements</h3>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Agreement #</th>
@@ -58,6 +59,7 @@
             @endforelse
         </tbody>
     </table>
+    </div></div>
 
     @if($agreements->hasPages())
     <div style="padding: 20px 24px; border-top: 1px solid var(--border-color);">

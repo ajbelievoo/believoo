@@ -58,18 +58,18 @@
     
     {{-- Basic Info --}}
     <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-        <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+        <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
             <i class="fas fa-info-circle" style="margin-right: 8px; color: #00b7ff;"></i>Provider Information
         </h4>
         
         <div style="margin-bottom: 16px;">
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">Name</label>
-            <div style="color: #fff; font-weight: 600;">{{ $provider->name }}</div>
+            <div style="color: var(--text-primary); font-weight: 600;">{{ $provider->name }}</div>
         </div>
         
         <div style="margin-bottom: 16px;">
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">Code</label>
-            <div style="color: #fff; font-family: monospace; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; display: inline-block;">{{ $provider->code }}</div>
+            <div style="color: var(--text-primary); font-family: monospace; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; display: inline-block;">{{ $provider->code }}</div>
         </div>
         
         <div style="margin-bottom: 16px;">
@@ -95,7 +95,7 @@
         
         <div>
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">Last Checked</label>
-            <div style="color: #fff;">
+            <div style="color: var(--text-primary);">
                 @if($provider->last_checked_at)
                     {{ $provider->last_checked_at->diffForHumans() }}
                 @else
@@ -107,7 +107,7 @@
     
     {{-- Supported TLDs --}}
     <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-        <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+        <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
             <i class="fas fa-globe" style="margin-right: 8px; color: #22c55e;"></i>Supported TLDs
         </h4>
         
@@ -128,7 +128,7 @@
         @endif
         
         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <h5 style="font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 12px;">
+            <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">
                 <i class="fas fa-server" style="margin-right: 8px; color: #8b5cf6;"></i>Default Nameservers
             </h5>
             @php
@@ -150,21 +150,21 @@
 
 {{-- API Configuration --}}
 <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; margin-bottom: 30px;">
-    <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+    <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
         <i class="fas fa-key" style="margin-right: 8px; color: #eab308;"></i>API Configuration
     </h4>
     
     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
         <div>
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">API URL</label>
-            <div style="color: #fff; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; word-break: break-all;">
+            <div style="color: var(--text-primary); background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; word-break: break-all;">
                 {{ $provider->api_url ?? 'Not configured' }}
             </div>
         </div>
         
         <div>
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">API Key</label>
-            <div style="color: #fff; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 0.85rem;">
+            <div style="color: var(--text-primary); background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 0.85rem;">
                 @if($provider->getMetadata('api_key') || $provider->getMetadata('api_token'))
                     ******** (configured)
                 @else
@@ -175,14 +175,14 @@
         
         <div>
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">Username / Account ID</label>
-            <div style="color: #fff; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 0.85rem;">
+            <div style="color: var(--text-primary); background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 0.85rem;">
                 {{ $provider->getMetadata('username') ?? $provider->getMetadata('auth_userid') ?? $provider->getMetadata('account_id') ?? 'Not configured' }}
             </div>
         </div>
         
         <div>
             <label style="display: block; font-size: 0.8rem; color: #8b9bb4; margin-bottom: 4px;">Test Mode</label>
-            <div style="color: #fff;">
+            <div style="color: var(--text-primary);">
                 @if($provider->test_mode === '1')
                     <span style="color: #f59e0b;"><i class="fas fa-flask"></i> Enabled (Sandbox)</span>
                 @else
@@ -202,7 +202,7 @@
 {{-- Recent Domains --}}
 @if($provider->userDomains()->count() > 0)
 <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-    <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+    <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
         <i class="fas fa-list" style="margin-right: 8px; color: #00b7ff;"></i>Recent Domains
     </h4>
     
@@ -218,7 +218,7 @@
         <tbody>
             @foreach($provider->userDomains()->latest()->take(10)->get() as $domain)
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <td style="padding: 12px; color: #fff; font-weight: 500;">{{ $domain->domain_name }}</td>
+                <td style="padding: 12px; color: var(--text-primary); font-weight: 500;">{{ $domain->domain_name }}</td>
                 <td style="padding: 12px; color: #8b9bb4;">{{ $domain->user->name ?? 'N/A' }}</td>
                 <td style="padding: 12px; color: #8b9bb4;">{{ $domain->expiry_date?->format('M d, Y') ?? 'N/A' }}</td>
                 <td style="padding: 12px;">

@@ -33,12 +33,13 @@
 <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
 
     {{-- IP List --}}
-    <div class="data-table">
+    <div class="card">
         <div class="table-header">
             <h3 class="table-title"><i class="fas fa-network-wired mr-2" style="color:#00b7ff;"></i>IP Addresses</h3>
         </div>
         @if($ips->count())
-        <table>
+        <div class="card-body"><div class="table-responsive">
+        <table class="data-table">
             <thead><tr>
                 <th>IP Address</th><th>Gateway</th><th>Node</th><th>Status</th><th>Assigned To</th><th>Actions</th>
             </tr></thead>

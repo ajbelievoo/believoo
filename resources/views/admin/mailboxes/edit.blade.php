@@ -16,7 +16,7 @@
 </div>
 @endif
 
-<div class="data-table" style="max-width: 640px;">
+<div class="card" style="max-width: 640px;">
     <div class="table-header"><h3 class="table-title">Mailbox Settings</h3></div>
     <div style="padding: 24px;">
         <form action="{{ route('admin.mailboxes.update', $mailbox->username) }}" method="POST">

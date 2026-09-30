@@ -15,7 +15,7 @@
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
     <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-        <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 20px;"><i class="fas fa-info-circle" style="color: #00b7ff; margin-right: 8px;"></i>Details</h3>
+        <h3 style="font-size: 1.1rem; color: var(--text-primary); margin-bottom: 20px;"><i class="fas fa-info-circle" style="color: #00b7ff; margin-right: 8px;"></i>Details</h3>
         <table style="width: 100%; color: #d1d5db;">
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 12px 0; color: #8b9bb4;">Plan Code</td>
@@ -45,7 +45,7 @@
     </div>
 
     <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-        <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 20px;"><i class="fas fa-dollar-sign" style="color: #00b7ff; margin-right: 8px;"></i>Pricing</h3>
+        <h3 style="font-size: 1.1rem; color: var(--text-primary); margin-bottom: 20px;"><i class="fas fa-dollar-sign" style="color: #00b7ff; margin-right: 8px;"></i>Pricing</h3>
         <table style="width: 100%; color: #d1d5db;">
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <td style="padding: 12px 0; color: #8b9bb4;">Monthly Price</td>
@@ -68,29 +68,29 @@
 </div>
 
 <div style="margin-top: 24px; padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-    <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 20px;"><i class="fas fa-server" style="color: #00b7ff; margin-right: 8px;"></i>Specifications</h3>
+    <h3 style="font-size: 1.1rem; color: var(--text-primary); margin-bottom: 20px;"><i class="fas fa-server" style="color: #00b7ff; margin-right: 8px;"></i>Specifications</h3>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
         <div style="padding: 16px; background: rgba(0,183,255,0.08); border-radius: 12px;">
             <div style="font-size: 0.75rem; color: #8b9bb4; text-transform: uppercase;">CPU Cores</div>
-            <div style="font-size: 1.25rem; color: #fff; font-weight: 600;">{{ $ovhProduct->cpu_cores ?? 'N/A' }}</div>
+            <div style="font-size: 1.25rem; color: var(--text-primary); font-weight: 600;">{{ $ovhProduct->cpu_cores ?? 'N/A' }}</div>
         </div>
         <div style="padding: 16px; background: rgba(139,92,246,0.08); border-radius: 12px;">
             <div style="font-size: 0.75rem; color: #8b9bb4; text-transform: uppercase;">RAM</div>
-            <div style="font-size: 1.25rem; color: #fff; font-weight: 600;">{{ $ovhProduct->ram_gb ? $ovhProduct->ram_gb . ' GB' : 'N/A' }}</div>
+            <div style="font-size: 1.25rem; color: var(--text-primary); font-weight: 600;">{{ $ovhProduct->ram_gb ? $ovhProduct->ram_gb . ' GB' : 'N/A' }}</div>
         </div>
         <div style="padding: 16px; background: rgba(245,158,11,0.08); border-radius: 12px;">
             <div style="font-size: 0.75rem; color: #8b9bb4; text-transform: uppercase;">Disk</div>
-            <div style="font-size: 1.25rem; color: #fff; font-weight: 600;">{{ $ovhProduct->disk_gb ? $ovhProduct->disk_gb . ' GB' : 'N/A' }}</div>
+            <div style="font-size: 1.25rem; color: var(--text-primary); font-weight: 600;">{{ $ovhProduct->disk_gb ? $ovhProduct->disk_gb . ' GB' : 'N/A' }}</div>
         </div>
         <div style="padding: 16px; background: rgba(34,197,94,0.08); border-radius: 12px;">
             <div style="font-size: 0.75rem; color: #8b9bb4; text-transform: uppercase;">Bandwidth</div>
-            <div style="font-size: 1.25rem; color: #fff; font-weight: 600;">{{ $ovhProduct->bandwidth_mbps ? $ovhProduct->bandwidth_mbps . ' Mbps' : 'N/A' }}</div>
+            <div style="font-size: 1.25rem; color: var(--text-primary); font-weight: 600;">{{ $ovhProduct->bandwidth_mbps ? $ovhProduct->bandwidth_mbps . ' Mbps' : 'N/A' }}</div>
         </div>
     </div>
 </div>
 
 <div style="margin-top: 24px; padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-    <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 20px;"><i class="fas fa-code" style="color: #00b7ff; margin-right: 8px;"></i>OVH Raw Config</h3>
+    <h3 style="font-size: 1.1rem; color: var(--text-primary); margin-bottom: 20px;"><i class="fas fa-code" style="color: #00b7ff; margin-right: 8px;"></i>OVH Raw Config</h3>
     <pre style="background: #0a0e1a; padding: 16px; border-radius: 12px; color: #8b9bb4; overflow-x: auto; font-size: 0.85rem;">{{ json_encode($ovhProduct->ovh_config, JSON_PRETTY_PRINT) }}</pre>
 </div>
 

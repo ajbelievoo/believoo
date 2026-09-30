@@ -9,8 +9,8 @@
 </div>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 900px;">
-    <div class="data-table">
-        <div class="table-header"><h3 class="table-title">Subscription Details</h3></div>
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Subscription Details</h3></div>
         <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
             <div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Client</div>
@@ -44,8 +44,8 @@
     </div>
 
     @if($amcSubscription->agreement)
-    <div class="data-table">
-        <div class="table-header"><h3 class="table-title">Linked Agreement</h3></div>
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Linked Agreement</h3></div>
         <div style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
             <div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Agreement #</div>

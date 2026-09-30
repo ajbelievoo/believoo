@@ -30,8 +30,8 @@
     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
         <div>
             <!-- Agreement Information -->
-            <div class="data-table" style="margin-bottom: 24px;">
-                <div class="table-header"><h3 class="table-title">Agreement Information</h3></div>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header"><h3 class="card-title">Agreement Information</h3></div>
                 <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
                         <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Title *</label>
@@ -79,8 +79,8 @@
             </div>
 
             <!-- Project Details -->
-            <div class="data-table" style="margin-bottom: 24px;">
-                <div class="table-header"><h3 class="table-title">Project Details</h3></div>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header"><h3 class="card-title">Project Details</h3></div>
                 <div style="padding: 24px;">
                     <div style="margin-bottom: 16px;">
                         <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Project Name *</label>
@@ -101,8 +101,8 @@
             </div>
 
             <!-- Financial Details -->
-            <div class="data-table" style="margin-bottom: 24px;">
-                <div class="table-header"><h3 class="table-title">Financial Details</h3></div>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header"><h3 class="card-title">Financial Details</h3></div>
                 <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
                     <div>
                         <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Total Amount *</label>
@@ -138,8 +138,8 @@
             </div>
 
             <!-- Terms & Deliverables -->
-            <div class="data-table" style="margin-bottom: 24px;">
-                <div class="table-header"><h3 class="table-title">Terms & Deliverables</h3></div>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header"><h3 class="card-title">Terms & Deliverables</h3></div>
                 <div style="padding: 24px;">
                     <div style="margin-bottom: 16px;">
                         <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Payment Terms</label>
@@ -165,9 +165,9 @@
             </div>
 
             <!-- Work Items -->
-            <div class="data-table" style="margin-bottom: 24px;">
-                <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 class="table-title">Work Items</h3>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 class="card-title">Work Items</h3>
                     <button type="button" class="btn btn-secondary" onclick="addWorkItem()" style="padding: 6px 14px; font-size: 0.8rem;">
                         <i class="fas fa-plus"></i> Add Work Item
                     </button>
@@ -178,9 +178,9 @@
             </div>
 
             <!-- Milestones -->
-            <div class="data-table" style="margin-bottom: 24px;">
-                <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 class="table-title">Milestones & Payments</h3>
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 class="card-title">Milestones & Payments</h3>
                     <button type="button" class="btn btn-secondary" onclick="addMilestone()" style="padding: 6px 14px; font-size: 0.8rem;">
                         <i class="fas fa-plus"></i> Add Milestone
                     </button>
@@ -193,8 +193,8 @@
 
         <!-- Sidebar -->
         <div>
-            <div class="data-table" style="position: sticky; top: 24px;">
-                <div class="table-header"><h3 class="table-title">Actions</h3></div>
+            <div class="card" style="position: sticky; top: 24px;">
+                <div class="card-header"><h3 class="card-title">Actions</h3></div>
                 <div style="padding: 24px;">
                     <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 12px;">
                         <i class="fas fa-save"></i> Create Agreement

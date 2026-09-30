@@ -8,8 +8,8 @@
     <p class="page-subtitle">Manage portfolio items</p>
 </div>
 
-<div class="data-table">
-    <div class="table-header">
+<div class="card">
+    <div class="card-header">
         <h3 class="table-title">All Portfolio Items</h3>
         <div class="table-actions">
             <a href="{{ route('admin.portfolio.create') }}" class="btn btn-primary">
@@ -17,7 +17,8 @@
             </a>
         </div>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Title</th>
@@ -97,6 +98,7 @@
             @endforelse
         </tbody>
     </table>
+    </div></div>
 
     @if($portfolios->hasPages())
     <div style="padding: 20px 24px; border-top: 1px solid var(--border-color);">

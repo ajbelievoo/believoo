@@ -3,9 +3,9 @@
 @section('title', 'Stream Details - ' . ($stream->stream_id ?? '#' . $stream->id))
 
 @section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">Stream #{{ $stream->id }}</h1>
+<div>
+    <div class="page-header">
+        <div><h1 class="page-title">Stream #{{ $stream->id }}</h1><p class="page-subtitle">Stream activity and usage details</p></div>
         <a href="{{ route('admin.stream-analytics.index') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left me-2"></i>Back to Analytics
         </a>

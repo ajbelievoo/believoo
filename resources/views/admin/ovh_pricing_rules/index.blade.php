@@ -3,12 +3,14 @@
 @section('title', 'OVH Pricing Rules')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1>OVH Pricing Rules</h1>
-  <a href="{{ route('admin.ovh-pricing-rules.create') }}" class="btn btn-primary">Add Rule</a>
+<div class="page-header">
+  <div><h1 class="page-title">OVH Pricing Rules</h1><p class="page-subtitle">Manage catalog margins and markups</p></div>
+  <a href="{{ route('admin.ovh-pricing-rules.create') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Add Rule</a>
 </div>
 
-<table class="table table-striped">
+<div class="card">
+<div class="card-header"><div class="card-title"><i class="fas fa-sliders-h"></i>Pricing Rules</div></div>
+<div class="card-body"><div class="table-responsive"><table class="data-table">
   <thead>
     <tr>
       <th>Category</th>
@@ -41,7 +43,7 @@
     </tr>
     @endforeach
   </tbody>
-</table>
-
-{{ $rules->links() }}
+</table></div></div>
+<div class="card-footer">{{ $rules->links() }}</div>
+</div>
 @endsection

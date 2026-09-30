@@ -13,14 +13,16 @@
     </div>
 @endif
 
-<div class="data-table">
+<div class="card">
+    <div class="card-header">
     <div class="table-header">
         <h3 class="table-title">All Hosting Plans</h3>
         <div class="table-actions">
             <span style="font-size: 0.8rem; color: var(--text-muted);">{{ $hostings->total() }} total</span>
         </div>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Client</th>

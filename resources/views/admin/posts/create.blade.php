@@ -7,8 +7,8 @@
     <h1 class="page-title">Create Blog Post</h1>
 </div>
 
-<div class="data-table">
-    <div style="padding: 24px;">
+<div class="card">
+    <div class="card-body">
         <form action="{{ route('admin.posts.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">

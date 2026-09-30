@@ -52,14 +52,15 @@
 </div>
 @endif
 
-<div class="data-table">
+<div class="card">
     <div class="table-header">
         <h3 class="table-title"><i class="fas fa-server" style="margin-right: 10px; color: #00b7ff;"></i>Virtual Machines</h3>
         <span style="font-size: 0.85rem; color: #8b9bb4;">{{ count($vms) }} VMs found</span>
     </div>
 
     @if(count($vms) > 0)
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>VM ID</th>

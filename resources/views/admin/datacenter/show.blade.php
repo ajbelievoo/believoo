@@ -11,8 +11,8 @@
         margin-top: 24px;
     }
     .detail-card {
-        background: linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
         border-radius: 16px;
         padding: 24px;
         margin-bottom: 20px;

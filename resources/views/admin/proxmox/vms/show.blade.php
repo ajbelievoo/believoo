@@ -273,7 +273,7 @@
     {{-- Left Column: Resource Usage --}}
     <div>
         {{-- Resource Usage with Progress Bars --}}
-        <div class="data-table" style="margin-bottom: 24px;">
+        <div class="card" style="margin-bottom: 24px;">
             <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3 class="table-title"><i class="fas fa-chart-line" style="margin-right: 10px; color: #00b7ff;"></i>Real-Time Resource Usage</h3>
                 <span style="font-size: 0.75rem; color: #8b9bb4; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 12px;">
@@ -407,7 +407,7 @@
         </div>
 
         {{-- System Information --}}
-        <div class="data-table" style="margin-bottom: 24px;">
+        <div class="card" style="margin-bottom: 24px;">
             <div class="table-header">
                 <h3 class="table-title"><i class="fas fa-server" style="margin-right: 10px; color: #22c55e;"></i>System Information</h3>
             </div>
@@ -499,7 +499,7 @@
     {{-- Right Column: Quick Actions & Info --}}
     <div>
         {{-- Quick Info --}}
-        <div class="data-table" style="margin-bottom: 24px;">
+        <div class="card" style="margin-bottom: 24px;">
             <div class="table-header">
                 <h3 class="table-title"><i class="fas fa-info-circle" style="margin-right: 10px; color: #8b5cf6;"></i>Quick Info</h3>
             </div>

@@ -35,7 +35,7 @@
         
         {{-- Basic Settings --}}
         <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-            <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
                 <i class="fas fa-cog" style="margin-right: 8px; color: #00b7ff;"></i>Basic Settings
             </h4>
 
@@ -69,7 +69,7 @@
                 <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $provider->is_active) ? 'checked' : '' }}
                         style="width: 20px; height: 20px; accent-color: #22c55e;">
-                    <span style="font-size: 0.95rem; color: #fff;">Active Provider</span>
+                    <span style="font-size: 0.95rem; color: var(--text-primary);">Active Provider</span>
                 </label>
                 <small style="display: block; margin-top: 6px; color: #6b7280; font-size: 0.75rem;">
                     Only active providers are used for domain registration
@@ -80,14 +80,14 @@
                 <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
                     <input type="checkbox" name="test_mode" value="1" {{ old('test_mode', $provider->test_mode === '1') ? 'checked' : '' }}
                         style="width: 20px; height: 20px; accent-color: #eab308;">
-                    <span style="font-size: 0.95rem; color: #fff;">Test Mode (Sandbox)</span>
+                    <span style="font-size: 0.95rem; color: var(--text-primary);">Test Mode (Sandbox)</span>
                 </label>
             </div>
         </div>
 
         {{-- API Configuration --}}
         <div style="padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-            <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
                 <i class="fas fa-key" style="margin-right: 8px; color: #8b5cf6;"></i>API Configuration
             </h4>
 
@@ -136,7 +136,7 @@
 
     {{-- Domain Settings --}}
     <div style="margin-top: 24px; padding: 24px; background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;">
-        <h4 style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px;">
+        <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 20px;">
             <i class="fas fa-globe" style="margin-right: 8px; color: #22c55e;"></i>Domain Settings
         </h4>
 

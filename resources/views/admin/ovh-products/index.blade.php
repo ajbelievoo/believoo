@@ -44,13 +44,14 @@
     </small>
 </div>
 
-<div class="data-table">
+<div class="card">
     <div class="table-header">
         <h3 class="table-title"><i class="fas fa-cloud" style="margin-right: 10px; color: #00b7ff;"></i>Products</h3>
         <span style="font-size: 0.85rem; color: #8b9bb4;">{{ $products->total() }} total</span>
     </div>
 
-    <table style="width: 100%; border-collapse: collapse;">
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
                 <th style="padding: 16px; text-align: left; color: #8b9bb4; font-size: 0.8rem; text-transform: uppercase;">Category</th>

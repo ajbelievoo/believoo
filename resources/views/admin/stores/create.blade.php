@@ -7,9 +7,9 @@
     <h1 class="page-title">Add Store</h1>
 </div>
 
-<div class="data-table" style="max-width: 600px;">
-    <div class="table-header"><h3 class="table-title">Store Details</h3></div>
-    <div style="padding: 24px;">
+<div class="card" style="max-width: 600px;">
+    <div class="card-header"><h3 class="table-title">Store Details</h3></div>
+    <div class="card-body">
         <form action="{{ route('admin.stores.store') }}" method="POST">
             @csrf
             <div style="margin-bottom: 16px;">

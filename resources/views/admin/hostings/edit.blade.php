@@ -2,7 +2,7 @@
 @section('title', 'Manage Hosting — ' . $hosting->plan_name)
 @section('content')
 
-<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px;">
+<div class="page-header">
     <div>
         <a href="{{ route('admin.hostings.index') }}" style="font-size: 0.75rem; font-weight: 700; color: #00b7ff; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;">
             <i class="fas fa-arrow-left"></i> Back to Hostings

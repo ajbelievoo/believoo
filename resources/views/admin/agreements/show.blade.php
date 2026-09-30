@@ -10,8 +10,8 @@
 
 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
     <div>
-        <div class="data-table" style="margin-bottom: 24px;">
-            <div class="table-header"><h3 class="table-title">Agreement Details</h3></div>
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header"><h3 class="card-title">Agreement Details</h3></div>
             <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Client</div>
@@ -42,8 +42,8 @@
             </div>
         </div>
 
-        <div class="data-table">
-            <div class="table-header"><h3 class="table-title">Invoices</h3></div>
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Invoices</h3></div>
             <table>
                 <thead>
                     <tr><th>Invoice</th><th>Amount</th><th>Status</th><th>Date</th></tr>
@@ -65,8 +65,8 @@
     </div>
 
     <div>
-        <div class="data-table" style="margin-bottom: 24px;">
-            <div class="table-header"><h3 class="table-title">Update Status</h3></div>
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header"><h3 class="card-title">Update Status</h3></div>
             <div style="padding: 24px;">
                 <form action="{{ route('admin.agreements.update-status', $agreement) }}" method="POST">
                     @csrf
@@ -80,8 +80,8 @@
             </div>
         </div>
 
-        <div class="data-table">
-            <div class="table-header"><h3 class="table-title">Milestones</h3></div>
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Milestones</h3></div>
             <div style="padding: 16px;">
                 @forelse($agreement->milestones as $milestone)
                 <div style="padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 8px;">

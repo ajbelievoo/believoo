@@ -7,9 +7,9 @@
     <h1 class="page-title">Create Service</h1>
 </div>
 
-<div class="data-table" style="max-width: 900px;">
-    <div class="table-header"><h3 class="table-title">Service Details</h3></div>
-    <div style="padding: 24px;">
+<div class="card" style="max-width: 900px;">
+    <div class="card-header"><h3 class="table-title">Service Details</h3></div>
+    <div class="card-body">
         <form action="{{ route('admin.services.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">

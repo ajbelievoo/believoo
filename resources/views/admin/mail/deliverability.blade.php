@@ -22,7 +22,7 @@
         <div style="font-size: 0.8rem; color: var(--text-muted);">Mail IP</div>
     </div>
     <div class="card" style="text-align:center; padding:18px;">
-        <div style="font-size: 2rem; font-weight: 800; color: {{ $checks['cert_expiry_days'] !== null && $checks['cert_expiry_days'] > 7 ? 'var(--success)' : 'var(--warning)') }};">
+        <div style="font-size: 2rem; font-weight: 800; color: {{ $checks['cert_expiry_days'] !== null && $checks['cert_expiry_days'] > 7 ? 'var(--success)' : 'var(--warning)' }};">
             {{ $checks['cert_expiry_days'] !== null ? $checks['cert_expiry_days'] . 'd' : 'N/A' }}
         </div>
         <div style="font-size: 0.8rem; color: var(--text-muted);">Cert Expiry</div>
@@ -105,9 +105,10 @@
 @endif
 
 @if($recentBounces->count())
-<div class="data-table">
+<div class="card">
     <div class="table-header"><h3 class="table-title">Recent Announcement Bounces / Errors</h3></div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Time</th>

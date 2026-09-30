@@ -8,8 +8,8 @@
     <p class="page-subtitle">Manage SEO articles and news</p>
 </div>
 
-<div class="data-table">
-    <div class="table-header">
+<div class="card">
+    <div class="card-header">
         <h3 class="table-title">All Posts</h3>
         <div class="table-actions">
             <a href="{{ route('admin.posts.create') }}" class="btn btn-primary">
@@ -17,7 +17,8 @@
             </a>
         </div>
     </div>
-    <table>
+    <div class="card-body"><div class="table-responsive">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Title</th>
@@ -62,7 +63,8 @@
             @endforelse
         </tbody>
     </table>
-    <div style="padding: 16px;">
+    </div></div>
+    <div class="card-footer">
         {{ $posts->links() }}
     </div>
 </div>
