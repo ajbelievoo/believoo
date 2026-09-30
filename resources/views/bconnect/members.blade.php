@@ -22,27 +22,29 @@ $limitLabel = $memberLimit === null ? 'Unlimited' : $memberLimit;
             <h3 class="font-bold">Team Members</h3>
             <span class="bc-badge bc-badge-slate">{{ $memberUsage }} / {{ $limitLabel }}</span>
         </div>
-        <table class="bc-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody>
-                @foreach($members as $m)
-                <tr>
-                    <td class="font-medium">{{ $m->user->name }}</td>
-                    <td class="text-slate-400">{{ $m->user->email }}</td>
-                    <td><span class="bc-badge bc-badge-slate">{{ ucfirst(str_replace('_', ' ', $m->role)) }}</span></td>
-                    <td>{!! $m->is_active ? '<span class="bc-badge bc-badge-green">Active</span>' : '<span class="bc-badge bc-badge-red">Inactive</span>' !!}</td>
-                    <td>
-                        <form method="POST" action="{{ route('bconnect.members.update', $m->id) }}" class="inline">@csrf @method('PUT')
-                            <select name="role" onchange="this.form.submit()" class="bg-slate-800 border border-slate-600 rounded text-xs p-1 text-white">
-                                @foreach($roles as $role)<option value="{{ $role }}" {{ $m->role == $role ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$role)) }}</option>@endforeach
-                            </select>
-                        </form>
-                        <form method="POST" action="{{ route('bconnect.members.destroy', $m->id) }}" class="inline" onsubmit="return confirm('Delete?')">@csrf @method('DELETE')<button class="text-red-400 text-xs ml-2 hover:text-red-300"><i class="fas fa-trash"></i></button></form>
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
+        <div class="overflow-x-auto -mx-6 px-6">
+            <table class="bc-table min-w-[640px]">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                    @foreach($members as $m)
+                    <tr>
+                        <td class="font-medium">{{ $m->user->name }}</td>
+                        <td class="text-slate-400">{{ $m->user->email }}</td>
+                        <td><span class="bc-badge bc-badge-slate">{{ ucfirst(str_replace('_', ' ', $m->role)) }}</span></td>
+                        <td>{!! $m->is_active ? '<span class="bc-badge bc-badge-green">Active</span>' : '<span class="bc-badge bc-badge-red">Inactive</span>' !!}</td>
+                        <td>
+                            <form method="POST" action="{{ route('bconnect.members.update', $m->id) }}" class="inline">@csrf @method('PUT')
+                                <select name="role" onchange="this.form.submit()" class="bg-slate-800 border border-slate-600 rounded text-xs p-1 text-white">
+                                    @foreach($roles as $role)<option value="{{ $role }}" {{ $m->role == $role ? 'selected' : '' }}>{{ ucfirst(str_replace('_',' ',$role)) }}</option>@endforeach
+                                </select>
+                            </form>
+                            <form method="POST" action="{{ route('bconnect.members.destroy', $m->id) }}" class="inline" onsubmit="return confirm('Delete?')">@csrf @method('DELETE')<button class="text-red-400 text-xs ml-2 hover:text-red-300"><i class="fas fa-trash"></i></button></form>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
         {{ $members->links() }}
     </div>
     <div class="bc-card p-6">
