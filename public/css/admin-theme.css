@@ -937,6 +937,79 @@ body {
     border: 1px solid var(--admin-accent-glow);
 }
 
+/* ===== Settings Page ===== */
+.settings-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius-sm);
+    margin-bottom: 24px;
+}
+
+.settings-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: var(--admin-surface-2) !important;
+    border: 1px solid var(--admin-border) !important;
+    border-radius: var(--admin-radius-xs);
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--admin-text-secondary) !important;
+    transition: all var(--admin-transition);
+}
+
+.settings-tab:hover {
+    background: var(--admin-border-subtle) !important;
+    color: var(--admin-text) !important;
+}
+
+.settings-tab.active,
+.settings-tab[data-tab].active {
+    background: linear-gradient(135deg, var(--admin-accent), var(--admin-accent-strong)) !important;
+    color: white !important;
+    border-color: transparent !important;
+    box-shadow: 0 4px 12px var(--admin-accent-glow);
+}
+
+.settings-content {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.settings-content > div:first-child {
+    padding: 22px 24px;
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.settings-content h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--admin-text);
+}
+
+.settings-content p {
+    font-size: 0.875rem;
+    color: var(--admin-text-muted);
+    margin: 0;
+}
+
+.settings-content form > div:last-child,
+.settings-content > form > div:last-of-type {
+    padding: 20px 24px;
+    border-top: 1px solid var(--admin-border);
+    background: var(--admin-surface-2);
+}
+
 /* ===== Utilities ===== */
 .grid { display: grid; gap: 18px; }
 .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
