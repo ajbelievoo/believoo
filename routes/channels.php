@@ -30,3 +30,18 @@ Broadcast::channel('import.{importId}', function ($user, $importId) {
     
     return $import !== null;
 });
+
+// B-CONNECT public channels: restrict to active company members
+Broadcast::channel('company.{companyId}.chat.{channelType}.{channelId}', function ($user, $companyId, $channelType, $channelId) {
+    return \App\Models\Bconnect\Member::where('user_id', $user->id)
+        ->where('company_id', $companyId)
+        ->where('is_active', true)
+        ->exists();
+});
+
+Broadcast::channel('company.{companyId}.whiteboard.{projectId}', function ($user, $companyId, $projectId) {
+    return \App\Models\Bconnect\Member::where('user_id', $user->id)
+        ->where('company_id', $companyId)
+        ->where('is_active', true)
+        ->exists();
+});
