@@ -3,43 +3,46 @@
 @section('title', 'Conversation ' . Str::limit($sessionId, 12))
 
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">Conversation <code>{{ Str::limit($sessionId, 24) }}</code></h1>
-        <div>
-            @if($user)
-                <span class="badge bg-info">User: {{ $user->name }} ({{ $user->email }})</span>
-            @endif
-            <a href="{{ route('admin.ai-messages.index') }}" class="btn btn-outline-secondary btn-sm ms-2">Back</a>
-        </div>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Conversation <code style="color: var(--accent);">{{ Str::limit($sessionId, 24) }}</code></h1>
+        <p class="page-subtitle">View full AI chat history</p>
     </div>
+    <div class="page-actions">
+        @if($user)
+            <span class="badge badge-info">User: {{ $user->name }} ({{ $user->email }})</span>
+        @endif
+        <a href="{{ route('admin.ai-messages.index') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i>Back
+        </a>
+    </div>
+</div>
 
-    @include('admin.partials.alerts')
+@include('admin.partials.alerts')
 
-    <div class="card shadow-sm">
-        <div class="card-body" style="max-height: 70vh; overflow-y: auto;">
-            @foreach($messages as $message)
-                <div class="d-flex mb-3 {{ $message->type === 'user' ? 'justify-content-end' : '' }}">
-                    <div class="p-3 rounded-3 {{ $message->type === 'user' ? 'bg-primary text-white' : 'bg-light border' }}" style="max-width: 75%;">
-                        <div class="small mb-1 {{ $message->type === 'user' ? 'text-white-50' : 'text-muted' }}">
-                            {{ $message->type === 'user' ? 'User' : 'AI' }} &bull; {{ $message->created_at->format('d M Y H:i') }}
-                            @if($message->source)
-                                &bull; {{ ucfirst($message->source) }}
-                            @endif
-                        </div>
-                        <div>{!! nl2br(e($message->message)) !!}</div>
-                        @if(!empty($message->citations))
-                            <div class="mt-2 small {{ $message->type === 'user' ? 'text-white-50' : 'text-muted' }}">
-                                Citations:
-                                @foreach($message->citations as $citation)
-                                    <span class="badge bg-secondary">{{ $citation }}</span>
-                                @endforeach
-                            </div>
+<div class="card">
+    <div class="card-body" style="max-height: 70vh; overflow-y: auto;">
+        @foreach($messages as $message)
+            <div class="d-flex mb-3 {{ $message->type === 'user' ? 'justify-content-end' : '' }}" style="display: flex; margin-bottom: 16px; {{ $message->type === 'user' ? 'justify-content: flex-end;' : '' }}">
+                <div style="max-width: 75%; padding: 16px; border-radius: 14px; background: {{ $message->type === 'user' ? 'var(--accent)' : 'var(--bg-tertiary)' }}; border: 1px solid {{ $message->type === 'user' ? 'transparent' : 'var(--border-color)' }}; color: {{ $message->type === 'user' ? '#fff' : 'var(--text-primary)' }};">
+                    <div style="font-size: 0.78rem; margin-bottom: 6px; color: {{ $message->type === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }};">
+                        {{ $message->type === 'user' ? 'User' : 'AI' }} &bull; {{ $message->created_at->format('d M Y H:i') }}
+                        @if($message->source)
+                            &bull; {{ ucfirst($message->source) }}
                         @endif
                     </div>
+                    <div style="font-size: 0.9rem; line-height: 1.5;">{!! nl2br(e($message->message)) !!}</div>
+                    @if(!empty($message->citations))
+                        <div style="margin-top: 10px; font-size: 0.78rem; color: {{ $message->type === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }};">
+                            Citations:
+                            @foreach($message->citations as $citation)
+                                <span class="badge badge-slate">{{ $citation }}</span>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
-            @endforeach
-        </div>
+            </div>
+        @endforeach
     </div>
 </div>
 @endsection

@@ -5,7 +5,7 @@
 @push('styles')
 <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
 <style>
-.ql-toolbar.ql-snow { background: #f8fafc; border-color: var(--border-color); border-radius: 10px 10px 0 0; }
+.ql-toolbar.ql-snow { background: var(--bg-secondary); border-color: var(--border-color); border-radius: 10px 10px 0 0; }
 .ql-container.ql-snow { background: var(--bg-tertiary); border-color: var(--border-color); border-radius: 0 0 10px 10px; color: var(--text-primary); min-height: 240px; }
 .ql-editor { color: var(--text-primary); }
 #audience-count { font-weight: 600; color: var(--accent); }
@@ -14,57 +14,60 @@
 
 @section('content')
 <div class="page-header">
-    <h1 class="page-title">Edit Announcement</h1>
-    <p class="page-subtitle">Update or re-send</p>
+    <div>
+        <h1 class="page-title">Edit Announcement</h1>
+        <p class="page-subtitle">Update or re-send</p>
+    </div>
 </div>
 
-<div class="data-table" style="max-width: 1100px;">
-    <div class="table-header"><h3 class="table-title">Announcement Details</h3></div>
-    <div style="padding: 24px;">
+<div class="card" style="max-width: 1100px;">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-bullhorn"></i>Announcement Details</div>
+    </div>
+    <div class="card-body">
         <form action="{{ route('admin.announcements.update', $announcement) }}" method="POST" id="announcementForm" enctype="multipart/form-data">
             @csrf
             @method('PUT')
 
-            <div style="margin-bottom: 18px;">
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Title</label>
-                <input type="text" name="title" value="{{ old('title', $announcement->title) }}" required
-                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" name="title" value="{{ old('title', $announcement->title) }}" required class="form-input">
             </div>
 
-            <div style="margin-bottom: 18px;">
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Message (English)</label>
+            <div class="form-group">
+                <label class="form-label">Message (English)</label>
                 <input type="hidden" name="message" id="message" value="{{ old('message', $announcement->message) }}">
                 <div id="editor" style="min-height: 240px;">{!! old('message', $announcement->message) !!}</div>
             </div>
 
-            <div style="margin-bottom: 18px;">
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Message (Hindi) <small style="color: var(--text-muted); font-weight: 400;">optional</small></label>
+            <div class="form-group">
+                <label class="form-label">Message (Hindi) <small style="color: var(--text-muted); font-weight: 400;">optional</small></label>
                 <input type="hidden" name="message_hi" id="message_hi" value="{{ old('message_hi', $announcement->message_hi) }}">
                 <div id="editor_hi" style="min-height: 200px;">{!! old('message_hi', $announcement->message_hi) !!}</div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 18px;">
-                <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Type</label>
-                    <select name="type" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Type</label>
+                    <select name="type" class="form-select">
                         <option value="info" {{ old('type', $announcement->type) == 'info' ? 'selected' : '' }}>Info</option>
                         <option value="warning" {{ old('type', $announcement->type) == 'warning' ? 'selected' : '' }}>Warning</option>
                         <option value="important" {{ old('type', $announcement->type) == 'important' ? 'selected' : '' }}>Important</option>
                     </select>
                 </div>
 
-                <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Language</label>
-                    <select name="locale" id="locale" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Language</label>
+                    <select name="locale" id="locale" class="form-select">
                         <option value="en" {{ old('locale', $announcement->locale) == 'en' ? 'selected' : '' }}>English</option>
                         <option value="hi" {{ old('locale', $announcement->locale) == 'hi' ? 'selected' : '' }}>Hindi</option>
                         <option value="both" {{ old('locale', $announcement->locale) == 'both' ? 'selected' : '' }}>Both</option>
                     </select>
                 </div>
 
-                <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Audience</label>
-                    <select name="audience" id="audience" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Audience</label>
+                    <select name="audience" id="audience" class="form-select">
                         <option value="all" {{ old('audience', $announcement->audience) == 'all' ? 'selected' : '' }}>All users</option>
                         <option value="clients" {{ old('audience', $announcement->audience) == 'clients' ? 'selected' : '' }}>Clients only</option>
                         <option value="bconnect" {{ old('audience', $announcement->audience) == 'bconnect' ? 'selected' : '' }}>B-Connect users</option>
@@ -72,65 +75,60 @@
                     </select>
                 </div>
 
-                <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Audience Count</label>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Audience Count</label>
                     <div id="audience-count" style="padding: 10px 0; font-size: 1rem;">—</div>
                 </div>
             </div>
 
             <div style="margin-bottom: 18px; padding: 14px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px;">
-                <label style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px; font-weight: 600;">
+                <label style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px; font-weight: 600; cursor: pointer;">
                     <input type="checkbox" name="ab_enabled" value="1" {{ old('ab_enabled', $announcement->ab_enabled) ? 'checked' : '' }} onchange="toggleAbTest()"> Enable A/B testing
                 </label>
                 <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 12px;">Split test two variants. A test sample is sent first; the winner is automatically sent to the rest after the test window.</p>
 
                 <div id="ab-test-fields" style="display: none;">
-                    <div style="margin-bottom: 14px;">
-                        <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">A/B Test Name</label>
-                        <input type="text" name="ab_test_name" value="{{ old('ab_test_name', $announcement->ab_test_name) }}" placeholder="e.g. March Subject Line Test"
-                            style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                    <div class="form-group">
+                        <label class="form-label">A/B Test Name</label>
+                        <input type="text" name="ab_test_name" value="{{ old('ab_test_name', $announcement->ab_test_name) }}" placeholder="e.g. March Subject Line Test" class="form-input">
                     </div>
 
-                    <div style="margin-bottom: 14px;">
-                        <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Variant B Title</label>
-                        <input type="text" name="title_b" value="{{ old('title_b', $announcement->title_b) }}"
-                            style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                    <div class="form-group">
+                        <label class="form-label">Variant B Title</label>
+                        <input type="text" name="title_b" value="{{ old('title_b', $announcement->title_b) }}" class="form-input">
                     </div>
 
-                    <div style="margin-bottom: 14px;">
-                        <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Variant B Message (English)</label>
+                    <div class="form-group">
+                        <label class="form-label">Variant B Message (English)</label>
                         <input type="hidden" name="message_b" id="message_b" value="{{ old('message_b', $announcement->message_b) }}">
                         <div id="editor_b" style="min-height: 200px;">{!! old('message_b', $announcement->message_b) !!}</div>
                     </div>
 
-                    <div style="margin-bottom: 14px;">
-                        <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Variant B Message (Hindi) <small style="color: var(--text-muted); font-weight: 400;">optional</small></label>
+                    <div class="form-group">
+                        <label class="form-label">Variant B Message (Hindi) <small style="color: var(--text-muted); font-weight: 400;">optional</small></label>
                         <input type="hidden" name="message_hi_b" id="message_hi_b" value="{{ old('message_hi_b', $announcement->message_hi_b) }}">
                         <div id="editor_hi_b" style="min-height: 180px;">{!! old('message_hi_b', $announcement->message_hi_b) !!}</div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 8px;">
-                        <div>
-                            <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Test sample %</label>
-                            <input type="number" name="ab_test_percentage" value="{{ old('ab_test_percentage', $announcement->ab_test_percentage) }}" min="1" max="100"
-                                style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.9rem;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 8px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 0.8rem;">Test sample %</label>
+                            <input type="number" name="ab_test_percentage" value="{{ old('ab_test_percentage', $announcement->ab_test_percentage) }}" min="1" max="100" class="form-input">
                         </div>
-                        <div>
-                            <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Variant A % of test</label>
-                            <input type="number" name="ab_split" value="{{ old('ab_split', $announcement->ab_split) }}" min="0" max="100"
-                                style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.9rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 0.8rem;">Variant A % of test</label>
+                            <input type="number" name="ab_split" value="{{ old('ab_split', $announcement->ab_split) }}" min="0" max="100" class="form-input">
                         </div>
-                        <div>
-                            <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Win metric</label>
-                            <select name="ab_metric" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.9rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 0.8rem;">Win metric</label>
+                            <select name="ab_metric" class="form-select">
                                 <option value="opens" {{ old('ab_metric', $announcement->ab_metric) == 'opens' ? 'selected' : '' }}>Opens</option>
                                 <option value="clicks" {{ old('ab_metric', $announcement->ab_metric) == 'clicks' ? 'selected' : '' }}>Clicks</option>
                             </select>
                         </div>
-                        <div>
-                            <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Test duration (min)</label>
-                            <input type="number" name="ab_duration_minutes" value="{{ old('ab_duration_minutes', $announcement->ab_duration_minutes) }}" min="1"
-                                style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.9rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 0.8rem;">Test duration (min)</label>
+                            <input type="number" name="ab_duration_minutes" value="{{ old('ab_duration_minutes', $announcement->ab_duration_minutes) }}" min="1" class="form-input">
                         </div>
                     </div>
                 </div>
@@ -140,19 +138,19 @@
                 This announcement will be sent to all Believoo, B-Connect and GHC users.
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
-                <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Attachment</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Attachment</label>
                     @if($announcement->attachment)
                         <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 6px;">Current: {{ $announcement->attachment }}</p>
                     @endif
-                    <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.zip"
-                        style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                    <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.zip" class="form-input">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin: 6px 0 0;">Max 5MB: pdf, png, jpg, zip</p>
                 </div>
 
-                <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Load Template</label>
-                    <select id="template-select" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Load Template</label>
+                    <select id="template-select" class="form-select">
                         <option value="">— Select —</option>
                         @foreach($templates as $template)
                         <option value="{{ $template->id }}">{{ $template->name }}</option>
@@ -161,33 +159,31 @@
                 </div>
             </div>
 
-            <div style="margin-bottom: 18px;">
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Send Time</label>
-                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 10px;">
-                    @php
-                        $sendType = old('send_type', $announcement->scheduled_at ? 'schedule' : ($announcement->is_published ? 'now' : 'draft'));
-                    @endphp
-                    <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem;">
+            <div class="form-group">
+                <label class="form-label">Send Time</label>
+                @php
+                    $sendType = old('send_type', $announcement->scheduled_at ? 'schedule' : ($announcement->is_published ? 'now' : 'draft'));
+                @endphp
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;">
                         <input type="radio" name="send_type" value="now" {{ $sendType == 'now' ? 'checked' : '' }} onchange="toggleSchedule()"> Send now
                     </label>
-                    <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;">
                         <input type="radio" name="send_type" value="schedule" {{ $sendType == 'schedule' ? 'checked' : '' }} onchange="toggleSchedule()"> Schedule
                     </label>
-                    <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;">
                         <input type="radio" name="send_type" value="draft" {{ $sendType == 'draft' ? 'checked' : '' }} onchange="toggleSchedule()"> Save draft
                     </label>
                 </div>
-                <input type="datetime-local" name="scheduled_at" id="scheduled_at" value="{{ old('scheduled_at', $announcement->scheduled_at?->format('Y-m-d\TH:i')) }}"
-                    style="width: 100%; max-width: 300px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; color: var(--text-primary); font-size: 0.9rem;">
+                <input type="datetime-local" name="scheduled_at" id="scheduled_at" value="{{ old('scheduled_at', $announcement->scheduled_at?->format('Y-m-d\TH:i')) }}" class="form-input" style="max-width: 300px;">
             </div>
 
             <div style="margin-bottom: 18px; padding: 14px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px;">
-                <label style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;">
                     <input type="checkbox" name="save_template" value="1" {{ old('save_template') ? 'checked' : '' }} onchange="document.getElementById('template-name-wrap').style.display = this.checked ? 'block' : 'none';"> Save as template
                 </label>
                 <div id="template-name-wrap" style="display: none; margin-top: 8px;">
-                    <input type="text" name="template_name" value="{{ old('template_name') }}" placeholder="Template name"
-                        style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 0.9rem;">
+                    <input type="text" name="template_name" value="{{ old('template_name') }}" placeholder="Template name" class="form-input">
                 </div>
             </div>
 

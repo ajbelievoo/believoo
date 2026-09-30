@@ -3,54 +3,62 @@
 @section('title', 'Test All Domain Providers - Believoo')
 
 @section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">Test All Providers</h1>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Test All Providers</h1>
+        <p class="page-subtitle">Connection test results for every configured domain provider</p>
+    </div>
+    <div class="page-actions">
         <a href="{{ route('admin.domain-providers.index') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Back to Providers
+            <i class="fas fa-arrow-left"></i>Back to Providers
         </a>
     </div>
+</div>
 
-    <div class="card">
-        <div class="card-body">
-            @if(!empty($results) && count($results) > 0)
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Provider</th>
-                            <th>Status</th>
-                            <th>Message</th>
-                            <th>Latency</th>
-                            <th>Checked At</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($results as $result)
-                        <tr>
-                            <td>
-                                <strong>{{ $result['name'] ?? ($result['provider'] ?? 'Unknown') }}</strong>
-                            </td>
-                            <td>
-                                @if($result['success'] ?? false)
-                                    <span class="badge bg-success">Connected</span>
-                                @else
-                                    <span class="badge bg-danger">Failed</span>
-                                @endif
-                            </td>
-                            <td>{{ $result['message'] ?? '—' }}</td>
-                            <td>{{ isset($result['latency_ms']) ? $result['latency_ms'] . ' ms' : '—' }}</td>
-                            <td>{{ isset($result['checked_at']) ? \Carbon\Carbon::parse($result['checked_at'])->format('M d, Y H:i') : now()->format('M d, Y H:i') }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @else
-                <div class="text-center py-5">
-                    <i class="fas fa-plug" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 16px;"></i>
-                    <h5 class="text-muted">No provider test results available.</h5>
-                    <p class="text-muted">Run a connection test from the providers list.</p>
-                </div>
-            @endif
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-plug"></i>Test Results</div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Provider</th>
+                        <th>Status</th>
+                        <th>Message</th>
+                        <th>Latency</th>
+                        <th>Checked At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($results as $result)
+                    <tr>
+                        <td style="font-weight: 600;">
+                            {{ $result['name'] ?? ($result['provider'] ?? 'Unknown') }}
+                        </td>
+                        <td>
+                            @if($result['success'] ?? false)
+                                <span class="badge badge-success">Connected</span>
+                            @else
+                                <span class="badge badge-danger">Failed</span>
+                            @endif
+                        </td>
+                        <td>{{ $result['message'] ?? '—' }}</td>
+                        <td>{{ isset($result['latency_ms']) ? $result['latency_ms'] . ' ms' : '—' }}</td>
+                        <td>{{ isset($result['checked_at']) ? \Carbon\Carbon::parse($result['checked_at'])->format('M d, Y H:i') : now()->format('M d, Y H:i') }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <i class="fas fa-plug"></i>
+                            <div>No provider test results available</div>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">Run a connection test from the providers list.</p>
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
