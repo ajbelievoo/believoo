@@ -2,30 +2,30 @@
 @section('title', 'Meeting: ' . $meeting->title)
 @section('content')
 <div class="h-[calc(100vh-140px)] flex flex-col">
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <div>
             <h3 class="font-bold text-lg">{{ $meeting->title }}</h3>
             <code class="text-xs text-slate-400">Room: {{ $room }}</code>
         </div>
-        <div class="flex gap-2">
-            <button id="micBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300"><i class="fas fa-microphone"></i></button>
-            <button id="camBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300"><i class="fas fa-video"></i></button>
-            <button id="screenBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300"><i class="fas fa-desktop"></i></button>
+        <div class="flex flex-wrap gap-2">
+            <button id="micBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"><i class="fas fa-microphone"></i></button>
+            <button id="camBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"><i class="fas fa-video"></i></button>
+            <button id="screenBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"><i class="fas fa-desktop"></i></button>
             @if($canRecord)
-            <button id="recordBtn" class="px-4 py-2 bg-pink-500/20 text-pink-400 rounded-lg font-bold hover:bg-pink-500/30"><i class="fas fa-circle mr-1"></i>Record</button>
+            <button id="recordBtn" class="px-4 py-2 bg-pink-500/20 text-pink-400 rounded-lg font-bold hover:bg-pink-500/30 text-sm"><i class="fas fa-circle mr-1"></i>Record</button>
             @endif
             @if($canAi)
-            <button id="transcriptBtn" class="px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30"><i class="fas fa-closed-captioning mr-1"></i>Captions</button>
-            <label id="audioUploadBtn" class="px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30 cursor-pointer hidden">
+            <button id="transcriptBtn" class="px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30 text-sm"><i class="fas fa-closed-captioning mr-1"></i>Captions</button>
+            <label id="audioUploadBtn" class="px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg font-bold hover:bg-cyan-500/30 cursor-pointer hidden text-sm">
                 <i class="fas fa-upload mr-1"></i>Audio
                 <input type="file" id="audioUploadInput" accept="audio/*" class="hidden">
             </label>
             @endif
-        <button id="endMeetingBtn" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg font-bold hover:bg-red-500/30"><i class="fas fa-phone-slash mr-1"></i>End{{ $canAi ? ' & Summarize' : '' }}</button>
+            <button id="endMeetingBtn" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg font-bold hover:bg-red-500/30 text-sm"><i class="fas fa-phone-slash mr-1"></i>End{{ $canAi ? ' & Summarize' : '' }}</button>
         </div>
     </div>
-    <div class="flex-1 bg-slate-900 rounded-2xl border border-slate-800 relative overflow-hidden flex flex-wrap gap-2 p-2" id="video-grid">
-        <div id="local-player" class="w-1/2 h-1/2 bg-slate-800 rounded-xl flex items-center justify-center relative"><span class="text-slate-500 text-sm">Loading camera...</span></div>
+    <div class="flex-1 bg-slate-900 rounded-2xl border border-slate-800 relative overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-2 p-2" id="video-grid">
+        <div id="local-player" class="bg-slate-800 rounded-xl flex items-center justify-center relative min-h-[180px]"><span class="text-slate-500 text-sm">Loading camera...</span></div>
     </div>
     @if($canAi)
     <div id="transcriptBox" class="hidden mt-4 p-4 bg-slate-900 border border-cyan-500/30 rounded-xl max-h-48 overflow-y-auto">
@@ -96,7 +96,7 @@ function showRemoteVideo(user) {
     if (!document.getElementById(id)) {
         const div = document.createElement('div');
         div.id = id;
-        div.className = 'w-1/2 h-1/2 bg-slate-800 rounded-xl relative flex items-center justify-center';
+        div.className = 'bg-slate-800 rounded-xl relative flex items-center justify-center min-h-[180px]';
         document.getElementById('video-grid').appendChild(div);
     }
     user.videoTrack.play(id);
