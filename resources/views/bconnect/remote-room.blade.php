@@ -7,8 +7,8 @@ $isViewer = !$isHost;
 @endphp
 <div class="h-[calc(100vh-140px)] flex flex-col">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-        <div>
-            <h3 class="font-bold text-lg"><i class="fas fa-desktop mr-2 text-green-400"></i>Remote Session</h3>
+        <div class="min-w-0">
+            <h3 class="font-bold text-lg truncate"><i class="fas fa-desktop mr-2 text-green-400"></i>Remote Session</h3>
             <p class="text-xs text-slate-400">
                 Code: <code>{{ $session->session_code }}</code> • Permission: <span class="font-bold text-cyan-400">{{ ucfirst($session->permission) }}</span>
                 • <span id="connStatus" class="text-amber-400">Connecting...</span>
