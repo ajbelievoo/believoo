@@ -26,7 +26,11 @@ class DashboardController extends Controller {
         ];
 
         $recentTickets = Ticket::where('company_id', $companyId)->with('project')->latest()->limit(5)->get();
-        $recentMeetings = Meeting::where('company_id', $companyId)->with('creator.user')->where('ended_at', null)->orWhere('ended_at', '>=', now()->subDay())->latest()->limit(5)->get();
+        $recentMeetings = Meeting::where('company_id', $companyId)->with('creator.user')
+            ->where(function ($q) {
+                $q->whereNull('ended_at')->orWhere('ended_at', '>=', now()->subDay());
+            })
+            ->latest()->limit(5)->get();
         $pendingInvoices = Invoice::where('company_id', $companyId)->where('status', 'pending')->latest()->limit(5)->get();
         $planLimits = [
             'members' => BconnectPlanService::check($companyId, 'members'),

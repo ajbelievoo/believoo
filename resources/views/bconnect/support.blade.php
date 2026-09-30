@@ -1,8 +1,5 @@
 @php
 $companyId = request()->input('bconnect_company_id');
-$projects = \App\Models\Bconnect\Project::where('company_id', $companyId)->get();
-$canCreate = \App\Services\BconnectPlanService::canCreateTicket($companyId);
-$ticketLimit = \App\Services\BconnectPlanService::check($companyId, 'tickets');
 @endphp
 @extends('bconnect.layout')
 @section('title', 'Help & Support')
@@ -11,7 +8,7 @@ $ticketLimit = \App\Services\BconnectPlanService::check($companyId, 'tickets');
     <div class="lg:col-span-2 space-y-6">
         <div class="bc-card p-6">
             <h2 class="text-2xl font-bold text-white mb-2">Help & Support</h2>
-            <p class="text-slate-400 mb-6">Find guides or create a support ticket.</p>
+            <p class="text-slate-400 mb-6">Find guides or create a support ticket. Our team typically replies within 24 hours.</p>
             <div class="grid md:grid-cols-2 gap-4 mb-6">
                 <a href="https://believoo.com/help" target="_blank" class="bc-card p-4 block hover:border-cyan-500/30 transition">
                     <i class="fas fa-book text-cyan-400 text-2xl mb-3"></i>
@@ -25,7 +22,7 @@ $ticketLimit = \App\Services\BconnectPlanService::check($companyId, 'tickets');
                 </a>
             </div>
 
-            <h3 class="font-bold mb-4">Quick Guides</h3>
+            <h3 class="font-bold mb-4 text-white">Quick Guides</h3>
             <div class="space-y-3">
                 <details class="group bg-slate-800/50 rounded-xl p-4 border border-[var(--bc-border)]">
                     <summary class="font-semibold text-white cursor-pointer list-none flex justify-between items-center"><span>How do I start a video meeting?</span><i class="fas fa-chevron-down text-cyan-400 group-open:rotate-180 transition"></i></summary>
@@ -41,10 +38,37 @@ $ticketLimit = \App\Services\BconnectPlanService::check($companyId, 'tickets');
                 </details>
             </div>
         </div>
+
+        <div class="bc-card p-6">
+            <h3 class="font-bold mb-4 text-white">My Recent Support Tickets</h3>
+            @if($tickets->count())
+                <div class="overflow-x-auto">
+                    <table class="bc-table w-full">
+                        <thead><tr><th>Title</th><th>Project</th><th>Status</th><th>Priority</th><th>Created</th></tr></thead>
+                        <tbody>
+                            @foreach($tickets as $t)
+                            <tr>
+                                <td><a href="{{ route('bconnect.tickets.show', $t->id) }}" class="text-cyan-400 hover:underline font-medium">{{ Str::limit($t->title, 40) }}</a></td>
+                                <td class="text-slate-400">{{ $t->project?->name ?? '—' }}</td>
+                                <td><span class="bc-badge bc-badge-{{ $t->status === 'closed' || $t->status === 'resolved' ? 'green' : ($t->status === 'open' ? 'cyan' : 'amber') }}">{{ ucfirst(str_replace('_', ' ', $t->status)) }}</span></td>
+                                <td><span class="bc-badge bc-badge-{{ $t->priority === 'critical' ? 'red' : ($t->priority === 'high' ? 'amber' : 'slate') }}">{{ ucfirst($t->priority) }}</span></td>
+                                <td class="text-slate-400 text-sm">{{ $t->created_at->diffForHumans() }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="text-center py-8 text-slate-500">
+                    <i class="fas fa-ticket-alt text-3xl mb-3 opacity-50"></i>
+                    <p>No support tickets yet.</p>
+                </div>
+            @endif
+        </div>
     </div>
 
-    <div class="bc-card p-6">
-        <h3 class="font-bold mb-4">Create Support Ticket</h3>
+    <div class="bc-card p-6 h-fit">
+        <h3 class="font-bold mb-4 text-white">Create Support Ticket</h3>
         @if(!$canCreate)
         <div class="p-4 mb-4 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 text-sm">
             <i class="fas fa-exclamation-circle mr-2"></i>Ticket limit reached. <a href="{{ route('bconnect.billing.upgrade') }}" class="underline hover:text-white">Upgrade plan</a>.
@@ -58,7 +82,7 @@ $ticketLimit = \App\Services\BconnectPlanService::check($companyId, 'tickets');
                 @endforeach
             </select>
             <input type="text" name="title" placeholder="Issue title" required class="bc-input" @if(!$canCreate) disabled @endif>
-            <textarea name="description" rows="4" placeholder="Describe the issue" required class="bc-input" @if(!$canCreate) disabled @endif></textarea>
+            <textarea name="description" rows="4" placeholder="Describe the issue in detail..." required class="bc-input" @if(!$canCreate) disabled @endif></textarea>
             <select name="priority" class="bc-input" @if(!$canCreate) disabled @endif>
                 <option value="low">Low</option>
                 <option value="medium" selected>Medium</option>
