@@ -3,78 +3,76 @@
 @section('title', 'Settings')
 
 @section('content')
-<div class="page-header" style="color: var(--text-primary);">
-    <h1 class="page-title" style="color: var(--text-primary);">Settings</h1>
-    <p class="page-subtitle" style="color: var(--text-muted);">Manage all your application settings</p>
+<div class="page-header">
+    <h1 class="page-title">Settings</h1>
+    <p class="page-subtitle">Manage all your application settings</p>
 </div>
 
 <!-- Tabs Navigation -->
-<div style="margin-bottom: 24px;">
-    <div style="display: flex; gap: 8px; flex-wrap: wrap; padding: 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px;">
-        <button type="button" onclick="showTab('general')" class="settings-tab active" data-tab="general" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #00b7ff; color: #000000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
+<div class="settings-tabs mb-6">
+        <button type="button" onclick="showTab('general')" class="settings-tab active" data-tab="general">
             <i class="fas fa-globe"></i> General
         </button>
-        <button type="button" onclick="showTab('contact')" class="settings-tab" data-tab="contact" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('contact')" class="settings-tab" data-tab="contact">
             <i class="fas fa-address-book"></i> Contact
         </button>
-        <button type="button" onclick="showTab('social')" class="settings-tab" data-tab="social" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('social')" class="settings-tab" data-tab="social">
             <i class="fas fa-share-alt"></i> Social Media
         </button>
-        <button type="button" onclick="showTab('seo')" class="settings-tab" data-tab="seo" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('seo')" class="settings-tab" data-tab="seo">
             <i class="fas fa-search"></i> SEO
         </button>
-        <button type="button" onclick="showTab('payment')" class="settings-tab" data-tab="payment" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('payment')" class="settings-tab" data-tab="payment">
             <i class="fas fa-credit-card"></i> Payment
         </button>
-        <button type="button" onclick="showTab('agora')" class="settings-tab" data-tab="agora" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('agora')" class="settings-tab" data-tab="agora">
             <i class="fas fa-video"></i> Agora
         </button>
-        <button type="button" onclick="showTab('push')" class="settings-tab" data-tab="push" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('push')" class="settings-tab" data-tab="push">
             <i class="fas fa-bell"></i> Push
         </button>
-        <button type="button" onclick="showTab('bconnect')" class="settings-tab" data-tab="bconnect" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('bconnect')" class="settings-tab" data-tab="bconnect">
             <i class="fas fa-rocket"></i> B-CONNECT
         </button>
-        <button type="button" onclick="showTab('email')" class="settings-tab" data-tab="email" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('email')" class="settings-tab" data-tab="email">
             <i class="fas fa-envelope"></i> Email/SMTP
         </button>
-        <button type="button" onclick="showTab('appearance')" class="settings-tab" data-tab="appearance" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('appearance')" class="settings-tab" data-tab="appearance">
             <i class="fas fa-paint-brush"></i> Appearance
         </button>
-        <button type="button" onclick="showTab('maintenance')" class="settings-tab" data-tab="maintenance" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('maintenance')" class="settings-tab" data-tab="maintenance">
             <i class="fas fa-tools"></i> Maintenance
         </button>
-        <button type="button" onclick="showTab('security')" class="settings-tab" data-tab="security" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('security')" class="settings-tab" data-tab="security">
             <i class="fas fa-shield-alt"></i> Security
         </button>
-        <button type="button" onclick="showTab('notifications')" class="settings-tab" data-tab="notifications" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('notifications')" class="settings-tab" data-tab="notifications">
             <i class="fas fa-bell"></i> Notifications
         </button>
-        <button type="button" onclick="showTab('backup')" class="settings-tab" data-tab="backup" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('backup')" class="settings-tab" data-tab="backup">
             <i class="fas fa-database"></i> Backup
         </button>
-        <button type="button" onclick="showTab('server')" class="settings-tab" data-tab="server" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('server')" class="settings-tab" data-tab="server">
             <i class="fas fa-server"></i> Server Management
         </button>
-        <button type="button" onclick="showTab('ghc')" class="settings-tab" data-tab="ghc" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('ghc')" class="settings-tab" data-tab="ghc">
             <i class="fas fa-server"></i> GHC Site
         </button>
-        <button type="button" onclick="showTab('ai')" class="settings-tab" data-tab="ai" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('ai')" class="settings-tab" data-tab="ai">
             <i class="fas fa-robot"></i> AI Assistant
         </button>
-        <button type="button" onclick="showTab('integrations')" class="settings-tab" data-tab="integrations" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+        <button type="button" onclick="showTab('integrations')" class="settings-tab" data-tab="integrations">
             <i class="fas fa-plug"></i> Integrations
         </button>
-    </div>
 </div>
 
 <!-- Settings Content -->
-<div style="background: var(--bg-primary); padding: 24px; border-radius: 16px;">
+<div class="card">
         <form action="{{ route('admin.settings.update') }}" method="POST" enctype="multipart/form-data">
             @csrf
 
             <!-- General Settings -->
-            <div id="general" class="settings-content data-table" style="margin-bottom: 24px;">
+            <div id="general" class="settings-content">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">General Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Basic site configuration</p>
@@ -129,13 +127,13 @@
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
                             <div>
                                 <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
-                                    <i class="fas fa-bullhorn" style="color: #00b7ff; margin-right: 6px;"></i>Announcement Bar
+                                    <i class="fas fa-bullhorn" style="color: var(--accent); margin-right: 6px;"></i>Announcement Bar
                                 </h4>
                                 <p style="font-size: 0.8rem; color: var(--text-muted);">Website ke sabse top pe dikhne wala promo banner</p>
                             </div>
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-primary); white-space: nowrap;">
                                 <input type="checkbox" name="announcement_enabled" value="1" {{ ($settings['announcement_enabled'] ?? '1') === '1' ? 'checked' : '' }}
-                                    style="width: 16px; height: 16px; accent-color: #00b7ff;">
+                                    style="width: 16px; height: 16px; accent-color: var(--accent);">
                                 Enabled
                             </label>
                         </div>
@@ -164,10 +162,10 @@
             </div>
 
             <!-- GHC Site Settings -->
-            <div id="ghc" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="ghc" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">
-                        <i class="fas fa-server" style="color: #00f0ff; margin-right: 8px;"></i>GHC Site Settings
+                        <i class="fas fa-server" style="color: var(--accent); margin-right: 8px;"></i>GHC Site Settings
                     </h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">ghc.believoo.com (Go Host Cloud) ki branding — yahan se control hogi</p>
                 </div>
@@ -238,7 +236,7 @@
                         </div>
                     </div>
                     <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                        <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;"><i class="fas fa-heading" style="color: #00f0ff; margin-right: 6px;"></i>Hero Section Text</h4>
+                        <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;"><i class="fas fa-heading" style="color: var(--accent); margin-right: 6px;"></i>Hero Section Text</h4>
                         <div style="display: grid; gap: 16px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Hero Badge</label>
@@ -257,7 +255,7 @@
                             </div>
                         </div>
                     <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                        <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;"><i class="fas fa-bullhorn" style="color: #00f0ff; margin-right: 6px;"></i>GHC Announcement Bar</h4>
+                        <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;"><i class="fas fa-bullhorn" style="color: var(--accent); margin-right: 6px;"></i>GHC Announcement Bar</h4>
                         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Announcement Text</label>
@@ -278,7 +276,7 @@
             </div>
 
             <!-- Contact Settings -->
-            <div id="contact" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="contact" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Contact Information</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">How customers can reach you</p>
@@ -350,11 +348,73 @@
                         <textarea name="google_maps" rows="2"
                             style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; resize: vertical; color: var(--text-primary);">{{ $settings['google_maps'] ?? '' }}</textarea>
                     </div>
+
+                    <!-- Company Legal / Registration Details -->
+                    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px; color: var(--text-primary);"><i class="fas fa-building" style="margin-right: 8px;"></i>Company Legal Details</h4>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Shown in the site footer, About page and on invoices</p>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Legal Company Name</label>
+                                <input type="text" name="company_legal_name" value="{{ $settings['company_legal_name'] ?? '' }}" placeholder="BELIEVOO PRIVATE LIMITED"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">CIN (Corporate Identity Number)</label>
+                                <input type="text" name="company_cin" value="{{ $settings['company_cin'] ?? '' }}" placeholder="U63119UP2026PTC252696"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">PAN</label>
+                                <input type="text" name="company_pan" value="{{ $settings['company_pan'] ?? '' }}" placeholder="AAPCB1563P"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">TAN</label>
+                                <input type="text" name="company_tan" value="{{ $settings['company_tan'] ?? '' }}" placeholder="KBNB14221E"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Date of Incorporation</label>
+                                <input type="text" name="company_incorporation_date" value="{{ $settings['company_incorporation_date'] ?? '' }}" placeholder="16 September 2026"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">GST Number (optional)</label>
+                                <input type="text" name="gst_number" value="{{ $settings['gst_number'] ?? '' }}" placeholder="Leave blank if not registered"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Registered Office Address</label>
+                            <textarea name="company_registered_office" rows="2" placeholder="As per Certificate of Incorporation"
+                                style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; resize: vertical; color: var(--text-primary);">{{ $settings['company_registered_office'] ?? '' }}</textarea>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Invoice Email</label>
+                                <input type="email" name="company_email" value="{{ $settings['company_email'] ?? '' }}" placeholder="billing@believoo.com"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Invoice Phone</label>
+                                <input type="text" name="company_phone" value="{{ $settings['company_phone'] ?? '' }}" placeholder="+91-XXXXXXXXXX"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Company Website</label>
+                                <input type="text" name="company_website" value="{{ $settings['company_website'] ?? '' }}" placeholder="https://believoo.com"
+                                    style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Social Media -->
-            <div id="social" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="social" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Social Media Links</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Connect with your audience</p>
@@ -403,9 +463,9 @@
                         <!-- Google OAuth -->
                         <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                                <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);"><i class="fab fa-google" style="margin-right: 8px; color: #4285F4;"></i>Google Login</h5>
+                                <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);"><i class="fab fa-google" style="margin-right: 8px; color: var(--accent);"></i>Google Login</h5>
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                    <input type="checkbox" name="google_login_enabled" value="1" {{ ($settings['google_login_enabled'] ?? '1') == '1' ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: #00b7ff;">
+                                    <input type="checkbox" name="google_login_enabled" value="1" {{ ($settings['google_login_enabled'] ?? '1') == '1' ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: var(--accent);">
                                     <span style="font-size: 0.85rem; color: var(--text-secondary);">Enable</span>
                                 </label>
                             </div>
@@ -426,9 +486,9 @@
                         <!-- Facebook OAuth -->
                         <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                                <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);"><i class="fab fa-facebook" style="margin-right: 8px; color: #1877F2;"></i>Facebook Login</h5>
+                                <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);"><i class="fab fa-facebook" style="margin-right: 8px; color: var(--accent);"></i>Facebook Login</h5>
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                    <input type="checkbox" name="facebook_login_enabled" value="1" {{ ($settings['facebook_login_enabled'] ?? '0') == '1' ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: #00b7ff;">
+                                    <input type="checkbox" name="facebook_login_enabled" value="1" {{ ($settings['facebook_login_enabled'] ?? '0') == '1' ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: var(--accent);">
                                     <span style="font-size: 0.85rem; color: var(--text-secondary);">Enable</span>
                                 </label>
                             </div>
@@ -449,9 +509,9 @@
                         <!-- Twitter OAuth -->
                         <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                                <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);"><i class="fab fa-twitter" style="margin-right: 8px; color: #1DA1F2;"></i>Twitter / X Login</h5>
+                                <h5 style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);"><i class="fab fa-twitter" style="margin-right: 8px; color: var(--accent);"></i>Twitter / X Login</h5>
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                    <input type="checkbox" name="twitter_login_enabled" value="1" {{ ($settings['twitter_login_enabled'] ?? '0') == '1' ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: #00b7ff;">
+                                    <input type="checkbox" name="twitter_login_enabled" value="1" {{ ($settings['twitter_login_enabled'] ?? '0') == '1' ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: var(--accent);">
                                     <span style="font-size: 0.85rem; color: var(--text-secondary);">Enable</span>
                                 </label>
                             </div>
@@ -473,7 +533,7 @@
             </div>
 
             <!-- SEO Settings -->
-            <div id="seo" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="seo" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">SEO Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Search engine optimization</p>
@@ -513,14 +573,14 @@
             </div>
 
             <!-- Payment Settings -->
-            <div id="payment" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="payment" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Payment Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure payment gateways</p>
                 </div>
                 <div style="padding: 24px;">
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; background: var(--bg-tertiary);">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #00b7ff;"><i class="fas fa-credit-card" style="margin-right: 8px;"></i>Razorpay</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--accent);"><i class="fas fa-credit-card" style="margin-right: 8px;"></i>Razorpay</h4>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Key ID</label>
@@ -583,7 +643,7 @@
 
                     {{-- PayPal Settings --}}
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; background: var(--bg-tertiary); margin-top: 20px;">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #0070BA;"><i class="fab fa-paypal" style="margin-right: 8px;"></i>PayPal</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--accent);"><i class="fab fa-paypal" style="margin-right: 8px;"></i>PayPal</h4>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Client ID</label>
@@ -615,7 +675,7 @@
 
                     {{-- Stripe Settings --}}
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; background: var(--bg-tertiary);">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #6772E5;"><i class="fab fa-stripe" style="margin-right: 8px;"></i>Stripe</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--accent);"><i class="fab fa-stripe" style="margin-right: 8px;"></i>Stripe</h4>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Publishable Key</label>
@@ -638,7 +698,7 @@
 
                     {{-- PayU Settings --}}
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; background: var(--bg-tertiary);">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #FF6B35;"><i class="fas fa-credit-card" style="margin-right: 8px;"></i>PayU</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--warning);"><i class="fas fa-credit-card" style="margin-right: 8px;"></i>PayU</h4>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Key</label>
@@ -689,14 +749,14 @@
             </div>
 
             <!-- Agora Settings -->
-            <div id="agora" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="agora" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Agora Video/Voice Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure Agora.io for B-CONNECT video conferences and audio calls.</p>
                 </div>
                 <div style="padding: 24px;">
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; background: var(--bg-tertiary);">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #00b7ff;"><i class="fas fa-video" style="margin-right: 8px;"></i>Agora</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--accent);"><i class="fas fa-video" style="margin-right: 8px;"></i>Agora</h4>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">App ID</label>
@@ -746,7 +806,7 @@
             </div>
 
             <!-- Push Notification Settings -->
-            <div id="push" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="push" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Push Notification Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">VAPID keys for browser push on B-CONNECT</p>
@@ -766,7 +826,7 @@
             </div>
 
             <!-- B-CONNECT Brand & SEO -->
-            <div id="bconnect" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="bconnect" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">B-CONNECT Brand & SEO</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Logo, title, favicon, meta tags and Google verification for bc.believoo.com</p>
@@ -817,7 +877,7 @@
             </div>
 
             <!-- Email/SMTP Settings -->
-            <div id="email" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="email" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Email/SMTP Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure email notifications</p>
@@ -867,7 +927,7 @@
             </div>
 
             <!-- Appearance -->
-            <div id="appearance" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="appearance" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Appearance</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Customize the look and feel</p>
@@ -906,7 +966,7 @@
             </div>
 
             <!-- Maintenance -->
-            <div id="maintenance" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="maintenance" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Maintenance Mode</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Take site offline for maintenance</p>
@@ -915,7 +975,7 @@
                     <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
                         <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 16px;">
                             <input type="checkbox" name="maintenance_mode" value="1" {{ ($settings['maintenance_mode'] ?? '0') == '1' ? 'checked' : '' }}>
-                            <span style="font-size: 1rem; font-weight: 600; color: #ef4444;">Enable Maintenance Mode</span>
+                            <span style="font-size: 1rem; font-weight: 600; color: var(--danger);">Enable Maintenance Mode</span>
                         </label>
                         <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 16px;">When enabled, only admins can access the site. All other users will see a maintenance message.</p>
                         <div>
@@ -928,13 +988,13 @@
                 <div style="padding: 24px; border-top: 1px solid var(--border-color);">
                     <div style="display: flex; gap: 12px; align-items: center;">
                         <input type="email" name="test_email" value="{{ auth()->user()->email ?? '' }}" placeholder="Test email address" style="flex: 1; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
-                        <a href="{{ route('admin.settings.test-mail') }}" class="btn btn-primary" style="padding: 12px 20px;" onclick="event.preventDefault(); fetch(this.href, {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}, body:new URLSearchParams({email: document.querySelector('input[name=test_email]').value})}).then(r=>r.text()).then(t=>alert(t));"><i class="fas fa-paper-plane mr-2"></i>Send Test Email</a>
+                        <a href="{{ route('admin.settings.test-mail') }}" class="btn btn-primary" style="padding: 12px 20px;" onclick="event.preventDefault(); fetch(this.href, {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}, body:new URLSearchParams({email: document.querySelector('input[name=test_email]').value})}).then(r=>r.text()).then(t=>alert(t));"><i class="fas fa-paper-plane me-2"></i>Send Test Email</a>
                     </div>
                 </div>
             </div>
 
             <!-- Security Settings -->
-            <div id="security" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="security" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Security Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Protect your application</p>
@@ -984,7 +1044,7 @@
             </div>
 
             <!-- Notifications Settings -->
-            <div id="notifications" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="notifications" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Notification Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure system notifications</p>
@@ -1067,7 +1127,7 @@
             </div>
 
             <!-- Backup Settings -->
-            <div id="backup" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="backup" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Backup Settings</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure automatic backups</p>
@@ -1107,7 +1167,7 @@
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
                         <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--text-primary);">Manual Backup</h4>
                         <div style="display: flex; gap: 12px;">
-                            <button type="button" onclick="alert('Backup initiated')" style="padding: 10px 20px; background: #00b7ff; color: #000000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            <button type="button" onclick="alert('Backup initiated')" style="padding: 10px 20px; background: var(--accent); color: var(--text-primary); border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
                                 <i class="fas fa-download"></i> Download Full Backup
                             </button>
                             <button type="button" onclick="alert('Database backup initiated')" style="padding: 10px 20px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 600; cursor: pointer;">
@@ -1119,7 +1179,7 @@
             </div>
 
             <!-- Server Management Settings -->
-            <div id="server" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="server" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);"><i class="fas fa-server" style="margin-right: 8px;"></i>Server Management</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure WHMCS and Virtualizor API settings for VPS dashboard</p>
@@ -1127,7 +1187,7 @@
                 <div style="padding: 24px;">
                     <!-- WHMCS Configuration -->
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 24px; background: var(--bg-tertiary);">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #00b7ff;"><i class="fas fa-credit-card" style="margin-right: 8px;"></i>WHMCS API Configuration</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--accent);"><i class="fas fa-credit-card" style="margin-right: 8px;"></i>WHMCS API Configuration</h4>
                         <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Get these from WHMCS Admin > Setup > Staff Management > Manage API Credentials</p>
                         
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 16px;">
@@ -1151,7 +1211,7 @@
 
                     <!-- Virtualizor Configuration -->
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 24px; background: var(--bg-tertiary);">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #00b7ff;"><i class="fas fa-hdd" style="margin-right: 8px;"></i>Virtualizor API Configuration</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--accent);"><i class="fas fa-hdd" style="margin-right: 8px;"></i>Virtualizor API Configuration</h4>
                         <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Get these from Virtualizor Admin > Configuration > API Credentials</p>
                         
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 16px;">
@@ -1180,7 +1240,7 @@
 
                     <!-- Proxmox VE Configuration -->
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 24px; background: var(--bg-tertiary); margin-top: 24px;">
-                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #22c55e;"><i class="fas fa-cloud" style="margin-right: 8px;"></i>Proxmox VE API Configuration</h4>
+                        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--success);"><i class="fas fa-cloud" style="margin-right: 8px;"></i>Proxmox VE API Configuration</h4>
                         <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Configure Proxmox VE API for VM automation. Create API token from Proxmox: Datacenter > Permissions > API Tokens</p>
                         
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 16px;">
@@ -1264,7 +1324,7 @@
             </div>
 
             <!-- AI Assistant Settings -->
-            <div id="ai" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="ai" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);"><i class="fas fa-robot" style="margin-right: 8px;"></i>AI Chat Assistant</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Configure AI model and API keys for customer support widget</p>
@@ -1372,16 +1432,16 @@
             </div>
 
             <!-- ══════ External Integrations ══════ -->
-            <div id="integrations" class="settings-content data-table" style="margin-bottom: 24px; display: none;">
+            <div id="integrations" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
-                    <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);"><i class="fas fa-plug" style="color: #8b5cf6; margin-right: 8px;"></i>External Integrations</h3>
+                    <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);"><i class="fas fa-plug" style="color: var(--admin-purple); margin-right: 8px;"></i>External Integrations</h3>
                     <p style="font-size: 0.8rem; color: var(--text-muted);">Connect Telegram, WhatsApp, Facebook/Instagram, and email-to-chat</p>
                 </div>
                 <div style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
 
                     <!-- Telegram -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-telegram" style="color: #0088cc; margin-right: 6px;"></i>Telegram Bot</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-telegram" style="color: var(--accent); margin-right: 6px;"></i>Telegram Bot</h4>
                         <div>
                             <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Bot Token</label>
                             <input type="password" name="telegram_bot_token" value="{{ $settings['telegram_bot_token'] ?? '' }}" placeholder="123456:ABC-DEF..." style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; color: var(--text-primary);">
@@ -1391,7 +1451,7 @@
 
                     <!-- Meta (FB/IG) -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-facebook" style="color: #1877f2; margin-right: 6px;"></i>Facebook / Instagram DM</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-facebook" style="color: var(--accent); margin-right: 6px;"></i>Facebook / Instagram DM</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div>
                                 <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Verify Token</label>
@@ -1407,7 +1467,7 @@
 
                     <!-- WhatsApp -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-whatsapp" style="color: #25d366; margin-right: 6px;"></i>WhatsApp</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-whatsapp" style="color: var(--success); margin-right: 6px;"></i>WhatsApp</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div>
                                 <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">WhatsApp Number (no +)</label>
@@ -1431,7 +1491,7 @@
 
                     <!-- Cloudflare DNS -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); margin-top: 16px;">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-cloudflare" style="color: #f48120; margin-right: 6px;"></i>Cloudflare DNS</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-cloudflare" style="color: var(--warning); margin-right: 6px;"></i>Cloudflare DNS</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div>
                                 <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">API Token</label>
@@ -1447,7 +1507,7 @@
 
                     <!-- Email to Chat -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fas fa-envelope" style="color: #f59e0b; margin-right: 6px;"></i>Email → Chat</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fas fa-envelope" style="color: var(--warning); margin-right: 6px;"></i>Email → Chat</h4>
                         <div>
                             <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Webhook Secret (optional)</label>
                             <input type="text" name="inbound_email_secret" value="{{ $settings['inbound_email_secret'] ?? '' }}" placeholder="Secret to validate inbound emails" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; color: var(--text-primary);">
@@ -1457,7 +1517,7 @@
 
                     <!-- SMS -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fas fa-sms" style="color: #f59e0b; margin-right: 6px;"></i>SMS (Twilio)</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fas fa-sms" style="color: var(--warning); margin-right: 6px;"></i>SMS (Twilio)</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div>
                                 <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Account SID</label>
@@ -1473,14 +1533,14 @@
                             </div>
                             <div>
                                 <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Enable SMS</label>
-                                <input type="checkbox" name="sms_enabled" value="1" {{ ($settings['sms_enabled'] ?? '') ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: #f59e0b;">
+                                <input type="checkbox" name="sms_enabled" value="1" {{ ($settings['sms_enabled'] ?? '') ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: var(--warning);">
                             </div>
                         </div>
                     </div>
 
                     <!-- Slack / Discord -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-slack" style="color: #4a154b; margin-right: 6px;"></i>Slack / Discord Alerts</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-slack" style="color: var(--admin-purple); margin-right: 6px;"></i>Slack / Discord Alerts</h4>
                         <div>
                             <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Slack Webhook URL</label>
                             <input type="text" name="slack_webhook_url" value="{{ $settings['slack_webhook_url'] ?? '' }}" placeholder="https://hooks.slack.com/services/..." style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; color: var(--text-primary);">
@@ -1494,7 +1554,7 @@
 
                     <!-- Google Calendar -->
                     <div style="padding: 16px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-google" style="color: #4285f4; margin-right: 6px;"></i>Google Calendar</h4>
+                        <h4 style="font-weight: 700; margin-bottom: 12px; color: var(--text-primary);"><i class="fab fa-google" style="color: var(--accent); margin-right: 6px;"></i>Google Calendar</h4>
                         <div>
                             <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Calendar ID</label>
                             <input type="text" name="google_calendar_id" value="{{ $settings['google_calendar_id'] ?? '' }}" placeholder="primary or your-calendar-id@group.calendar.google.com" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; color: var(--text-primary);">
@@ -1514,7 +1574,6 @@
             </div>
         </form>
     </div>
-</div>
 
 <script>
 function showTab(tabName) {
@@ -1525,21 +1584,14 @@ function showTab(tabName) {
 
     // Remove active class from all tabs
     document.querySelectorAll('.settings-tab').forEach(tab => {
-        tab.style.background = 'var(--bg-tertiary)';
-        tab.style.border = '1px solid var(--border-color)';
-        tab.style.color = 'var(--text-secondary)';
-        tab.style.fontWeight = '500';
+        tab.classList.remove('active');
     });
 
     // Show selected content
     document.getElementById(tabName).style.display = 'block';
 
     // Add active class to clicked tab
-    const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
-    activeTab.style.background = '#00b7ff';
-    activeTab.style.border = 'none';
-    activeTab.style.color = '#000000';
-    activeTab.style.fontWeight = '600';
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 }
 </script>
 @endsection
