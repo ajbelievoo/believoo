@@ -2,29 +2,31 @@
 @section('title', 'File Manager')
 @section('content')
 <div class="flex flex-col h-[calc(100vh-140px)]">
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
         <h3 class="font-bold text-xl"><i class="fas fa-folder-open mr-2 text-cyan-400"></i>File Manager</h3>
-        <form method="POST" action="{{ route('bconnect.files.store') }}" enctype="multipart/form-data" class="flex gap-2">@csrf
-            <select name="project_id" class="bg-slate-800 border border-slate-600 rounded-lg text-sm p-2 text-white"><option value="">No Project</option>@foreach($projects as $p)<option value="{{ $p->id }}">{{ $p->name }}</option>@endforeach</select>
-            <input type="file" name="file" required class="text-sm text-slate-400">
-            <button type="submit" class="px-4 py-2 bg-cyan-500 text-slate-900 font-bold rounded-lg hover:bg-cyan-400">Upload</button>
+        <form method="POST" action="{{ route('bconnect.files.store') }}" enctype="multipart/form-data" class="flex flex-wrap gap-2">@csrf
+            <select name="project_id" class="bc-input text-sm py-2 w-auto"><option value="">No Project</option>@foreach($projects as $p)<option value="{{ $p->id }}">{{ $p->name }}</option>@endforeach</select>
+            <input type="file" name="file" required class="text-sm text-slate-400 self-center">
+            <button type="submit" class="bc-btn bc-btn-primary text-sm"><i class="fas fa-upload mr-1"></i>Upload</button>
         </form>
     </div>
-    <div class="bg-slate-900 rounded-xl border border-slate-800 p-6 flex-1 overflow-auto">
-        <table class="w-full text-sm">
-            <thead><tr class="text-left text-slate-400 border-b border-slate-700"><th>Name</th><th>Project</th><th>Size</th><th>By</th><th>Action</th></tr></thead>
-            <tbody>
-                @forelse($files as $f)
-                <tr class="border-b border-slate-800">
-                    <td class="py-3"><a href="{{ Storage::url($f->path) }}" target="_blank" class="text-cyan-400 hover:underline">{{ $f->name }}</a></td>
-                    <td>{{ $f->project?->name ?? '—' }}</td>
-                    <td>{{ number_format($f->size / 1024, 2) }} KB</td>
-                    <td>{{ $f->member->user->name }}</td>
-                    <td><form method="POST" action="{{ route('bconnect.files.destroy', $f->id) }}" onsubmit="return confirm('Delete?')">@csrf @method('DELETE')<button class="text-red-400 text-xs"><i class="fas fa-trash"></i></button></form></td>
-                </tr>
-                @empty<tr><td colspan="5" class="py-6 text-center text-slate-500">No files uploaded.</td></tr>@endforelse
-            </tbody>
-        </table>
+    <div class="bc-card flex-1 overflow-auto p-4 md:p-6">
+        <div class="overflow-x-auto">
+            <table class="bc-table min-w-[600px]">
+                <thead><tr><th>Name</th><th>Project</th><th>Size</th><th>By</th><th>Action</th></tr></thead>
+                <tbody>
+                    @forelse($files as $f)
+                    <tr>
+                        <td><a href="{{ Storage::url($f->path) }}" target="_blank" class="text-cyan-400 hover:underline font-medium">{{ $f->name }}</a></td>
+                        <td class="text-slate-400">{{ $f->project?->name ?? '—' }}</td>
+                        <td class="text-slate-400">{{ number_format($f->size / 1024, 2) }} KB</td>
+                        <td class="text-slate-400">{{ $f->member->user->name }}</td>
+                        <td><form method="POST" action="{{ route('bconnect.files.destroy', $f->id) }}" onsubmit="return confirm('Delete?')">@csrf @method('DELETE')<button class="text-red-400 hover:text-red-300 text-xs"><i class="fas fa-trash"></i></button></form></td>
+                    </tr>
+                    @empty<tr><td colspan="5" class="bc-empty">No files uploaded.</td></tr>@endforelse
+                </tbody>
+            </table>
+        </div>
         {{ $files->links() }}
     </div>
 </div>
