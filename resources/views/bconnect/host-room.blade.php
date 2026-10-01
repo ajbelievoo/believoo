@@ -77,6 +77,14 @@ function dbg(step) {
 function whisper(evt, data) { try { channel.whisper(evt, data); } catch (e) { console.warn(e); } }
 
 document.getElementById('shareBtn').addEventListener('click', async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        setStatus('Browser screen share not supported on this device', 'bc-badge-amber');
+        document.getElementById('previewPlaceholder').innerHTML =
+            '<i class="fab fa-android text-4xl mb-3 text-green-500"></i>' +
+            '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
+            '<p class="text-xs text-slate-500 mt-1">Install the <a href="/remote/agent" class="text-cyan-400 underline">BMyDesk Agent app</a> on this device to host from it — or open this page on a computer.</p>';
+        return;
+    }
     try {
         stream = await navigator.mediaDevices.getDisplayMedia({
             video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },

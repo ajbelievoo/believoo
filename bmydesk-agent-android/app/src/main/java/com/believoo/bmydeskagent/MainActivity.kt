@@ -166,6 +166,12 @@ class MainActivity : Activity() {
         }
         col.addView(endBtn)
 
+        col.addView(TextView(this).apply {
+            text = "v" + BuildConfig.VERSION_NAME
+            setTextColor(Color.parseColor("#475569")); textSize = 10f; gravity = Gravity.CENTER
+            setPadding(0, 20, 0, 0)
+        })
+
         setContentView(root)
     }
 
