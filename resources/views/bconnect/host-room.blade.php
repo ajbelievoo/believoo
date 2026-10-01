@@ -58,7 +58,7 @@
 <script>
 const CODE = @json($session->session_code);
 const channelName = 'remote-agent.' + CODE;
-const END_URL = @json(route('bconnect.remote.code.end', CODE));
+const END_URL = @json(route('bconnect.remote.code.end', $session->session_code));
 const backUrl = @json(route('bconnect.remote.connect'));
 
 let pc = null, stream = null, channel = null, iceQueue = [];
