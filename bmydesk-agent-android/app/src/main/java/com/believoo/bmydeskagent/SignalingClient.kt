@@ -30,6 +30,9 @@ class SignalingClient(
         fun onJoinRequest(name: String)
         fun onSignal(payload: JsonObject)
         fun onEnd()
+        fun onSubscribed() {}
+        fun onJoinAccept() {}
+        fun onJoinReject() {}
     }
 
     private val gson = Gson()
@@ -66,11 +69,13 @@ class SignalingClient(
                 val data = gson.fromJson(event.data ?: "{}", JsonObject::class.java)
                 when (event.eventName) {
                     "client-join-request" -> listener?.onJoinRequest(data.get("name")?.asString ?: "Someone")
+                    "client-join-accept" -> listener?.onJoinAccept()
+                    "client-join-reject" -> listener?.onJoinReject()
                     "client-signal" -> listener?.onSignal(data)
                     "client-end" -> listener?.onEnd()
                 }
             }
-            override fun onSubscriptionSucceeded(channelName: String?) {}
+            override fun onSubscriptionSucceeded(channelName: String?) { listener?.onSubscribed() }
             override fun onAuthenticationFailure(message: String?, e: Exception?) {}
         })
     }

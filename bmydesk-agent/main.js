@@ -53,6 +53,12 @@ ipcMain.handle('get-screen-sources', async () => {
     return sources.map(s => ({ id: s.id, name: s.name, thumbnail: s.thumbnail.toDataURL() }));
 });
 
+ipcMain.handle('set-view-mode', (_e, on) => {
+    if (!win) return;
+    if (on) { win.setResizable(true); win.setSize(1100, 720); win.center(); }
+    else { win.setResizable(false); win.setSize(460, 640); }
+});
+
 ipcMain.handle('open-external', async (_e, url) => {
     if (typeof url === 'string' && /^https:\/\/([a-z0-9-]+\.)*believoo\.com\//.test(url)) {
         await shell.openExternal(url);

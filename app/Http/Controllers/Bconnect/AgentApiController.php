@@ -25,6 +25,12 @@ class AgentApiController extends Controller
         return $token && hash_equals((string) $session->agent_token, (string) $token);
     }
 
+    protected function checkViewerToken(Request $r, RemoteSession $session): bool
+    {
+        $token = $r->bearerToken() ?: $r->input('agent_token');
+        return $token && $session->viewer_token && hash_equals((string) $session->viewer_token, (string) $token);
+    }
+
     // POST /api/v1/bmydesk/agent/register — desktop agent calls this to get a session code
     public function register(Request $r)
     {
@@ -78,6 +84,38 @@ class AgentApiController extends Controller
         ]);
     }
 
+    // POST /api/v1/bmydesk/agent/{code}/join — an agent app joining ANOTHER
+    // session as viewer (AnyDesk "remote desk" box). Issues a short-lived
+    // viewer token; the host still has to accept the join-request.
+    public function join(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || $session->status === 'expired' || $session->status === 'ended'
+            || ($session->expires_at && $session->expires_at->isPast())) {
+            return response()->json(['ok' => false, 'error' => 'invalid or expired code'], 404);
+        }
+
+        // One viewer at a time: refuse if a viewer joined within the last 2 min
+        if ($session->viewer_token && $session->viewer_joined_at
+            && $session->viewer_joined_at->gt(now()->subMinutes(2))) {
+            return response()->json(['ok' => false, 'error' => 'session busy — a viewer is already connected'], 409);
+        }
+
+        $session->update([
+            'viewer_token' => Str::random(48),
+            'viewer_joined_at' => now(),
+            'status' => $session->status === 'waiting' ? 'connecting' : $session->status,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'viewer_token' => $session->viewer_token,
+            'channel' => 'private-remote-agent.' . $session->session_code,
+            'host_label' => $session->host_label,
+            'ice_servers' => \App\Services\TurnCredentialService::iceServers('agentv-' . $session->id),
+        ]);
+    }
+
     // GET /api/v1/bmydesk/agent/{code}/status — agent polls waiting/connected state
     public function status(Request $r, string $code)
     {
@@ -117,7 +155,8 @@ class AgentApiController extends Controller
             return response()->json(['ok' => false, 'error' => 'bad channel'], 403);
         }
         $session = $this->findByCode($m[1]);
-        if (!$session || !$this->checkToken($r, $session) || $session->status === 'expired' || $session->status === 'ended') {
+        if (!$session || !($this->checkToken($r, $session) || $this->checkViewerToken($r, $session))
+            || $session->status === 'expired' || $session->status === 'ended') {
             return response()->json(['ok' => false, 'error' => 'invalid token'], 403);
         }
 

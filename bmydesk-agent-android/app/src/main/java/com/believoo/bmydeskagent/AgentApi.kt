@@ -54,6 +54,23 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         }.getOrNull()
     }
 
+    data class JoinResult(val viewerToken: String, val channel: String, val hostLabel: String?, val iceServers: com.google.gson.JsonArray?)
+
+    /** Join another session as a viewer (agent-to-agent remote). Throws on error. */
+    fun join(code: String): JoinResult {
+        val req = Request.Builder().url("$base/$code/join").post("{}".toRequestBody(json)).build()
+        http.newCall(req).execute().use { res ->
+            val obj = gson.fromJson(res.body!!.string(), JsonObject::class.java)
+            if (!obj.get("ok").asBoolean) throw RuntimeException(obj.get("error")?.asString ?: "join failed")
+            return JoinResult(
+                viewerToken = obj.get("viewer_token").asString,
+                channel = obj.get("channel").asString,
+                hostLabel = obj.get("host_label")?.asString,
+                iceServers = obj.getAsJsonArray("ice_servers"),
+            )
+        }
+    }
+
     fun status(code: String, token: String): JsonObject? {
         val req = Request.Builder().url("$base/$code/status")
             .header("Authorization", "Bearer $token").build()

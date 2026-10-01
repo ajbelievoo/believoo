@@ -43,6 +43,14 @@ class MainActivity : Activity() {
     private var pendingProjection = false
     private var waitingOfferSdp: String? = null
 
+    // Viewer mode (Remote Desk — connect to another code)
+    private val vSignaling = SignalingClient()
+    private var remoteViewer: RemoteViewer? = null
+    private var remoteSurface: org.webrtc.SurfaceViewRenderer? = null
+    private lateinit var remoteCodeInput: android.widget.EditText
+    private lateinit var viewerPane: android.widget.FrameLayout
+    private lateinit var viewerStatus: TextView
+
     private val conn = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             service = (binder as ScreenShareService.LocalBinder).service
@@ -110,13 +118,15 @@ class MainActivity : Activity() {
         val rose = Color.parseColor("#fb7185")
         val green = Color.parseColor("#22c55e")
 
-        val root = ScrollView(this).apply { setBackgroundColor(bg) }
+        val frame = android.widget.FrameLayout(this).apply { setBackgroundColor(bg) }
+        val scroll = ScrollView(this)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(48, 60, 48, 40)
         }
-        root.addView(col)
+        scroll.addView(col)
+        frame.addView(scroll)
 
         col.addView(TextView(this).apply {
             text = "BMyDesk Agent"
@@ -174,6 +184,39 @@ class MainActivity : Activity() {
         card.addView(reqBox)
         col.addView(card)
 
+        // ── Remote desk: enter a partner code to view + control them ──
+        val remoteCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 28, 32, 28)
+            background = GradientDrawable().apply { setColor(panel); cornerRadius = 36f }
+        }
+        remoteCard.addView(TextView(this).apply {
+            text = "REMOTE DESK"
+            setTextColor(Color.parseColor("#64748b")); textSize = 11f; letterSpacing = 0.2f
+        })
+        remoteCard.addView(TextView(this).apply {
+            text = "Enter a partner code to view & control"
+            setTextColor(Color.parseColor("#94a3b8")); textSize = 12f; setPadding(0, 4, 0, 14)
+        })
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        remoteCodeInput = android.widget.EditText(this).apply {
+            hint = "ABC123XY"
+            setTextColor(rose); textSize = 17f; typeface = Typeface.MONOSPACE
+            setHintTextColor(Color.parseColor("#475569"))
+            filters = arrayOf(android.text.InputFilter.AllCaps(), android.text.InputFilter.LengthFilter(8))
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setPadding(20, 12, 20, 12)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
+        }
+        row.addView(remoteCodeInput)
+        row.addView(Button(this).apply {
+            text = "Connect"
+            setOnClickListener { connectRemote() }
+        })
+        remoteCard.addView(row)
+        col.addView(remoteCard)
+
         col.addView(TextView(this).apply {
             text = "Viewer enters this code at\nbmydesk.believoo.com → Remote → Connect"
             setTextColor(Color.parseColor("#64748b")); textSize = 12f; gravity = Gravity.CENTER
@@ -186,13 +229,33 @@ class MainActivity : Activity() {
         }
         col.addView(endBtn)
 
+        // ── Fullscreen viewer pane (remote screen + touch control) ──
+        viewerPane = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK); visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+        }
+        remoteSurface = org.webrtc.SurfaceViewRenderer(this)
+        viewerPane.addView(remoteSurface, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
+        val vBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(20, 10, 20, 10); setBackgroundColor(Color.parseColor("#0f172a"))
+        }
+        viewerStatus = TextView(this).apply { text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 12f }
+        vBar.addView(viewerStatus, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        vBar.addView(Button(this).apply { text = "Disconnect"; setOnClickListener { exitViewer() } })
+        viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP))
+        frame.addView(viewerPane)
+
         col.addView(TextView(this).apply {
             text = "v" + BuildConfig.VERSION_NAME
             setTextColor(Color.parseColor("#475569")); textSize = 10f; gravity = Gravity.CENTER
             setPadding(0, 20, 0, 0)
         })
 
-        setContentView(root)
+        setContentView(frame)
     }
 
     private fun ui(block: () -> Unit) = runOnUiThread(block)
@@ -296,8 +359,112 @@ class MainActivity : Activity() {
         setStatus("Session ended", "#f59e0b")
     }
 
+    // ── Remote Desk (viewer): join another device's session ────────
+    private var vJoin: AgentApi.JoinResult? = null
+
+    private fun connectRemote() {
+        val code = remoteCodeInput.text.toString().trim().uppercase()
+        if (code.length < 6) { remoteCodeInput.requestFocus(); return }
+        ui {
+            viewerPane.visibility = View.VISIBLE
+            viewerStatus.text = "Joining $code…"
+        }
+        thread {
+            try {
+                val j = api.join(code)
+                vJoin = j
+                vSignaling.listener = object : SignalingClient.Listener {
+                    override fun onConnected() {}
+                    override fun onDisconnected() {}
+                    override fun onJoinRequest(name: String) {}
+                    override fun onSubscribed() {
+                        vSignaling.send("join-request", JsonObject().apply {
+                            addProperty("name", (android.os.Build.MODEL ?: "Android") + " (app)")
+                        })
+                        ui { viewerStatus.text = "Waiting for host approval…" }
+                    }
+                    override fun onJoinAccept() {
+                        ui { viewerStatus.text = "Accepted — starting stream…" }
+                        startViewerPeer(j)
+                    }
+                    override fun onJoinReject() {
+                        ui { viewerStatus.text = "Host declined"; }
+                        thread { Thread.sleep(1500); ui { exitViewer() } }
+                    }
+                    override fun onSignal(p: JsonObject) { remoteViewer?.onSignal(p) }
+                    override fun onEnd() { ui { viewerStatus.text = "Host ended session"; thread { Thread.sleep(1200); ui { exitViewer() } } } }
+                }
+                vSignaling.connect(j.channel, j.viewerToken)
+            } catch (e: Exception) {
+                ui { viewerStatus.text = "Join failed: ${e.message}"; }
+                thread { Thread.sleep(2500); ui { exitViewer() } }
+            }
+        }
+    }
+
+    private fun startViewerPeer(j: AgentApi.JoinResult) {
+        remoteViewer = RemoteViewer(this).apply {
+            listener = object : RemoteViewer.Listener {
+                override fun sendSignal(payload: JsonObject) = vSignaling.send("signal", payload)
+                override fun onPeerConnected() = ui { viewerStatus.text = "Connected — touch to control" }
+                override fun onPeerDisconnected() = ui { viewerStatus.text = "Disconnected" }
+                override fun onTrack(track: org.webrtc.VideoTrack) = ui {
+                    remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, null)
+                    remoteSurface!!.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+                    track.addSink(remoteSurface)
+                    bindViewerTouch()
+                    viewerStatus.text = "Live — touch to control"
+                }
+                override fun onError(message: String) = ui { viewerStatus.text = message }
+            }
+        }
+        remoteViewer!!.start(iceServersFrom(j.iceServers))
+    }
+
+    // Touch → input events (same JSON protocol as the web/Electron viewer)
+    private var touchMoved = false
+    private var lastMove = 0L
+    private fun bindViewerTouch() {
+        remoteSurface?.setOnTouchListener { _, ev ->
+            val w = remoteSurface!!.width.toFloat().coerceAtLeast(1f)
+            val h = remoteSurface!!.height.toFloat().coerceAtLeast(1f)
+            when (ev.action) {
+                android.view.MotionEvent.ACTION_DOWN -> touchMoved = false
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    touchMoved = true
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastMove >= 33) {
+                        lastMove = now
+                        remoteViewer?.sendInput(JsonObject().apply {
+                            addProperty("t", "move"); addProperty("x", ev.x / w); addProperty("y", ev.y / h)
+                        })
+                    }
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (!touchMoved) { // tap = left click
+                        remoteViewer?.sendInput(JsonObject().apply {
+                            addProperty("t", "move"); addProperty("x", ev.x / w); addProperty("y", ev.y / h)
+                        })
+                        remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "down"); addProperty("b", 0) })
+                        remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "up"); addProperty("b", 0) })
+                    }
+                }
+            }
+            true
+        }
+    }
+
+    private fun exitViewer() {
+        runCatching { vSignaling.send("end", JsonObject()) }
+        remoteViewer?.stop(); remoteViewer = null
+        vSignaling.disconnect()
+        runCatching { remoteSurface?.release() }
+        viewerPane.visibility = View.GONE
+    }
+
     override fun onDestroy() {
         runCatching { endSession() }
+        runCatching { exitViewer() }
         signaling.disconnect()
         super.onDestroy()
     }

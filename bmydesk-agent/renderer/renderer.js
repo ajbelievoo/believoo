@@ -204,8 +204,138 @@ $('endBtn').onclick = async () => {
 
 window.addEventListener('beforeunload', () => {
     try { ch?.trigger('client-end', {}); } catch (e) {}
+    try { vCh?.trigger('client-end', {}); } catch (e) {}
     try { if (session) navigator.sendBeacon(API + '/' + session.session_code + '/end', new Blob([JSON.stringify({agent_token: session.agent_token})], {type:'application/json'})); } catch (e) {}
 });
+
+// ═══════════ VIEWER MODE — connect to a partner's code (Remote Desk) ═══════════
+let vCh = null, vPc = null, vDc = null, vJoinedCode = null;
+
+function vStatus(t) { $('viewerStatus').textContent = t; }
+
+function newPusher(opts = {}) {
+    return new Pusher(REVERB_KEY, Object.assign({
+        cluster: 'mt1', wsHost: REVERB_HOST, wssPort: REVERB_PORT,
+        forceTLS: true, enabledTransports: ['wss'],
+    }, opts));
+}
+
+async function connectToPartner() {
+    const code = $('remoteCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 6) { $('remoteCode').focus(); return; }
+    $('connectBtn').disabled = true;
+
+    $('viewerPane').classList.remove('hidden');
+    $('viewerOverlay').classList.remove('hidden');
+    window.agent.setViewMode(true);
+    vStatus('Joining ' + code + '…');
+
+    try {
+        const r = await fetch(API + '/' + code + '/join', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: '{}',
+        });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'join failed');
+        vJoinedCode = code;
+        const vToken = d.viewer_token;
+        if (Array.isArray(d.ice_servers) && d.ice_servers.length) pcConfig = { iceServers: d.ice_servers };
+
+        const p2 = newPusher({
+            authorizer: () => ({
+                authorize: (socketId, callback) => {
+                    fetch(API + '/broadcast-auth', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ socket_id: socketId, channel_name: 'private-remote-agent.' + code, agent_token: vToken }),
+                    }).then(x => x.json()).then(d2 => d2.auth ? callback(null, d2) : callback(new Error(d2.error || 'auth'), null))
+                      .catch(e => callback(e, null));
+                },
+            }),
+        });
+        vCh = p2.subscribe('private-remote-agent.' + code);
+
+        vCh.bind('pusher:subscription_succeeded', () => {
+            vStatus('Waiting for host approval…');
+            vCh.trigger('client-join-request', { name: require_os_name() + ' (agent)' });
+        });
+        vCh.bind('pusher:subscription_error', () => { vStatus('Channel auth failed'); exitViewer(3000); });
+        vCh.bind('client-join-accept', () => startViewerPeer());
+        vCh.bind('client-join-reject', () => { vStatus('Host declined the request'); exitViewer(2500); });
+        vCh.bind('client-signal', async (m) => {
+            if (!vPc) return;
+            try {
+                if (m.kind === 'answer') await vPc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+                else if (m.kind === 'ice' && m.candidate) await vPc.addIceCandidate(m.candidate).catch(() => {});
+            } catch (e) { console.error(e); }
+        });
+        vCh.bind('client-end', () => { vStatus('Session ended by host'); exitViewer(2000); });
+    } catch (e) {
+        vStatus('Join failed: ' + (e.message || e));
+        exitViewer(3000);
+    } finally {
+        $('connectBtn').disabled = false;
+    }
+}
+
+async function startViewerPeer() {
+    vStatus('Accepted — starting stream…');
+    vPc = new RTCPeerConnection(pcConfig);
+    vDc = vPc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
+
+    vPc.ontrack = (e) => {
+        $('remoteVideo').srcObject = e.streams[0];
+        $('viewerOverlay').classList.add('hidden');
+        vStatus('Connected — move & click to control');
+    };
+    vPc.onicecandidate = (e) => { if (e.candidate) vCh.trigger('client-signal', { kind: 'ice', candidate: e.candidate }); };
+    vPc.onconnectionstatechange = () => {
+        if (vPc.connectionState === 'connected') vStatus('Connected');
+        if (vPc.connectionState === 'failed') vStatus('Connection failed — retry');
+        if (['disconnected', 'closed'].includes(vPc.connectionState)) vStatus('Disconnected');
+    };
+
+    const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
+    await vPc.setLocalDescription(offer);
+    vCh.trigger('client-signal', { kind: 'offer', sdp: vPc.localDescription.sdp });
+}
+
+// Input capture on the remote video → host's DataChannel handler
+function bindViewerInput() {
+    const v = $('remoteVideo');
+    const send = (o) => { if (vDc && vDc.readyState === 'open') { try { vDc.send(JSON.stringify(o)); } catch (e) {} } };
+    let last = 0;
+    v.addEventListener('mousemove', (e) => {
+        const n = performance.now(); if (n - last < 33) return; last = n;
+        const r = v.getBoundingClientRect();
+        send({ t: 'move', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+    });
+    v.addEventListener('mousedown', (e) => { e.preventDefault(); send({ t: 'down', b: e.button }); });
+    v.addEventListener('mouseup', (e) => send({ t: 'up', b: e.button }));
+    v.addEventListener('wheel', (e) => { e.preventDefault(); send({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
+    v.addEventListener('contextmenu', (e) => e.preventDefault());
+    v.tabIndex = 0;
+    v.addEventListener('keydown', (e) => { e.preventDefault(); send({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
+    v.addEventListener('keyup', (e) => { e.preventDefault(); send({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
+    v.addEventListener('click', () => v.focus());
+}
+
+function exitViewer(delay = 0) {
+    const doIt = () => {
+        try { vCh?.trigger('client-end', {}); } catch (e) {}
+        if (vPc) { try { vPc.close(); } catch (e) {} vPc = null; }
+        vDc = null; vCh = null; vJoinedCode = null;
+        $('viewerPane').classList.add('hidden');
+        $('remoteVideo').srcObject = null;
+        window.agent.setViewMode(false);
+    };
+    delay ? setTimeout(doIt, delay) : doIt();
+}
+
+$('connectBtn').addEventListener('click', connectToPartner);
+$('remoteCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') connectToPartner(); });
+$('viewerEnd').addEventListener('click', () => exitViewer());
+bindViewerInput();
 
 register();
 checkUpdate();

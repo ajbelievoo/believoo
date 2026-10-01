@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('agent', {
     getDisplaySize: () => ipcRenderer.invoke('get-display-size'),
     sendInput: (msg) => ipcRenderer.send('input-event', msg),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
+    setViewMode: (on) => ipcRenderer.invoke('set-view-mode', on),
     platform: process.platform,
 });
