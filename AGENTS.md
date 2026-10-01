@@ -175,3 +175,13 @@ Examples:
   - DB `settings`: meta_title/meta_description/meta_keywords no longer mention "Live Streaming" or brand names.
 - Checkout already charges INR (`PaymentController` converts USD→INR via `ExchangeRate::getUsdToInrRate()` × 1.18 GST).
 - After approval: revert PAYU-REVIEW blocks, restore meta in Admin → Site Settings.
+
+## BMyDesk Remote Desktop (AnyDesk-style, added 2026-10-01)
+
+- **Code-based sessions**: host gets an 8-char code (`BMyDesk Agent` app or "Share my screen" browser host), viewer enters it at `/remote/connect`. Signaling over Reverb private channel `remote-agent.{code}` (client events). Stream is **P2P WebRTC** (no Agora for remote).
+- **Agent API** (public, rate-limited): `POST /api/v1/bmydesk/agent/register` → code + `agent_token`; `GET .../status`; `POST .../end`; `POST .../broadcast-auth` (signs Reverb channel auth manually — agents have no user account).
+- **TURN relay**: coturn on `139.99.43.203:3478` (UDP+TCP), `use-auth-secret` mode. `App\Services\TurnCredentialService::iceServers()` issues 24h creds (username `<expiry>:<label>`, base64 hmac-sha1). Config keys `TURN_HOST`/`TURN_SECRET` → `config/services.php` (`services.turn.*`). DNS `turn.believoo.com` A record exists (grey cloud).
+- **Plan gating**: `remote` (view/connect) = all plans incl. free; `remote_control` (input injection) = pro/enterprise via `BconnectPlanService::canUseRemoteControl`.
+- **Electron agent**: source in `bmydesk-agent/` (register → Reverb → WebRTC answer → DataChannel input → `@nut-tree-fork/nut-js` OS injection). NOTE: package is `@nut-tree-fork/nut-js` — `@nut-tree/nut-js` is 404.
+- **Windows builds**: built on the IyolMe build server (`/opt/build/apps/bmydesk-agent`, wine32+wine64 installed; NSIS + zip targets work). `rcedit-ia32.exe` in `~/.cache/electron-builder/winCodeSign` was replaced with the x64 binary (wine64-only fix). Artifacts served from `public/downloads/` (gitignored).
+- Unsigned build — Windows SmartScreen warning is expected until code signing cert is added.
