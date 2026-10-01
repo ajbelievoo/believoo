@@ -102,4 +102,90 @@ class RemoteController extends Controller {
         if ($session->status != 'active') return redirect()->route('bconnect.remote')->with('error', 'Session not active');
         return view('bconnect.remote-room', compact('session'));
     }
+
+    // ── AnyDesk-style code flow ────────────────────────────────────
+
+    // GET /remote/connect — viewer enters the host's session code
+    public function connect(Request $r) {
+        return view('bconnect.remote-connect');
+    }
+
+    // POST /remote/join — resolve code and open the viewer room
+    public function joinByCode(Request $r) {
+        $data = $r->validate(['code' => 'required|string|max:20']);
+        $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $data['code']));
+        $session = RemoteSession::where('session_code', $code)->first();
+
+        if (!$session) {
+            return back()->with('error', 'Invalid code. Check the code shown on the host device.');
+        }
+        if (in_array($session->status, ['ended', 'rejected', 'expired'])) {
+            return back()->with('error', 'This session has ended. Ask the host for a new code.');
+        }
+        if ($session->expires_at && $session->expires_at->isPast() && in_array($session->status, ['waiting', 'pending'])) {
+            $session->update(['status' => 'expired']);
+            return back()->with('error', 'This code has expired. Ask the host for a new code.');
+        }
+        return redirect()->route('bconnect.remote.code', $code);
+    }
+
+    // GET /remote/code/{code} — viewer room for code sessions
+    public function codeRoom(Request $r, string $code) {
+        $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $code));
+        $session = RemoteSession::where('session_code', $code)->firstOrFail();
+        if (in_array($session->status, ['ended', 'rejected', 'expired'])) {
+            return redirect()->route('bconnect.remote.connect')->with('error', 'This session has ended.');
+        }
+        $member = $r->input('bconnect_member');
+        if ($session->viewer_member_id === null) {
+            $session->update(['viewer_member_id' => $member->id, 'status' => 'connecting']);
+        } elseif ($session->viewer_member_id !== $member->id && $session->requested_by !== $member->id) {
+            return redirect()->route('bconnect.remote.connect')->with('error', 'This session already has a connected viewer.');
+        }
+        return view('bconnect.agent-room', [
+            'session' => $session,
+            'viewerName' => $r->input('bconnect_member')->user->name ?? 'Viewer',
+            'viewerId' => $r->input('bconnect_member')->id,
+        ]);
+    }
+
+    // POST /remote/host/start — browser host: share screen via a code (no agent needed)
+    public function hostStart(Request $r) {
+        $this->ensureRemote($r->input('bconnect_company_id'));
+        do {
+            $code = strtoupper(Str::random(3) . rand(100, 999) . Str::random(2));
+        } while (RemoteSession::where('session_code', $code)->exists());
+
+        $session = RemoteSession::create([
+            'company_id' => $r->input('bconnect_company_id'),
+            'requested_by' => $r->input('bconnect_member')->id,
+            'host_kind' => 'member',
+            'host_label' => $r->input('bconnect_member')->user->name ?? 'Member',
+            'session_code' => $code,
+            'status' => 'waiting',
+            'permission' => 'view',
+            'expires_at' => now()->addMinutes(60),
+        ]);
+        return response()->json(['ok' => true, 'code' => $code, 'url' => route('bconnect.remote.host', $code)]);
+    }
+
+    // GET /remote/host/{code} — browser host room (shows code + waits for viewer)
+    public function hostRoom(Request $r, string $code) {
+        $this->ensureRemote($r->input('bconnect_company_id'));
+        $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $code));
+        $session = RemoteSession::where('session_code', $code)
+            ->where('requested_by', $r->input('bconnect_member')->id)
+            ->firstOrFail();
+        return view('bconnect.host-room', compact('session'));
+    }
+
+    // POST /remote/code/{code}/end — either side ends a code session
+    public function endByCode(Request $r, string $code) {
+        $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $code));
+        $session = RemoteSession::where('session_code', $code)->firstOrFail();
+        $memberId = $r->input('bconnect_member')->id;
+        if (!in_array($memberId, [$session->requested_by, $session->viewer_member_id])) abort(403);
+        $session->update(['status' => 'ended', 'ended_at' => now()]);
+        return response()->json(['ok' => true]);
+    }
 }

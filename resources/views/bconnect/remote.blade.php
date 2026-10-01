@@ -1,6 +1,17 @@
 @extends('bconnect.layout')
 @section('title', 'Remote Desktop')
 @section('content')
+<div class="bc-card p-6 mb-6 flex flex-col md:flex-row items-center gap-5" style="background:linear-gradient(135deg,rgba({{ $bconnectBrand['brand_rgb'] }},0.10),transparent 60%);">
+    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style="background:rgba({{ $bconnectBrand['brand_rgb'] }},0.15);">
+        <i class="fas fa-plug text-2xl" style="color:var(--bc-cyan)"></i>
+    </div>
+    <div class="flex-1 text-center md:text-left">
+        <h3 class="font-black text-lg">Connect with a Code</h3>
+        <p class="text-xs text-slate-400">AnyDesk-style: enter the code shown on the host's BMyDesk Agent or browser host page — no team invite needed.</p>
+    </div>
+    <a href="{{ route('bconnect.remote.connect') }}" class="bc-btn bc-btn-primary px-8 py-3 shrink-0"><i class="fas fa-arrow-right mr-2"></i>Connect</a>
+</div>
+
 <div class="grid lg:grid-cols-2 gap-6 mb-6">
     <div class="bc-card p-6">
         <h3 class="font-bold mb-4"><i class="fas fa-desktop mr-2 text-green-400"></i>Request Control</h3>
@@ -43,8 +54,8 @@
                 @foreach($sessions as $s)
                 <tr>
                     <td class="font-mono">{{ $s->session_code }}</td>
-                    <td>{{ $s->requester->user->name }}</td>
-                    <td>{{ $s->target->user->name }}</td>
+                    <td>{{ $s->requester?->user?->name ?? $s->host_label ?? '—' }}{{ $s->host_kind === 'agent' ? ' (agent)' : '' }}</td>
+                    <td>{{ $s->target?->user?->name ?? $s->viewer?->user?->name ?? '—' }}</td>
                     <td>{{ ucfirst($s->permission) }}</td>
                     <td><span class="bc-badge {{ $s->status == 'active' ? 'bc-badge-green' : ($s->status == 'rejected' ? 'bc-badge-red' : 'bc-badge-amber') }}">{{ ucfirst($s->status) }}</span></td>
                     <td>

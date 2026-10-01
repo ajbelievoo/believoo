@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>BMyDesk Agent</title>
+<style>
+    * { box-sizing: border-box; margin: 0; font-family: 'Segoe UI', Inter, system-ui, sans-serif; }
+    body { background: #0b1220; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; }
+    .wrap { flex: 1; display: flex; flex-direction: column; padding: 28px; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+    .brand img { height: 34px; width: auto; }
+    .code-card { background: #0f172a; border: 1px solid rgba(148,163,184,.12); border-radius: 20px; padding: 28px 20px; text-align: center; }
+    .label { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
+    .code { font-size: 44px; font-weight: 900; letter-spacing: .22em; color: #fb7185; user-select: all; }
+    .status { margin-top: 14px; font-size: 13px; color: #94a3b8; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #f59e0b; }
+    .dot.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .dot.off { background: #ef4444; }
+    .hint { font-size: 11.5px; color: #64748b; text-align: center; margin-top: 18px; line-height: 1.6; }
+    .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .screens button { background: #131c2e; border: 2px solid rgba(148,163,184,.15); border-radius: 12px; padding: 6px; cursor: pointer; color: #e2e8f0; font-size: 11px; }
+    .screens button:hover { border-color: #fb7185; }
+    .screens img { width: 100%; border-radius: 8px; display: block; }
+    .req { background: #1c1503; border: 1px solid rgba(245,158,11,.4); border-radius: 16px; padding: 16px; margin-top: 14px; text-align: center; }
+    .req b { color: #fbbf24; }
+    .req .row { display: flex; gap: 10px; margin-top: 12px; }
+    .btn { flex: 1; border: 0; border-radius: 10px; padding: 11px; font-weight: 800; font-size: 13px; cursor: pointer; }
+    .btn-accept { background: linear-gradient(135deg,#f59e0b,#e11d48,#7c3aed); color: #fff; }
+    .btn-reject { background: #1e293b; color: #e2e8f0; }
+    .btn-end { width: 100%; background: #7f1d1d; color: #fecaca; margin-top: 14px; }
+    .foot { margin-top: auto; padding-top: 16px; font-size: 10.5px; color: #475569; text-align: center; }
+    .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="brand">
+        <img id="logoImg" src="https://bmydesk.believoo.com/images/bconnect-logo.png" alt="BMyDesk" onerror="this.style.display='none'">
+        <div>
+            <div style="font-weight:900;font-size:16px;">BMyDesk Agent</div>
+            <div style="font-size:10.5px;color:#64748b;">Remote access by Believoo</div>
+        </div>
+    </div>
+
+    <div class="code-card">
+        <div class="label">Your Session Code</div>
+        <div class="code" id="code">— — —</div>
+        <div class="status"><span class="dot" id="dot"></span><span id="statusText">Registering…</span></div>
+
+        <div class="req hidden" id="reqBox">
+            <div style="font-size:13px;"><b id="reqName">Someone</b> wants to view &amp; control this device</div>
+            <div class="row">
+                <button class="btn btn-accept" id="acceptBtn">Accept</button>
+                <button class="btn btn-reject" id="rejectBtn">Reject</button>
+            </div>
+        </div>
+
+        <div class="screens hidden" id="screenPick"></div>
+    </div>
+
+    <p class="hint">Share this code with your support engineer.<br>They enter it at <b style="color:#94a3b8">bmydesk.believoo.com → Remote → Connect</b>.</p>
+
+    <button class="btn btn-end hidden" id="endBtn">End Session</button>
+
+    <div class="foot">BMyDesk Agent v1.0 · <span id="verNote">codes expire after 60 min</span></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

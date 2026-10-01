@@ -58,6 +58,12 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::get('/settings', [\App\Http\Controllers\Bconnect\SettingsController::class, 'index'])->middleware('bconnect.permission:settings.view')->name('bconnect.settings');
     Route::get('/remote', [\App\Http\Controllers\Bconnect\RemoteController::class, 'index'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote');
     Route::get('/remote/agent', [\App\Http\Controllers\Bconnect\AgentController::class, 'index'])->name('bconnect.remote.agent');
+    Route::get('/remote/connect', [\App\Http\Controllers\Bconnect\RemoteController::class, 'connect'])->name('bconnect.remote.connect');
+    Route::post('/remote/join', [\App\Http\Controllers\Bconnect\RemoteController::class, 'joinByCode'])->name('bconnect.remote.join');
+    Route::get('/remote/code/{code}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'codeRoom'])->name('bconnect.remote.code');
+    Route::post('/remote/code/{code}/end', [\App\Http\Controllers\Bconnect\RemoteController::class, 'endByCode'])->name('bconnect.remote.code.end');
+    Route::post('/remote/host/start', [\App\Http\Controllers\Bconnect\RemoteController::class, 'hostStart'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote.host.start');
+    Route::get('/remote/host/{code}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'hostRoom'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote.host');
     Route::get('/remote/{session}/room', [\App\Http\Controllers\Bconnect\RemoteController::class, 'room'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote.room');
     Route::get('/billing', [\App\Http\Controllers\Bconnect\BillingController::class, 'index'])->middleware('bconnect.permission:billing.view,invoices.view')->name('bconnect.billing');
     Route::get('/billing/upgrade', [\App\Http\Controllers\Bconnect\BillingController::class, 'upgrade'])->middleware('bconnect.permission:billing.manage')->name('bconnect.billing.upgrade');

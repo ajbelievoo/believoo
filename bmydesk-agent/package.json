@@ -1,0 +1,34 @@
+{
+    "name": "bmydesk-agent",
+    "productName": "BMyDesk Agent",
+    "version": "1.0.0",
+    "description": "BMyDesk remote desktop agent — share your screen with a session code and allow remote control.",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "pack": "electron-builder --dir",
+        "dist": "electron-builder"
+    },
+    "dependencies": {
+        "@nut-tree/nut-js": "^4.2.4",
+        "pusher-js": "^8.4.0"
+    },
+    "devDependencies": {
+        "electron": "^33.4.0",
+        "electron-builder": "^25.1.8"
+    },
+    "build": {
+        "appId": "com.believoo.bmydesk.agent",
+        "productName": "BMyDesk Agent",
+        "win": {
+            "target": "nsis"
+        },
+        "mac": {
+            "target": "dmg",
+            "category": "public.app-category.utilities"
+        },
+        "linux": {
+            "target": "AppImage"
+        }
+    }
+}

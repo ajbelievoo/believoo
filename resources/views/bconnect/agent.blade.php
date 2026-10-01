@@ -4,19 +4,19 @@
 <div class="max-w-5xl mx-auto">
     <div class="mb-8">
         <h2 class="text-2xl font-bold text-white mb-2">Remote Desktop Access</h2>
-        <p class="text-slate-400">Browser-based screen sharing works instantly. Full OS control requires the desktop agent.</p>
+        <p class="text-slate-400">AnyDesk-style access: share a session code and connect instantly — or use full OS control via the desktop agent.</p>
     </div>
 
     <div class="grid lg:grid-cols-3 gap-6 mb-8">
         <div class="bc-card p-6 lg:col-span-2">
             <div class="flex items-start gap-4 mb-6">
-                <div class="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 text-xl flex-shrink-0">
-                    <i class="fas fa-globe"></i>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style="background:rgba({{ $bconnectBrand['brand_rgb'] }},0.12);color:var(--bc-cyan);">
+                    <i class="fas fa-plug"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-white text-lg mb-1">Browser Screen Sharing</h3>
-                    <p class="text-slate-400 text-sm mb-4">Start a session from <a href="{{ route('bconnect.remote') }}" class="text-cyan-400 hover:underline">Remote</a> and share your screen without installing anything. Viewers can watch your screen in real-time.</p>
-                    <a href="{{ route('bconnect.remote') }}" class="bc-btn bc-btn-primary text-sm"><i class="fas fa-desktop mr-1"></i>Start Browser Session</a>
+                    <h3 class="font-bold text-white text-lg mb-1">Connect with a Code</h3>
+                    <p class="text-slate-400 text-sm mb-4">Enter the code shown on the host device — works with the desktop agent and browser hosts.</p>
+                    <a href="{{ route('bconnect.remote.connect') }}" class="bc-btn bc-btn-primary text-sm"><i class="fas fa-keyboard mr-1"></i>Enter Code & Connect</a>
                 </div>
             </div>
             <div class="border-t border-slate-800 pt-6">
@@ -26,11 +26,18 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-white text-lg mb-1">Full Desktop Agent</h3>
-                        <p class="text-slate-400 text-sm mb-4">Unlock full mouse and keyboard control, multi-monitor support, and background access with the Bmydesk desktop agent.</p>
+                        <p class="text-slate-400 text-sm mb-3">The BMyDesk Agent gives full mouse & keyboard control. It shows a code on the host machine — that's it.</p>
+                        <ul class="text-xs text-slate-500 space-y-1.5 mb-4">
+                            <li><i class="fas fa-check text-green-400 mr-1"></i>Screen stream + input control over P2P WebRTC (low latency)</li>
+                            <li><i class="fas fa-check text-green-400 mr-1"></i>Host approves every connection — no silent access</li>
+                            <li><i class="fas fa-check text-green-400 mr-1"></i>Codes expire after 60 minutes</li>
+                        </ul>
                         <div class="flex flex-wrap gap-3">
                             <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-windows mr-1"></i>Windows Agent (Beta)</button>
                             <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-apple mr-1"></i>macOS Agent (Beta)</button>
+                            <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-linux mr-1"></i>Linux Agent (Beta)</button>
                         </div>
+                        <p class="text-[11px] text-slate-600 mt-3">Installers ship soon — request beta access below. Meanwhile, browser host gives view-only sharing with a code.</p>
                     </div>
                 </div>
             </div>
@@ -38,14 +45,13 @@
 
         <div class="bc-card p-6">
             <h3 class="font-bold text-white mb-4"><i class="fas fa-bell mr-2 text-amber-400"></i>Request Beta Access</h3>
-            <p class="text-slate-400 text-sm mb-4">Get notified when the desktop agent is available for your workspace.</p>
+            <p class="text-slate-400 text-sm mb-4">Get notified when the desktop agent installer is ready for your workspace.</p>
             @if(session('success'))
             <div class="p-3 mb-4 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 text-sm">
                 <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
             </div>
             @endif
             <form method="POST" action="{{ route('bconnect.remote.agent.request') }}" class="space-y-4">@csrf
-                <input type="hidden" name="os" value="windows">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Operating System</label>
                     <select name="os" class="bc-input w-full" required>
@@ -65,14 +71,14 @@
 
     <div class="grid md:grid-cols-3 gap-4">
         <div class="bc-card p-5 text-center">
-            <i class="fas fa-video text-cyan-400 text-2xl mb-3"></i>
-            <h4 class="font-bold text-white mb-1">HD Screen Share</h4>
-            <p class="text-slate-400 text-sm">Share any window or entire screen in the browser.</p>
+            <i class="fas fa-bolt text-amber-400 text-2xl mb-3"></i>
+            <h4 class="font-bold text-white mb-1">P2P & Low Latency</h4>
+            <p class="text-slate-400 text-sm">Direct WebRTC stream — sub-second delay on normal networks.</p>
         </div>
         <div class="bc-card p-5 text-center">
             <i class="fas fa-lock text-green-400 text-2xl mb-3"></i>
             <h4 class="font-bold text-white mb-1">Secure Sessions</h4>
-            <p class="text-slate-400 text-sm">Each session uses a unique code and Agora encryption.</p>
+            <p class="text-slate-400 text-sm">Unique codes, host approval, encrypted media, session expiry.</p>
         </div>
         <div class="bc-card p-5 text-center">
             <i class="fas fa-history text-purple-400 text-2xl mb-3"></i>
