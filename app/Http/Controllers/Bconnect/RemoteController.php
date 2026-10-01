@@ -35,6 +35,10 @@ class RemoteController extends Controller {
             'target_id' => 'required|exists:bconnect_members,id',
             'permission' => 'nullable|in:view,control,clipboard',
         ]);
+        if (in_array($data['permission'] ?? 'view', ['control', 'clipboard'])
+            && !\App\Services\BconnectPlanService::canUseRemoteControl($r->input('bconnect_company_id'))) {
+            return back()->with('error', 'Mouse & keyboard control requires a Pro/Enterprise plan.');
+        }
 
         $target = Member::where('company_id', $r->input('bconnect_company_id'))->findOrFail($data['target_id']);
         $session = RemoteSession::create([
@@ -146,6 +150,8 @@ class RemoteController extends Controller {
             'session' => $session,
             'viewerName' => $r->input('bconnect_member')->user->name ?? 'Viewer',
             'viewerId' => $r->input('bconnect_member')->id,
+            'canControl' => \App\Services\BconnectPlanService::canUseRemoteControl($r->input('bconnect_company_id')),
+            'iceServers' => \App\Services\TurnCredentialService::iceServers('viewer-' . $member->id),
         ]);
     }
 
@@ -176,7 +182,10 @@ class RemoteController extends Controller {
         $session = RemoteSession::where('session_code', $code)
             ->where('requested_by', $r->input('bconnect_member')->id)
             ->firstOrFail();
-        return view('bconnect.host-room', compact('session'));
+        return view('bconnect.host-room', [
+            'session' => $session,
+            'iceServers' => \App\Services\TurnCredentialService::iceServers('host-' . $session->id),
+        ]);
     }
 
     // POST /remote/code/{code}/end — either side ends a code session

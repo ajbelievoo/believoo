@@ -7,7 +7,7 @@ let nut = null;
 function loadNut() {
     if (nut) return nut;
     try {
-        nut = require('@nut-tree/nut-js');
+        nut = require('@nut-tree-fork/nut-js');
         nut.mouse.config.autoDelayMs = 0;
         nut.mouse.config.mouseSpeed = 6000; // px/sec — near-instant moves
         nut.keyboard.config.autoDelayMs = 0;

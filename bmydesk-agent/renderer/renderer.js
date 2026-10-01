@@ -10,7 +10,8 @@ const REVERB_HOST = 'believoo.com';
 const REVERB_PORT = 443;
 
 const $ = (id) => document.getElementById(id);
-const pcConfig = { iceServers: [
+// ICE servers come from /register (server issues time-limited TURN creds)
+let pcConfig = { iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
 ]};
@@ -34,6 +35,9 @@ async function register() {
         const data = await r.json();
         if (!data.ok) throw new Error(data.error || 'register failed');
         session = data;
+        if (Array.isArray(data.ice_servers) && data.ice_servers.length) {
+            pcConfig = { iceServers: data.ice_servers };
+        }
         $('code').textContent = data.session_code;
         setStatus('Ready — share your code', 'wait');
         connectChannel();

@@ -54,6 +54,7 @@ class AgentApiController extends Controller
             'channel' => 'private-remote-agent.' . $code,
             'expires_at' => $session->expires_at->toIso8601String(),
             'connect_url' => 'https://bmydesk.believoo.com/remote/connect',
+            'ice_servers' => \App\Services\TurnCredentialService::iceServers('agent-' . $session->id),
         ]);
     }
 

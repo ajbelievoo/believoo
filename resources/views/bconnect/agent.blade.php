@@ -33,11 +33,12 @@
                             <li><i class="fas fa-check text-green-400 mr-1"></i>Codes expire after 60 minutes</li>
                         </ul>
                         <div class="flex flex-wrap gap-3">
-                            <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-windows mr-1"></i>Windows Agent (Beta)</button>
-                            <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-apple mr-1"></i>macOS Agent (Beta)</button>
-                            <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-linux mr-1"></i>Linux Agent (Beta)</button>
+                            <a href="/downloads/BMyDesk-Agent-Setup-1.0.0.exe" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-windows mr-1"></i>Windows Agent (Beta)</a>
+                            <a href="/downloads/BMyDesk-Agent-1.0.0-win.zip" download class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                            <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-apple mr-1"></i>macOS (Soon)</button>
+                            <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-linux mr-1"></i>Linux (Soon)</button>
                         </div>
-                        <p class="text-[11px] text-slate-600 mt-3">Installers ship soon — request beta access below. Meanwhile, browser host gives view-only sharing with a code.</p>
+                        <p class="text-[11px] text-slate-600 mt-3">v1.0.0 Beta — unsigned build, Windows may show SmartScreen (click "More info → Run anyway"). macOS/Linux installers coming.</p>
                     </div>
                 </div>
             </div>

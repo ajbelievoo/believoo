@@ -6,9 +6,9 @@ use App\Models\Bconnect\Meeting;
 use App\Models\Bconnect\Ticket;
 class BconnectPlanService {
     public static $limits = [
-        'free' => ['members' => 2, 'meetings' => 100, 'tickets' => 50, 'remote' => false, 'ai' => false, 'recording' => false, 'branding' => false],
-        'pro' => ['members' => 10, 'meetings' => null, 'tickets' => null, 'remote' => true, 'ai' => false, 'recording' => false, 'branding' => true],
-        'enterprise' => ['members' => null, 'meetings' => null, 'tickets' => null, 'remote' => true, 'ai' => true, 'recording' => true, 'branding' => true],
+        'free' => ['members' => 2, 'meetings' => 100, 'tickets' => 50, 'remote' => true, 'remote_control' => false, 'ai' => false, 'recording' => false, 'branding' => false],
+        'pro' => ['members' => 10, 'meetings' => null, 'tickets' => null, 'remote' => true, 'remote_control' => true, 'ai' => false, 'recording' => false, 'branding' => true],
+        'enterprise' => ['members' => null, 'meetings' => null, 'tickets' => null, 'remote' => true, 'remote_control' => true, 'ai' => true, 'recording' => true, 'branding' => true],
     ];
 
     public static function check($companyId, $feature) {
@@ -45,6 +45,7 @@ class BconnectPlanService {
     }
 
     public static function canUseRemote($companyId) { return self::check($companyId, 'remote'); }
+    public static function canUseRemoteControl($companyId) { return self::check($companyId, 'remote_control'); }
     public static function canUseAi($companyId) { return self::check($companyId, 'ai'); }
     public static function canUseRecording($companyId) { return self::check($companyId, 'recording'); }
     public static function canUseBranding($companyId) { return self::check($companyId, 'branding'); }

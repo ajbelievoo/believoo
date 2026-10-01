@@ -65,10 +65,7 @@ let pc = null, stream = null, channel = null, iceQueue = [];
 const statusEl = document.getElementById('connStatus');
 const video = document.getElementById('localPreview');
 
-const pcConfig = { iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-]};
+const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
 
 function setStatus(text, badge = 'bc-badge-amber') { statusEl.textContent = text; statusEl.className = 'bc-badge ' + badge; }
 function whisper(evt, data) { try { channel.whisper(evt, data); } catch (e) { console.warn(e); } }

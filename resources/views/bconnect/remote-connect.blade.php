@@ -17,9 +17,9 @@
 
         <form method="POST" action="{{ route('bconnect.remote.join') }}" id="codeForm">
             @csrf
-            <input type="text" name="code" id="codeInput" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false"
+            <input type="text" name="code" id="codeInput" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"
                 placeholder="ABC123XY"
-                class="w-full max-w-sm mx-auto text-center text-3xl font-black tracking-[0.35em] bg-[var(--bc-panel)] border border-[var(--bc-border)] rounded-2xl py-4 px-6 outline-none focus:border-[var(--bc-cyan)] transition uppercase placeholder:text-slate-600 placeholder:text-lg">
+                class="w-full max-w-sm mx-auto text-center text-2xl sm:text-3xl font-black tracking-[0.3em] bg-[var(--bc-panel)] border border-[var(--bc-border)] rounded-2xl py-4 px-3 sm:px-6 outline-none focus:border-[var(--bc-cyan)] transition uppercase placeholder:text-slate-600 placeholder:text-lg">
             <button type="submit" class="bc-btn bc-btn-primary mt-6 px-10 py-3.5 text-base">
                 <i class="fas fa-plug mr-2"></i>Connect
             </button>

@@ -13,6 +13,7 @@
         </div>
         <div class="flex gap-2 flex-wrap">
             <span id="inputBadge" class="bc-badge bc-badge-amber hidden"><i class="fas fa-keyboard mr-1"></i>Control enabled</span>
+            @if(!$canControl)<span class="bc-badge bc-badge-cyan" title="Upgrade to Pro/Enterprise for mouse & keyboard control"><i class="fas fa-eye mr-1"></i>View only · upgrade for control</span>@endif
             <button id="fullscreenBtn" class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-expand mr-1"></i>Fullscreen</button>
             <button id="endSessionBtn" class="bc-btn bc-btn-danger text-sm"><i class="fas fa-phone-slash mr-1"></i>End</button>
         </div>
@@ -28,7 +29,7 @@
             </div>
         </div>
         <div id="clickHint" class="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/70 text-xs text-slate-300 hidden z-20">
-            <i class="fas fa-mouse-pointer mr-1"></i>Click the screen once to enable keyboard & mouse capture. Press <kbd class="px-1.5 py-0.5 bg-slate-700 rounded">Esc</kbd> to release.
+            <i class="fas fa-mouse-pointer mr-1"></i><span id="clickHintText">Click the screen once to enable keyboard &amp; mouse capture. Press <kbd class="px-1.5 py-0.5 bg-slate-700 rounded">Esc</kbd> to release.</span>
         </div>
     </div>
 </div>
@@ -36,6 +37,7 @@
 <script>
 const CODE = @json($session->session_code);
 const VIEWER = @json($viewerName);
+const CAN_CONTROL = @json($canControl);
 const END_URL = @json(route('bconnect.remote.code.end', $session->session_code));
 const channelName = 'remote-agent.' + CODE;
 
@@ -46,10 +48,7 @@ const iceQueue = [];
 
 function setStatus(text, cls = 'text-amber-400') { statusEl.textContent = text; statusEl.className = cls; }
 
-const pcConfig = { iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-]};
+const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
 
 function whisper(evt, data) {
     try { channel.whisper(evt, data); } catch (e) { console.warn('whisper failed', e); }
@@ -61,7 +60,7 @@ async function startPeer() {
     pc.ontrack = (e) => {
         video.srcObject = e.streams[0];
         document.getElementById('waitOverlay').classList.add('hidden');
-        document.getElementById('clickHint').classList.remove('hidden');
+        if (CAN_CONTROL) document.getElementById('clickHint').classList.remove('hidden');
         setStatus('Connected', 'text-green-400');
         connected = true;
         startPing();
@@ -79,7 +78,7 @@ async function startPeer() {
     };
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
-    dc.onopen = () => document.getElementById('inputBadge').classList.remove('hidden');
+    dc.onopen = () => { if (CAN_CONTROL) document.getElementById('inputBadge').classList.remove('hidden'); };
     dc.onclose = () => document.getElementById('inputBadge').classList.add('hidden');
     dc.onmessage = (e) => {
         try {
@@ -118,29 +117,54 @@ async function onSignal(m) {
     } catch (e) { console.error('signal error', e); }
 }
 
-// ── Input capture → DataChannel ──────────────────────────────
+// ── Input capture → DataChannel (Pro/Enterprise only) ─────────
 function sendInput(obj) {
-    if (dc && dc.readyState === 'open') {
+    if (CAN_CONTROL && dc && dc.readyState === 'open') {
         try { dc.send(JSON.stringify(obj)); } catch (e) {}
     }
 }
 
 let lastMove = 0;
-video.addEventListener('mousemove', (e) => {
-    const now = performance.now();
-    if (now - lastMove < 33) return; // ~30fps
-    lastMove = now;
-    const r = video.getBoundingClientRect();
-    sendInput({ t: 'move', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
-});
-video.addEventListener('mousedown', (e) => { e.preventDefault(); sendInput({ t: 'down', b: e.button }); });
-video.addEventListener('mouseup', (e) => sendInput({ t: 'up', b: e.button }));
-video.addEventListener('wheel', (e) => { e.preventDefault(); sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
+if (CAN_CONTROL) {
+    video.addEventListener('mousemove', (e) => {
+        const now = performance.now();
+        if (now - lastMove < 33) return; // ~30fps
+        lastMove = now;
+        const r = video.getBoundingClientRect();
+        sendInput({ t: 'move', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+    });
+    video.addEventListener('mousedown', (e) => { e.preventDefault(); sendInput({ t: 'down', b: e.button }); });
+    video.addEventListener('mouseup', (e) => sendInput({ t: 'up', b: e.button }));
+    video.addEventListener('wheel', (e) => { e.preventDefault(); sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
+    video.addEventListener('keydown', (e) => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
+    video.addEventListener('keyup', (e) => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
+
+    // Touch → mouse mapping (mobile viewers)
+    let touchMoved = false;
+    const pos = (t) => { const r = video.getBoundingClientRect(); return { x: (t.clientX - r.left) / r.width, y: (t.clientY - r.top) / r.height }; };
+    video.addEventListener('touchstart', (e) => { touchMoved = false; }, { passive: true });
+    video.addEventListener('touchmove', (e) => {
+        touchMoved = true;
+        const p = pos(e.touches[0]);
+        const now = performance.now();
+        if (now - lastMove < 33) return; lastMove = now;
+        sendInput({ t: 'move', x: p.x, y: p.y });
+    }, { passive: true });
+    video.addEventListener('touchend', (e) => {
+        if (!touchMoved && e.changedTouches.length) { // tap = left click
+            const p = pos(e.changedTouches[0]);
+            sendInput({ t: 'move', x: p.x, y: p.y });
+            sendInput({ t: 'down', b: 0 });
+            setTimeout(() => sendInput({ t: 'up', b: 0 }), 60);
+        }
+    }, { passive: true });
+    video.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+} else {
+    video.addEventListener('mousemove', () => { video.style.cursor = 'default'; });
+}
 video.addEventListener('contextmenu', (e) => e.preventDefault());
 video.addEventListener('click', () => { video.focus(); document.getElementById('clickHint').classList.add('hidden'); });
 video.tabIndex = 0;
-video.addEventListener('keydown', (e) => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
-video.addEventListener('keyup', (e) => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
 
 // ── Signaling channel ────────────────────────────────────────
 function initChannel() {

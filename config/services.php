@@ -65,4 +65,9 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    'turn' => [
+        'host' => env('TURN_HOST'),
+        'secret' => env('TURN_SECRET'),
+    ],
+
 ];

@@ -7,10 +7,12 @@
     "scripts": {
         "start": "electron .",
         "pack": "electron-builder --dir",
-        "dist": "electron-builder"
+        "dist": "electron-builder",
+        "dist:win": "electron-builder --win",
+        "dist:win:zip": "electron-builder --win zip"
     },
     "dependencies": {
-        "@nut-tree/nut-js": "^4.2.4",
+        "@nut-tree-fork/nut-js": "^4.2.6",
         "pusher-js": "^8.4.0"
     },
     "devDependencies": {
@@ -20,8 +22,14 @@
     "build": {
         "appId": "com.believoo.bmydesk.agent",
         "productName": "BMyDesk Agent",
+        "directories": { "output": "dist" },
         "win": {
-            "target": "nsis"
+            "target": ["nsis", "zip"]
+        },
+        "nsis": {
+            "oneClick": true,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": false
         },
         "mac": {
             "target": "dmg",

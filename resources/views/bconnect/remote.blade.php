@@ -30,12 +30,12 @@
         <h3 class="font-bold mb-4"><i class="fas fa-bell mr-2 text-amber-400"></i>Incoming Requests</h3>
         <div class="space-y-3">
             @forelse($sessions->where('status', 'pending') as $s)
-            <div class="bg-slate-900 rounded-lg p-4 flex justify-between items-center border border-slate-800">
+            <div class="bg-slate-900 rounded-lg p-4 flex justify-between items-center flex-wrap gap-3 border border-slate-800">
                 <div>
                     <div class="font-bold">{{ $s->requester->user->name }}</div>
                     <div class="text-xs text-slate-400">Code: <code>{{ $s->session_code }}</code> • {{ ucfirst($s->permission) }}</div>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 shrink-0">
                     <form method="POST" action="{{ route('bconnect.remote.respond', $s->id) }}" class="inline">@csrf<input type="hidden" name="status" value="active"><button class="bc-btn bc-btn-primary text-xs py-1 px-2">Accept</button></form>
                     <form method="POST" action="{{ route('bconnect.remote.respond', $s->id) }}" class="inline">@csrf<input type="hidden" name="status" value="rejected"><button class="bc-btn bc-btn-danger text-xs py-1 px-2">Reject</button></form>
                 </div>
@@ -60,7 +60,7 @@
                     <td><span class="bc-badge {{ $s->status == 'active' ? 'bc-badge-green' : ($s->status == 'rejected' ? 'bc-badge-red' : 'bc-badge-amber') }}">{{ ucfirst($s->status) }}</span></td>
                     <td>
                         @if($s->status == 'active')
-                        <a href="{{ route('bconnect.remote.room', $s->id) }}" class="bc-btn bc-btn-primary text-xs py-1 px-2">Join</a>
+                        <a href="{{ $s->host_kind === 'member' && $s->company_id ? route('bconnect.remote.room', $s->id) : route('bconnect.remote.code', $s->session_code) }}" class="bc-btn bc-btn-primary text-xs py-1 px-2">Join</a>
                         <form method="POST" action="{{ route('bconnect.remote.respond', $s->id) }}" class="inline">@csrf<input type="hidden" name="status" value="ended"><button class="bc-btn bc-btn-danger text-xs py-1 px-2">End</button></form>
                         @elseif($s->status == 'pending' && $s->target_id == request()->input('bconnect_member')->id)
                         <form method="POST" action="{{ route('bconnect.remote.respond', $s->id) }}" class="inline">@csrf<input type="hidden" name="status" value="active"><button class="bc-btn bc-btn-primary text-xs py-1 px-2">Accept</button></form>
