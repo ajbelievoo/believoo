@@ -59,7 +59,9 @@ class SignalingClient(
             override fun onError(message: String?, code: String?, e: Exception?) {}
         })
 
-        channel = pusher!!.subscribePrivate(channelName.removePrefix("private-"), object : PrivateChannelEventListener {
+        // subscribePrivate expects the FULL name incl. the private- prefix
+        val fullName = if (channelName.startsWith("private-")) channelName else "private-$channelName"
+        channel = pusher!!.subscribePrivate(fullName, object : PrivateChannelEventListener {
             override fun onEvent(event: PusherEvent) {
                 val data = gson.fromJson(event.data ?: "{}", JsonObject::class.java)
                 when (event.eventName) {

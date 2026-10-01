@@ -41,7 +41,7 @@ async function register() {
         $('code').textContent = data.session_code;
         setStatus('Ready — share your code', 'wait');
         try { connectChannel(); }
-        catch (e) { console.error('channel setup failed:', e); setStatus('Realtime channel failed — check connection', 'off'); }
+        catch (e) { console.error('channel setup failed:', e); setStatus('Realtime failed: ' + (e.message || e), 'off'); }
     } catch (e) {
         console.error('register failed:', e);
         setStatus('Register failed: ' + (e.message || 'network'), 'off');
@@ -55,16 +55,28 @@ function require_os_name() {
 }
 
 function connectChannel() {
+    if (typeof Pusher === 'undefined') {
+        setStatus('Realtime lib missing — reinstall the agent', 'off');
+        return;
+    }
     pusher = new Pusher(REVERB_KEY, {
         wsHost: REVERB_HOST,
         wssPort: REVERB_PORT,
         forceTLS: true,
         enabledTransports: ['wss'],
-        channelAuthorization: {
-            endpoint: API + '/broadcast-auth',
-            transport: 'ajax',
-            params: { agent_token: session.agent_token },
-        },
+        // custom authorizer — POSTs socket_id+channel_name to our API with the agent token
+        authorizer: (channel) => ({
+            authorize: (socketId, callback) => {
+                fetch(API + '/broadcast-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ socket_id: socketId, channel_name: channel.name, agent_token: session.agent_token }),
+                })
+                    .then(r => r.json())
+                    .then(d => d.auth ? callback(null, d) : callback(new Error(d.error || 'auth failed'), null))
+                    .catch(e => callback(e, null));
+            },
+        }),
     });
 
     ch = pusher.subscribe(session.channel);

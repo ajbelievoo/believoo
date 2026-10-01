@@ -10,6 +10,7 @@
                 • <span id="connStatus" class="text-amber-400">Waiting for host approval…</span>
                 <span id="latencyBadge" class="hidden text-slate-500">• <span id="latencyVal">—</span> ms</span>
             </p>
+            <p id="debugLine" class="text-[10px] text-slate-600 font-mono truncate"></p>
         </div>
         <div class="flex gap-2 flex-wrap">
             <span id="inputBadge" class="bc-badge bc-badge-amber hidden"><i class="fas fa-keyboard mr-1"></i>Control enabled</span>
@@ -47,6 +48,11 @@ const statusEl = document.getElementById('connStatus');
 const iceQueue = [];
 
 function setStatus(text, cls = 'text-amber-400') { statusEl.textContent = text; statusEl.className = cls; }
+function dbg(step) {
+    const el = document.getElementById('debugLine');
+    el.textContent = (el.textContent + ' › ' + step).slice(-140);
+    console.log('[bmydesk]', step);
+}
 
 const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
 
@@ -58,6 +64,7 @@ async function startPeer() {
     pc = new RTCPeerConnection(pcConfig);
 
     pc.ontrack = (e) => {
+        dbg('video track arrived');
         video.srcObject = e.streams[0];
         document.getElementById('waitOverlay').classList.add('hidden');
         if (CAN_CONTROL) document.getElementById('clickHint').classList.remove('hidden');
@@ -72,6 +79,7 @@ async function startPeer() {
     };
 
     pc.onconnectionstatechange = () => {
+        dbg('peer ' + pc.connectionState);
         if (pc.connectionState === 'connected') setStatus('Connected', 'text-green-400');
         if (pc.connectionState === 'failed' && pc) {
             setStatus('Reconnecting…', 'text-amber-400');
@@ -95,6 +103,7 @@ async function startPeer() {
     const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await pc.setLocalDescription(offer);
     whisper('signal', { kind: 'offer', sdp: pc.localDescription.sdp });
+    dbg('offer sent');
     setStatus('Connecting…', 'text-amber-400');
     if (streamTimeout) clearTimeout(streamTimeout);
     streamTimeout = setTimeout(() => {
@@ -118,6 +127,7 @@ async function onSignal(m) {
     if (!pc) return;
     try {
         if (m.kind === 'answer') {
+            dbg('answer received');
             await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
             iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
             iceQueue.length = 0;
@@ -191,11 +201,14 @@ function initChannel() {
 
     channel.subscribed(() => {
         setStatus('Requesting access…', 'text-amber-400');
+        dbg('channel subscribed');
         whisper('join-request', { name: VIEWER });
+        dbg('join-request sent');
     });
 
     channel.listenForWhisper('join-accept', () => {
         setStatus('Accepted — starting stream…', 'text-green-400');
+        dbg('host accepted');
         startPeer();
     });
     channel.listenForWhisper('join-reject', () => {

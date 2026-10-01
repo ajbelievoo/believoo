@@ -21,6 +21,7 @@
                 <h3 class="font-bold"><i class="fas fa-signal mr-2 text-slate-500"></i>Session Status</h3>
                 <span id="connStatus" class="bc-badge bc-badge-amber">Waiting for viewer…</span>
             </div>
+            <p id="debugLine" class="text-[10px] text-slate-600 font-mono truncate mb-2"></p>
 
             <div id="joinRequest" class="hidden mb-4 p-4 rounded-xl border border-amber-500/40 bg-amber-500/10">
                 <div class="flex items-center justify-between flex-wrap gap-3">
@@ -61,13 +62,18 @@ const channelName = 'remote-agent.' + CODE;
 const END_URL = @json(route('bconnect.remote.code.end', $session->session_code));
 const backUrl = @json(route('bconnect.remote.connect'));
 
-let pc = null, stream = null, channel = null, iceQueue = [];
+let pc = null, stream = null, channel = null, iceQueue = [], pendingOffer = null;
 const statusEl = document.getElementById('connStatus');
 const video = document.getElementById('localPreview');
 
 const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
 
 function setStatus(text, badge = 'bc-badge-amber') { statusEl.textContent = text; statusEl.className = 'bc-badge ' + badge; }
+function dbg(step) {
+    const el = document.getElementById('debugLine');
+    el.textContent = (el.textContent + ' › ' + step).slice(-140);
+    console.log('[bmydesk-host]', step);
+}
 function whisper(evt, data) { try { channel.whisper(evt, data); } catch (e) { console.warn(e); } }
 
 document.getElementById('shareBtn').addEventListener('click', async () => {
@@ -83,18 +89,21 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
         document.getElementById('shareBtn').disabled = true;
         setStatus('Screen ready — waiting for viewer', 'bc-badge-cyan');
         stream.getVideoTracks()[0].onended = () => { setStatus('Sharing stopped', 'bc-badge-amber'); };
+        if (pendingOffer) { const m = pendingOffer; pendingOffer = null; handleOffer(m); }
     } catch (e) {
         alert('Screen share cancelled or not supported: ' + e.message);
     }
 });
 
 async function handleOffer(m) {
-    if (!stream) { console.warn('No screen shared yet'); return; }
+    if (!stream) { pendingOffer = m; dbg('offer queued (no screen yet)'); setStatus('Viewer waiting — pick a screen to share', 'bc-badge-amber'); return; }
+    dbg('handling offer');
     try {
         pc = new RTCPeerConnection(pcConfig);
 
         pc.onicecandidate = (e) => { if (e.candidate) whisper('signal', { kind: 'ice', candidate: e.candidate }); };
         pc.onconnectionstatechange = () => {
+            dbg('peer ' + pc.connectionState);
             if (pc.connectionState === 'connected') setStatus('Viewer connected', 'bc-badge-green');
             if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) setStatus('Viewer disconnected', 'bc-badge-amber');
         };
@@ -113,10 +122,11 @@ async function handleOffer(m) {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         whisper('signal', { kind: 'answer', sdp: pc.localDescription.sdp });
+        dbg('answer sent');
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
         iceQueue.length = 0;
         setStatus('Streaming…', 'bc-badge-green');
-    } catch (e) { console.error('offer handling failed', e); }
+    } catch (e) { console.error('offer handling failed', e); dbg('ERR ' + e.message); setStatus('Stream error: ' + e.message, 'bc-badge-red'); }
 }
 
 async function onSignal(m) {
@@ -134,14 +144,15 @@ function initChannel() {
     }
     channel = window.Echo.private(channelName);
 
-    channel.subscribed(() => setStatus('Waiting for viewer…', 'bc-badge-amber'));
+    channel.subscribed(() => { dbg('channel subscribed'); setStatus('Waiting for viewer…', 'bc-badge-amber'); });
 
     channel.listenForWhisper('join-request', (m) => {
+        dbg('join-request received');
         document.getElementById('joinName').textContent = m.name || 'Someone';
         document.getElementById('joinRequest').classList.remove('hidden');
         setStatus('Join request', 'bc-badge-amber');
     });
-    channel.listenForWhisper('signal', (m) => onSignal(m));
+    channel.listenForWhisper('signal', (m) => { dbg('signal: ' + (m.kind || '?')); onSignal(m); });
     channel.listenForWhisper('end', () => {
         setStatus('Viewer disconnected', 'bc-badge-amber');
         if (pc) { pc.close(); pc = null; }
