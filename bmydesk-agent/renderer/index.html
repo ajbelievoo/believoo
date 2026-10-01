@@ -64,7 +64,11 @@
 
     <div class="foot">BMyDesk Agent v1.0 · <span id="verNote">codes expire after 60 min</span></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
+<script src="../node_modules/pusher-js/dist/web/pusher.min.js"></script>
+<script>
+// CDN fallback if the bundled copy is missing (e.g. dev without npm install)
+if (!window.Pusher) document.write('<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"><\/script>');
+</script>
 <script src="renderer.js"></script>
 </body>
 </html>

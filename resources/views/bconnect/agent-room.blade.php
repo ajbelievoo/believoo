@@ -228,7 +228,7 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
 
 window.addEventListener('beforeunload', () => { whisper('end', {}); cleanup(); });
 
-// Echo loads via @vite app.js — wait for it
+// Echo loads via the app bundle — wait for it
 let tries = 0;
 const waitEcho = setInterval(() => {
     if (window.Echo) { clearInterval(waitEcho); initChannel(); }

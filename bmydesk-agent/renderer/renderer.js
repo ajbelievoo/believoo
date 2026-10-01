@@ -40,9 +40,11 @@ async function register() {
         }
         $('code').textContent = data.session_code;
         setStatus('Ready — share your code', 'wait');
-        connectChannel();
+        try { connectChannel(); }
+        catch (e) { console.error('channel setup failed:', e); setStatus('Realtime channel failed — check connection', 'off'); }
     } catch (e) {
-        setStatus('Cannot reach server — retrying', 'off');
+        console.error('register failed:', e);
+        setStatus('Register failed: ' + (e.message || 'network'), 'off');
         $('code').textContent = 'ERROR';
         setTimeout(register, 5000);
     }
