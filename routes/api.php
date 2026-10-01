@@ -55,6 +55,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/{code}/status', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'status']);
         Route::post('/{code}/end', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'end']);
         Route::post('/broadcast-auth', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'broadcastAuth']);
+        Route::get('/version', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'version']);
     });
 
     // Authenticated routes

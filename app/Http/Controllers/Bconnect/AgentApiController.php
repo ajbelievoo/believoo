@@ -9,6 +9,10 @@ use Illuminate\Support\Str;
 
 class AgentApiController extends Controller
 {
+    // Bump this when a new agent build is published — apps poll /version and
+    // prompt the user to update.
+    const AGENT_LATEST = '1.0.3';
+
     protected function findByCode(string $code): ?RemoteSession
     {
         $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $code));
@@ -55,6 +59,22 @@ class AgentApiController extends Controller
             'expires_at' => $session->expires_at->toIso8601String(),
             'connect_url' => 'https://bmydesk.believoo.com/remote/connect',
             'ice_servers' => \App\Services\TurnCredentialService::iceServers('agent-' . $session->id),
+        ]);
+    }
+
+    // GET /api/v1/bmydesk/agent/version?platform=windows|android — update check
+    public function version(Request $r)
+    {
+        $platform = strtolower((string) $r->query('platform', 'windows'));
+        $base = 'https://bmydesk.believoo.com/downloads/';
+        $file = $platform === 'android'
+            ? 'BMyDesk-Agent-' . self::AGENT_LATEST . '.apk'
+            : 'BMyDesk-Agent-Setup-' . self::AGENT_LATEST . '.exe';
+
+        return response()->json([
+            'ok' => true,
+            'latest' => self::AGENT_LATEST,
+            'url' => $base . $file,
         ]);
     }
 

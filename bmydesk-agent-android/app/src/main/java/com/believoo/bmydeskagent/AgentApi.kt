@@ -27,7 +27,7 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
     )
 
     fun register(hostName: String, os: String = "android"): Registration {
-        val body = gson.toJson(mapOf("host_name" to hostName, "version" to "1.0.0", "os" to os))
+        val body = gson.toJson(mapOf("host_name" to hostName, "version" to BuildConfig.VERSION_NAME, "os" to os))
             .toRequestBody(json)
         val req = Request.Builder().url("$base/register").post(body).build()
         http.newCall(req).execute().use { res ->
@@ -41,6 +41,17 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
                 iceServers = obj.getAsJsonArray("ice_servers"),
             )
         }
+    }
+
+    /** Returns (latestVersion, downloadUrl) or null — used for the in-app update prompt. */
+    fun latestVersion(platform: String): Pair<String, String>? {
+        val req = Request.Builder().url("$base/version?platform=$platform").build()
+        return runCatching {
+            http.newCall(req).execute().use {
+                val o = gson.fromJson(it.body!!.string(), JsonObject::class.java)
+                if (o.get("ok").asBoolean) o.get("latest").asString to o.get("url").asString else null
+            }
+        }.getOrNull()
     }
 
     fun status(code: String, token: String): JsonObject? {

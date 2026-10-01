@@ -81,6 +81,26 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildUi()
         register()
+        checkUpdate()
+    }
+
+    // If a newer build exists on the server, offer to open the download page.
+    private fun checkUpdate() {
+        thread {
+            val latest = api.latestVersion("android") ?: return@thread
+            if (latest.first != BuildConfig.VERSION_NAME) ui {
+                runCatching {
+                    android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("Update available — v${latest.first}")
+                        .setMessage("A newer BMyDesk Agent is available. Download the update now?")
+                        .setPositiveButton("Download") { _, _ ->
+                            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(latest.second)))
+                        }
+                        .setNegativeButton("Later", null)
+                        .show()
+                }
+            }
+        }
     }
 
     // ── UI ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell } = require('electron');
 const path = require('path');
 
 // nut-js is a native module; load lazily so the app still starts even if the
@@ -51,6 +51,12 @@ ipcMain.handle('get-screen-sources', async () => {
         thumbnailSize: { width: 360, height: 220 },
     });
     return sources.map(s => ({ id: s.id, name: s.name, thumbnail: s.thumbnail.toDataURL() }));
+});
+
+ipcMain.handle('open-external', async (_e, url) => {
+    if (typeof url === 'string' && /^https:\/\/([a-z0-9-]+\.)*believoo\.com\//.test(url)) {
+        await shell.openExternal(url);
+    }
 });
 
 ipcMain.handle('get-display-size', async () => {

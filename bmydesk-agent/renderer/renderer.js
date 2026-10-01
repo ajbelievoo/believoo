@@ -4,6 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
+const APP_VERSION = '1.0.3';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -30,7 +31,7 @@ async function register() {
         const r = await fetch(API + '/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ host_name: require_os_name(), version: '1.0.0', os: window.agent?.platform || 'unknown' }),
+            body: JSON.stringify({ host_name: require_os_name(), version: APP_VERSION, os: window.agent?.platform || 'unknown' }),
         });
         const data = await r.json();
         if (!data.ok) throw new Error(data.error || 'register failed');
@@ -50,6 +51,20 @@ async function register() {
     }
 }
 
+function checkUpdate() {
+    fetch(API + '/version?platform=windows')
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok && d.latest && d.latest !== APP_VERSION) {
+                const b = $('updateBanner');
+                $('updateText').textContent = 'Update available — v' + d.latest;
+                b.classList.remove('hidden');
+                b.onclick = () => window.agent.openExternal(d.url || 'https://bmydesk.believoo.com/remote/agent');
+            }
+        })
+        .catch(() => {});
+}
+
 function require_os_name() {
     return (window.agent?.platform || 'pc') + '-' + (navigator.userAgent.match(/Windows|Mac|Linux/)?.[0] || 'host');
 }
@@ -60,6 +75,7 @@ function connectChannel() {
         return;
     }
     pusher = new Pusher(REVERB_KEY, {
+        cluster: 'mt1', // pusher-js requires a cluster even when wsHost overrides it
         wsHost: REVERB_HOST,
         wssPort: REVERB_PORT,
         forceTLS: true,
@@ -192,3 +208,5 @@ window.addEventListener('beforeunload', () => {
 });
 
 register();
+checkUpdate();
+setInterval(checkUpdate, 3600000);
