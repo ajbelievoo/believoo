@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Support\NotificationLink;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -21,6 +22,16 @@ class NavbarNotifications extends Component
         if (Auth::check()) {
             Auth::user()->unreadNotifications->markAsRead();
         }
+    }
+
+    public function openNotification(string $id)
+    {
+        $notification = Auth::user()?->notifications()->find($id);
+        if (!$notification) {
+            return;
+        }
+        $notification->markAsRead();
+        $this->redirect(NotificationLink::url($notification));
     }
 
     public function checkNotifications()

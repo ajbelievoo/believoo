@@ -7,9 +7,9 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: DejaVu Sans, Arial, sans-serif; color: #1f2937; font-size: 13px; margin: 0; padding: 40px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #00b7ff; padding-bottom: 20px; margin-bottom: 30px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid {{ $bconnectBrand['brand_color'] ?? '#7c3aed' }}; padding-bottom: 20px; margin-bottom: 30px; }
         .logo { font-size: 24px; font-weight: 800; color: #0f172a; }
-        .logo span { color: #00b7ff; }
+        .logo span { color: {{ $bconnectBrand['brand_color'] ?? '#7c3aed' }}; }
         .invoice-title { font-size: 28px; font-weight: 700; color: #0f172a; }
         .meta { margin-bottom: 30px; }
         .meta-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
@@ -73,7 +73,7 @@
     </div>
 
     <div class="footer">
-        Thank you for using B-CONNECT by Believoo. For support, contact support@believoo.com
+        Thank you for using Bmydesk by Believoo Private Limited. For support, contact support@believoo.com
     </div>
 </body>
 </html>

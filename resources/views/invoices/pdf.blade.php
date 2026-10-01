@@ -1,3 +1,4 @@
+@php($co = \App\Models\Setting::whereIn('key', ['company_legal_name','company_cin','company_pan','company_registered_office','company_address'])->pluck('value','key'))
 <!DOCTYPE html>
 <html>
 <head>
@@ -116,8 +117,14 @@
 </head>
 <body>
     <div class="header">
-        <div class="company-name">BELIEVOO</div>
+        <div class="company-name">{{ $co['company_legal_name'] ?? 'BELIEVOO' }}</div>
         <div style="color: #6b7280; margin-top: 5px;">Software Development Agency</div>
+        @if($co['company_cin'] ?? false)
+            <div style="color: #6b7280; margin-top: 5px; font-size: 12px;">CIN: {{ $co['company_cin'] }}@if($co['company_pan'] ?? false) &nbsp;|&nbsp; PAN: {{ $co['company_pan'] }}@endif</div>
+        @endif
+        @if(($co['company_registered_office'] ?? $co['company_address'] ?? false))
+            <div style="color: #6b7280; margin-top: 5px; font-size: 12px;">{{ $co['company_registered_office'] ?? $co['company_address'] }}</div>
+        @endif
     </div>
 
     <div style="text-align: center; margin-bottom: 30px;">
@@ -246,6 +253,9 @@
         <p><strong>Thank you for your business!</strong></p>
         <p>If you have any questions about this invoice, please contact us.</p>
         <p style="margin-top: 10px;">www.believoo.com | support@believoo.com</p>
+        @if($co['company_cin'] ?? false)
+            <p style="margin-top: 10px;">{{ $co['company_legal_name'] ?? 'Believoo Private Limited' }} · CIN: {{ $co['company_cin'] }} · Incorporated under the Companies Act, 2013, Govt. of India</p>
+        @endif
     </div>
 </body>
 </html>

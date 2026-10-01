@@ -43,7 +43,7 @@ class BconnectWebhookService
             $log->update(['status_code' => $resp->status(), 'response' => $resp->body(), 'delivered_at' => now()]);
         } catch (\Throwable $e) {
             $log->update(['response' => $e->getMessage()]);
-            Log::warning('B-Connect webhook failed: ' . $e->getMessage());
+            Log::warning('Bmydesk webhook failed: ' . $e->getMessage());
         }
     }
 

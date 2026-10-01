@@ -28,8 +28,8 @@ class ServiceIndex extends Component
             'streamingPlans' => $streamingPlans,
         ])->layout('components.layouts.believoo', [
             'title' => 'IT Services & Cloud Solutions in India - Believoo',
-            'description' => 'Explore Believoo services: VPS hosting, web hosting, live streaming, domain registration, server management, and custom software development in India.',
-            'keywords' => 'IT services, cloud solutions, VPS hosting, web hosting, live streaming, domain, software development, India',
+            'description' => 'Explore Believoo services: VPS hosting, web hosting, domain registration, server management, and custom software development in India.',
+            'keywords' => 'IT services, cloud solutions, VPS hosting, web hosting, domain, software development, India',
             'settings' => \App\Models\Setting::pluck('value', 'key')
         ]);
     }

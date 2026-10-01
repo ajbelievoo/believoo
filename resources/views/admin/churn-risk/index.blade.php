@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Churn Risk</h1>
-        <p class="page-subtitle">Predictive churn risk for users and B-Connect companies</p>
+        <p class="page-subtitle">Predictive churn risk for users and Bmydesk companies</p>
     </div>
     <div class="page-actions">
         <a href="{{ route('admin.churn-risk.index', ['tab' => $tab]) }}" class="btn btn-secondary">
@@ -39,7 +39,7 @@
     <div class="stat-card">
         <div class="stat-header">
             <div>
-                <div class="stat-label">High Risk B-Connect</div>
+                <div class="stat-label">High Risk Bmydesk</div>
                 <div class="stat-value" style="color: var(--danger);">{{ number_format($counts['companies_high']) }}</div>
             </div>
             <div class="stat-icon red"><i class="fas fa-building"></i></div>
@@ -48,7 +48,7 @@
     <div class="stat-card">
         <div class="stat-header">
             <div>
-                <div class="stat-label">Medium Risk B-Connect</div>
+                <div class="stat-label">Medium Risk Bmydesk</div>
                 <div class="stat-value" style="color: var(--warning);">{{ number_format($counts['companies_medium']) }}</div>
             </div>
             <div class="stat-icon yellow"><i class="fas fa-building"></i></div>
@@ -61,7 +61,7 @@
         <a class="nav-link {{ $tab === 'users' ? 'active' : '' }}" href="{{ route('admin.churn-risk.index', ['tab' => 'users']) }}">Users</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ $tab === 'bconnect' ? 'active' : '' }}" href="{{ route('admin.churn-risk.index', ['tab' => 'bconnect']) }}">B-Connect Companies</a>
+        <a class="nav-link {{ $tab === 'bconnect' ? 'active' : '' }}" href="{{ route('admin.churn-risk.index', ['tab' => 'bconnect']) }}">Bmydesk Companies</a>
     </li>
 </ul>
 
@@ -144,7 +144,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="empty-state"><i class="fas fa-building"></i><div>No B-Connect companies found</div></td></tr>
+                            <tr><td colspan="5" class="empty-state"><i class="fas fa-building"></i><div>No Bmydesk companies found</div></td></tr>
                         @endforelse
                     @endif
                 </tbody>

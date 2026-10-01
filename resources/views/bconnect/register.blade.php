@@ -6,15 +6,15 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/css/bconnect.css">
-<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'#00B7FF'}}}}</script>
-<style>body{background:radial-gradient(circle at top right, rgba(0,183,255,0.08), transparent 40%), #0b1220;}</style>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}}}</script>
+<style>body{background:radial-gradient(circle at top right, rgba({{ $bconnectBrand['brand_rgb'] }},0.08), transparent 40%), #0b1220;}</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 <div class="w-full max-w-md p-8 bg-[#0f172a] rounded-2xl border border-[var(--bc-border)] shadow-2xl">
     <div class="text-center mb-6">
-        <img src="{{ $bconnectBrand['logo'] }}" class="h-14 w-14 rounded-xl mx-auto mb-4" alt="B-CONNECT">
+        <img src="{{ $bconnectBrand['logo'] }}" class="h-16 w-auto max-w-[220px] mx-auto mb-4 object-contain" alt="Bmydesk">
         <h1 class="text-2xl font-black text-white">Create workspace</h1>
-        <p class="text-slate-400 text-sm mt-1">Start your B-CONNECT journey</p>
+        <p class="text-slate-400 text-sm mt-1">Start your Bmydesk journey</p>
     </div>
     @if(session('error'))<div class="mb-4 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm border border-red-500/20"><i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}</div>@endif
     <form method="POST" action="{{ route('bconnect.register') }}" class="space-y-4">@csrf

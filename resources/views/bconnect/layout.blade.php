@@ -6,11 +6,26 @@
 <meta name="keywords" content="{{ $bconnectBrand['keywords'] }}">
 <link rel="icon" type="image/png" href="{{ $bconnectBrand['favicon'] }}">
 <link rel="shortcut icon" type="image/x-icon" href="{{ $bconnectBrand['favicon'] }}">
-<meta name="theme-color" content="#00B7FF">
+<meta name="theme-color" content="{{ $bconnectBrand['brand_color'] }}">
+<meta property="og:title" content="{{ $bconnectBrand['title'] }}">
+<meta property="og:description" content="{{ $bconnectBrand['description'] }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bc.believoo.com">
+<meta property="og:site_name" content="{{ $bconnectBrand['name'] }} by Believoo">
+<meta property="og:image" content="{{ $bconnectBrand['og_image'] }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ $bconnectBrand['title'] }}">
+<meta name="twitter:description" content="{{ $bconnectBrand['description'] }}">
+<meta name="twitter:image" content="{{ $bconnectBrand['og_image'] }}">
+<link rel="canonical" href="https://bc.believoo.com{{ request()->getPathInfo() }}">
+@if($bconnectBrand['google_site_verification'])
+<meta name="google-site-verification" content="{{ $bconnectBrand['google_site_verification'] }}">
+@endif
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/css/bconnect.css">
-<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'#00b7ff'}}};</script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}};</script>
+<style>:root{--bc-cyan:{{ $bconnectBrand['brand_color_light'] }};--bc-cyan-dark:{{ $bconnectBrand['brand_color'] }};}.bc-badge-cyan{background:rgba({{ $bconnectBrand['brand_rgb_light'] }},0.12);}</style>
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <meta name="vapid-key" content="{{ \App\Models\Setting::where('key', 'vapid_public_key')->value('value') ?? '' }}">
 <link rel="manifest" href="/manifest.json">
@@ -21,12 +36,9 @@
 <body class="min-h-screen flex">
 <div id="mobileOverlay" class="bc-overlay" onclick="toggleSidebar()"></div>
 <aside id="sidebar" class="bc-sidebar w-64 bg-[#0b1220] border-r border-[var(--bc-border)] flex flex-col h-screen z-50">
-    <div class="p-5 flex items-center gap-3 border-b border-[var(--bc-border)]">
-        <img src="{{ $bconnectBrand['logo'] }}" class="h-9 w-9 rounded-lg" alt="B-CONNECT">
-        <div>
-            <h1 class="text-lg font-black tracking-tight" style="color:var(--bc-cyan)">B-CONNECT</h1>
-            <p class="text-[11px] text-slate-500 mt-0.5 truncate max-w-[140px]">{{ $bconnectCompany->name ?? 'Workspace' }}</p>
-        </div>
+    <div class="p-4 border-b border-[var(--bc-border)]">
+        <img src="{{ $bconnectBrand['logo'] }}" class="w-auto max-h-11 max-w-full object-contain object-left" alt="{{ $bconnectBrand['name'] }}">
+        <p class="text-[11px] text-slate-500 mt-1.5 truncate">{{ $bconnectCompany->name ?? 'Workspace' }}</p>
     </div>
     <div class="px-4 py-3">
         @php

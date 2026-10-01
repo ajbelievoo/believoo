@@ -20,8 +20,8 @@ class BconnectWelcome extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Welcome to ' . (\App\Helpers\BconnectHelper::brandData()['title'] ?? 'B-CONNECT'),
-            from: new Address('bconnect@believoo.com', 'Believoo B-Connect'),
+            subject: 'Welcome to ' . (\App\Helpers\BconnectHelper::brandData()['title'] ?? 'Bmydesk'),
+            from: new Address('bconnect@believoo.com', 'Bmydesk by Believoo'),
             replyTo: [new Address('support@believoo.com', 'Believoo Support')],
         );
     }

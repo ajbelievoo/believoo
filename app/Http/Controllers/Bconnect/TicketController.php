@@ -138,7 +138,7 @@ class TicketController extends Controller {
             'View Ticket'
         );
         BconnectMail::toCompanyAdmins($r->input('bconnect_company_id'),
-            'New B-Connect ticket: ' . $ticket->title,
+            'New Bmydesk ticket: ' . $ticket->title,
             'New ticket created',
             ['A new ticket has been created in your workspace.', 'Title: <strong>' . e($ticket->title) . '</strong><br>Priority: ' . e($ticket->priority) . '<br>Type: ' . e($ticket->type)],
             url('https://bc.believoo.com' . $ticketUrl),

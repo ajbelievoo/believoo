@@ -42,7 +42,7 @@ $isViewer = !$isHost;
     </div>
 
     <div id="controlNotice" class="hidden mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs">
-        <i class="fas fa-info-circle mr-1"></i> Browser-based remote desktop is <strong>view-only</strong>. Full OS mouse/keyboard control requires the host to install and run the B-CONNECT desktop agent and explicitly grant control.
+        <i class="fas fa-info-circle mr-1"></i> Browser-based remote desktop is <strong>view-only</strong>. Full OS mouse/keyboard control requires the host to install and run the Bmydesk desktop agent and explicitly grant control.
     </div>
 </div>
 

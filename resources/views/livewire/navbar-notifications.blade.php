@@ -28,24 +28,10 @@
                         @php
                             $title = $notification->data['title'] ?? 'Notification';
                             $body = $notification->data['body'] ?? ($notification->data['message'] ?? '');
-                            $url = null;
-                            
-                            // Check for Filament actions
-                            if (isset($notification->data['actions'])) {
-                                foreach ($notification->data['actions'] as $action) {
-                                    if (isset($action['url'])) {
-                                        $url = $action['url'];
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            // Check for custom notification ticket_id/url
-                            if (!$url && isset($notification->data['ticket_id'])) {
-                                $url = route('client.dashboard') . '?ticket=' . $notification->data['ticket_id'];
-                            }
+                            $url = \App\Support\NotificationLink::url($notification);
                         @endphp
-                        <a href="{{ $url ?? '#' }}" 
+                        <a href="{{ $url }}"
+                           wire:click.prevent="openNotification('{{ $notification->id }}')"
                            class="block p-4 border-b border-white/5 hover:bg-white/[0.05] transition-all {{ $notification->read_at ? 'opacity-50' : '' }} relative z-[120] cursor-pointer pointer-events-auto"
                            style="pointer-events: auto !important; position: relative; display: block;">
                             <p class="text-[11px] text-white font-black mb-1 uppercase tracking-wider">{{ $title }}</p>

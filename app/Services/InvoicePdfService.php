@@ -104,15 +104,19 @@ class InvoicePdfService
      */
     protected function getCompanySettings(): array
     {
+        $s = \App\Models\Setting::pluck('value', 'key');
+
         return [
-            'company_name' => config('app.name', 'Believoo'),
-            'company_address' => setting('company_address', 'Your Company Address'),
-            'company_phone' => setting('company_phone', '+91-XXXXXXXXXX'),
-            'company_email' => setting('company_email', 'billing@believoo.com'),
-            'company_website' => config('app.url', 'https://believoo.com'),
-            'gst_number' => setting('gst_number', 'GSTINXXXXXXX'),
-            'logo_url' => asset('storage/' . setting('site_logo', 'logo.png')),
-            'currency_symbol' => setting('currency_symbol', '₹'),
+            'company_name' => $s['company_legal_name'] ?? config('app.name', 'Believoo'),
+            'company_address' => $s['company_address'] ?? $s['address'] ?? 'Your Company Address',
+            'company_phone' => $s['company_phone'] ?? $s['contact_phone'] ?? '+91-XXXXXXXXXX',
+            'company_email' => $s['company_email'] ?? $s['contact_email'] ?? 'billing@believoo.com',
+            'company_website' => $s['company_website'] ?? config('app.url', 'https://believoo.com'),
+            'company_cin' => $s['company_cin'] ?? null,
+            'company_pan' => $s['company_pan'] ?? null,
+            'gst_number' => $s['gst_number'] ?? null,
+            'logo_url' => asset('storage/' . ($s['site_logo'] ?? 'logo.png')),
+            'currency_symbol' => $s['currency_symbol'] ?? '₹',
         ];
     }
 }

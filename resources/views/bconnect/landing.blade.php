@@ -15,12 +15,12 @@
     <link rel="icon" type="image/png" href="{{ $bconnectBrand['favicon'] }}">
     <link rel="shortcut icon" type="image/x-icon" href="{{ $bconnectBrand['favicon'] }}">
     <link rel="apple-touch-icon" href="{{ $bconnectBrand['logo'] }}">
-    <meta name="theme-color" content="#00B7FF">
+    <meta name="theme-color" content="{{ $bconnectBrand['brand_color'] }}">
     <meta property="og:title" content="{{ $bconnectBrand['title'] }}">
     <meta property="og:description" content="{{ $bconnectBrand['description'] }}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://bc.believoo.com">
-    <meta property="og:site_name" content="B-CONNECT by Believoo">
+    <meta property="og:site_name" content="{{ $bconnectBrand['name'] }} by Believoo">
     <meta property="og:image" content="{{ $bconnectBrand['og_image'] }}">
     <meta property="og:locale" content="en_IN">
     <meta name="twitter:card" content="summary_large_image">
@@ -35,11 +35,11 @@
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);} gtag('js',new Date()); gtag('config','{{ $bconnectBrand['google_analytics'] }}');</script>
     @endif
     <script type="application/ld+json">
-    {"@context":"https://schema.org","@type":"SoftwareApplication","name":"B-CONNECT","applicationCategory":"BusinessApplication","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"INR"},{"@type":"Offer","name":"Pro","price":"1999","priceCurrency":"INR"},{"@type":"Offer","name":"Enterprise","price":"9999","priceCurrency":"INR"}],"operatingSystem":"Web","provider":{"@type":"Organization","name":"Believoo"}}
+    {"@context":"https://schema.org","@type":"SoftwareApplication","name":"{{ $bconnectBrand['name'] }}","applicationCategory":"BusinessApplication","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"INR"},{"@type":"Offer","name":"Pro","price":"1999","priceCurrency":"INR"},{"@type":"Offer","name":"Enterprise","price":"9999","priceCurrency":"INR"}],"operatingSystem":"Web","provider":{"@type":"Organization","name":"Believoo"}}
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { theme: { extend: { colors: { brand: '#00B7FF', brandDark: '#0095D1', dark: '#0a0a1a' } }, fontFamily: { sans: ['Figtree','Inter','sans-serif'] } } };
+        tailwind.config = { theme: { extend: { colors: { brand: '{{ $bconnectBrand['brand_color'] }}', brandDark: '{{ $bconnectBrand['brand_color_dark'] }}', dark: '#0a0a1a' } }, fontFamily: { sans: ['Figtree','Inter','sans-serif'] } } };
     </script>
     <style>html,body{font-family:Figtree,Inter,sans-serif;scroll-behavior:smooth;}</style>
 </head>
@@ -50,8 +50,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
             <a href="https://believoo.com" class="flex items-center gap-2">
-                <img src="{{ $bconnectBrand['logo'] }}" class="h-10 w-10 rounded" alt="B-CONNECT">
-                <span class="font-extrabold text-xl tracking-tight text-slate-900">B-CONNECT</span>
+                <img src="{{ $bconnectBrand['logo'] }}" class="h-10 w-auto" alt="{{ $bconnectBrand['name'] }}">
             </a>
             <div class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
                 <a href="#features" class="hover:text-brand transition">Features</a>
@@ -80,14 +79,14 @@
             One workspace for<br><span class="text-brand">calls, code & clients</span>
         </h1>
         <p class="max-w-2xl mx-auto text-lg text-slate-600 mb-10">
-            B-CONNECT unifies video conferencing, remote desktop, bug tracking, AI summaries, client billing and real-time team chat — built for IT companies, developers and global clients.
+            Bmydesk unifies video conferencing, remote desktop, bug tracking, AI summaries, client billing and real-time team chat — built for IT companies, developers and global clients.
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-4">
             <a href="{{ route('bconnect.register') }}" class="px-8 py-4 text-lg font-bold text-white bg-brand hover:bg-brandDark rounded-full transition shadow-xl shadow-brand/30">Start Free Workspace</a>
             <a href="{{ route('bconnect.login') }}" class="px-8 py-4 text-lg font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition">Login to Dashboard</a>
         </div>
         <div class="mt-12 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden bg-slate-900">
-            <img src="{{ $bconnectBrand['og_image'] }}" alt="B-CONNECT Dashboard" class="w-full h-64 lg:h-96 object-cover opacity-90">
+            <img src="{{ $bconnectBrand['og_image'] }}" alt="Bmydesk Dashboard" class="w-full h-64 lg:h-96 object-cover opacity-90">
         </div>
     </div>
 </section>
@@ -183,7 +182,7 @@
 <section class="py-20 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-16">
-            <h2 class="text-3xl lg:text-5xl font-extrabold text-slate-900 mb-4">How B-CONNECT works</h2>
+            <h2 class="text-3xl lg:text-5xl font-extrabold text-slate-900 mb-4">How Bmydesk works</h2>
             <p class="text-slate-600">Set up your workspace in minutes, not days.</p>
         </div>
         <div class="grid md:grid-cols-4 gap-8">
@@ -252,7 +251,7 @@
         <div class="grid md:grid-cols-3 gap-8">
             <div class="p-8 bg-slate-50 rounded-2xl">
                 <div class="text-amber-400 text-sm mb-4"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
-                <p class="text-slate-700 mb-4">"B-CONNECT replaced Zoom, Jira and AnyDesk for our agency. Clients love the shared workspace."</p>
+                <p class="text-slate-700 mb-4">"Bmydesk replaced Zoom, Jira and AnyDesk for our agency. Clients love the shared workspace."</p>
                 <div class="font-bold">Rohit K.</div><div class="text-slate-500 text-sm">CTO, Delhi</div>
             </div>
             <div class="p-8 bg-slate-50 rounded-2xl">
@@ -277,12 +276,12 @@
         </div>
         <div class="space-y-4">
             <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
-                <summary class="font-bold text-slate-900 flex justify-between items-center">Is B-CONNECT free to start? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
+                <summary class="font-bold text-slate-900 flex justify-between items-center">Is Bmydesk free to start? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
                 <p class="text-slate-600 mt-4 text-sm">Yes. Free plan includes 2 members and basic calls. Upgrade anytime.</p>
             </details>
             <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
                 <summary class="font-bold text-slate-900 flex justify-between items-center">Can clients join meetings without an account? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
-                <p class="text-slate-600 mt-4 text-sm">Clients with an assigned role can join via B-CONNECT. Guest links are coming soon.</p>
+                <p class="text-slate-600 mt-4 text-sm">Clients with an assigned role can join via Bmydesk. Guest links are coming soon.</p>
             </details>
             <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
                 <summary class="font-bold text-slate-900 flex justify-between items-center">Is remote desktop secure? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
@@ -300,7 +299,7 @@
 <section class="py-20 bg-slate-900 text-white">
     <div class="max-w-4xl mx-auto px-4 text-center">
         <h2 class="text-3xl lg:text-5xl font-extrabold mb-6">Ready to unify your IT workflow?</h2>
-        <p class="text-slate-400 mb-10 text-lg">Join companies already using B-CONNECT to ship faster and support clients better.</p>
+        <p class="text-slate-400 mb-10 text-lg">Join companies already using Bmydesk to ship faster and support clients better.</p>
         <a href="{{ route('bconnect.register') }}" class="inline-block px-10 py-4 text-lg font-bold text-slate-900 bg-brand hover:bg-brandDark rounded-full transition shadow-xl shadow-brand/30">Create Free Workspace</a>
     </div>
 </section>
@@ -309,8 +308,7 @@
 <footer class="bg-white border-t border-slate-100 py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex items-center gap-2">
-            <img src="{{ $bconnectBrand['logo'] }}" class="h-8 w-8 rounded" alt="B-CONNECT">
-            <span class="font-bold text-slate-900">B-CONNECT</span>
+            <img src="{{ $bconnectBrand['logo'] }}" class="h-8 w-auto" alt="{{ $bconnectBrand['name'] }}">
         </div>
         <div class="text-sm text-slate-500">
             {!! $bconnectBrand['footer_text'] !!}

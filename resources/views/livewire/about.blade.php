@@ -48,8 +48,64 @@
         </div>
     </section>
 
-    <!-- Team -->
+    <!-- Registered Company -->
     <section class="py-24 bg-white dark:bg-slate-900 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div>
+                    <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm mb-2 block">A Government Registered Company</span>
+                    <h2 class="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-6">{{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}</h2>
+                    <p class="text-slate-600 dark:text-slate-300 leading-relaxed mb-8">
+                        Believoo is incorporated under the Companies Act, 2013 by the Ministry of Corporate Affairs, Government of India. When you work with us, you are doing business with a legally registered Indian private limited company — accountable, verifiable, and here for the long term.
+                    </p>
+                    <dl class="grid sm:grid-cols-2 gap-4">
+                        @if($settings['company_cin'] ?? false)
+                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                            <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Corporate Identity Number (CIN)</dt>
+                            <dd class="font-mono font-bold text-slate-900 dark:text-white">{{ $settings['company_cin'] }}</dd>
+                        </div>
+                        @endif
+                        @if($settings['company_incorporation_date'] ?? false)
+                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                            <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Date of Incorporation</dt>
+                            <dd class="font-bold text-slate-900 dark:text-white">{{ $settings['company_incorporation_date'] }}</dd>
+                        </div>
+                        @endif
+                        @if($settings['company_pan'] ?? false)
+                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                            <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">PAN</dt>
+                            <dd class="font-mono font-bold text-slate-900 dark:text-white">{{ $settings['company_pan'] }}</dd>
+                        </div>
+                        @endif
+                        @if($settings['company_tan'] ?? false)
+                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                            <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">TAN</dt>
+                            <dd class="font-mono font-bold text-slate-900 dark:text-white">{{ $settings['company_tan'] }}</dd>
+                        </div>
+                        @endif
+                    </dl>
+                </div>
+                <div class="bg-slate-900 rounded-3xl p-10 text-white shadow-2xl">
+                    <div class="w-14 h-14 rounded-2xl bg-amber-500/20 flex items-center justify-center mb-6">
+                        <i class="fas fa-certificate text-amber-400 text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Registered Office</h3>
+                    <p class="text-slate-300 leading-relaxed mb-8">{{ $settings['company_registered_office'] ?? $settings['address'] ?? 'Uttar Pradesh, India' }}</p>
+                    <div class="flex items-center gap-3 text-sm text-slate-400 mb-8">
+                        <i class="fas fa-check-circle text-emerald-400"></i>
+                        <span>Company limited by shares · Active on MCA records</span>
+                    </div>
+                    <a href="https://www.mca.gov.in" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition">
+                        <i class="fas fa-external-link-alt text-xs"></i>
+                        Verify on mca.gov.in
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team -->
+    <section class="py-24 bg-slate-50 dark:bg-slate-800 transition-colors">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16">
                 <span class="text-amber-600 font-semibold tracking-wider uppercase text-sm mb-2 block">Meet The Team</span>

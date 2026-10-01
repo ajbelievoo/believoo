@@ -1,4 +1,8 @@
 <x-layouts.believoo :settings="$settings">
+    @php
+        // PAYU-REVIEW: display INR prices (service prices are stored in USD)
+        $usdInrRate = \App\Models\ExchangeRate::getUsdToInrRate() ?: 83;
+    @endphp
     <!-- Hero Section -->
     <section class="relative min-h-screen flex items-center py-16 overflow-hidden bg-slate-50">
         <div class="absolute inset-0 z-0 pointer-events-none opacity-40" style="background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 32px 32px;"></div>
@@ -10,24 +14,24 @@
                         Growth Scale Partner
                     </span>
                     <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight mb-6">
-                        Cloud, VPS, B-CONNECT SaaS & Software Solutions for Growing Businesses
+                        Cloud, VPS, Web Hosting & Software Solutions for Growing Businesses
                     </h1>
-                    <a href="https://bc.believoo.com/" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-100 text-cyan-700 text-sm font-semibold mb-6 hover:bg-cyan-200 transition">
-                        <i class="fas fa-rocket text-xs"></i> New: B-CONNECT Workspace — Video, Remote, Billing & AI
-                    </a>
+                    <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-100 text-cyan-700 text-sm font-semibold mb-6">
+                        <i class="fas fa-server text-xs"></i> NVMe VPS & Cloud Infrastructure — Instant Provisioning
+                    </span>
                     <p class="text-lg md:text-xl font-semibold text-amber-600 mb-5" style="min-height:1.75rem;">
-                        Expertise in <span data-bel-typing data-bel-words="VPS Hosting|Web Hosting|B-CONNECT SaaS|Live Streaming|Domain Services|App Development|Custom Software"></span><span class="bel-typed-caret"></span>
+                        Expertise in <span data-bel-typing data-bel-words="VPS Hosting|Web Hosting|Cloud & DevOps|Domain Services|App Development|Custom Software"></span><span class="bel-typed-caret"></span>
                     </p>
                     <p class="text-lg text-slate-600 mb-8 max-w-xl leading-relaxed">
-                        Believoo delivers VPS hosting, web hosting, live streaming infrastructure, domain services and custom software engineering — built to scale your business in India and worldwide.
+                        Believoo delivers VPS hosting, web hosting, domain services and custom software engineering — built to scale your business in India and worldwide.
                     </p>
                     <div class="flex flex-wrap gap-4">
                         <a href="#services" class="bel-magnetic inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition shadow-lg shadow-amber-500/25">
                             Explore Services
                             <i class="fas fa-arrow-right text-sm"></i>
                         </a>
-                        <a href="https://bc.believoo.com/register" class="bel-magnetic inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition shadow-lg shadow-cyan-500/25">
-                            Try B-CONNECT Free
+                        <a href="{{ route('vps-plans.index') }}" class="bel-magnetic inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition shadow-lg shadow-cyan-500/25">
+                            View VPS Plans
                             <i class="fas fa-rocket text-sm"></i>
                         </a>
                         <a href="{{ route('contact') }}" class="bel-magnetic inline-flex items-center justify-center px-8 py-4 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-white hover:border-slate-400 transition">
@@ -50,6 +54,12 @@
                             <div class="text-sm text-slate-500">Support</div>
                         </div>
                     </div>
+                    @if($settings['company_cin'] ?? false)
+                    <div class="mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                        <i class="fas fa-certificate"></i>
+                        <span>{{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }} · MCA Registered · CIN: {{ $settings['company_cin'] }}</span>
+                    </div>
+                    @endif
                 </div>
                 <div class="relative">
                     <div class="relative aspect-square max-w-lg mx-auto">
@@ -223,7 +233,7 @@
                         <p class="text-sm text-slate-500 leading-relaxed mb-3">{!! strip_tags($service->description) !!}</p>
                         <div class="mt-auto">
                             <span class="text-xs text-slate-400 font-medium">{{ $service->price_label ?: 'Starting from' }}</span>
-                            <div class="text-2xl font-bold text-amber-600">${{ number_format($service->price, 2) }}</div>
+                            <div class="text-2xl font-bold text-amber-600">₹{{ number_format($service->price * $usdInrRate, 0) }}</div>
                         </div>
                     </a>
                 @empty
@@ -252,7 +262,7 @@
                         <p class="text-slate-500 leading-relaxed mb-4 line-clamp-3">{!! strip_tags($service->description) !!}</p>
                         <div class="flex items-baseline justify-between mb-4">
                             <span class="text-sm text-slate-400">{{ $service->price_label ?: 'Starting from' }}</span>
-                            <span class="text-xl font-bold text-amber-600">${{ number_format($service->price, 2) }}</span>
+                            <span class="text-xl font-bold text-amber-600">₹{{ number_format($service->price * $usdInrRate, 0) }}</span>
                         </div>
                         <span class="inline-flex items-center gap-2 text-amber-600 font-semibold text-sm group-hover:gap-3 transition-all">
                             Learn more <i class="fas fa-arrow-right text-xs"></i>
@@ -367,6 +377,7 @@
         </div>
     </section>
 
+    {{-- PAYU-REVIEW: brands & Bmydesk sections hidden during payment-gateway review — restore after approval
     <!-- Our Brands -->
     <section id="brands" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
@@ -378,18 +389,18 @@
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
 
-                <!-- B-CONNECT -->
+                <!-- Bmydesk -->
                 <a href="https://bc.believoo.com/" target="_blank" rel="noopener" class="bel-tilt group relative bg-slate-900 rounded-3xl p-8 overflow-hidden border border-slate-800 hover:border-cyan-400/50 transition-all block">
                     <div class="absolute -top-16 -right-16 w-48 h-48 bg-cyan-400/10 rounded-full blur-3xl group-hover:bg-cyan-400/20 transition-colors"></div>
                     <div class="relative">
                         <div class="w-14 h-14 rounded-2xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center mb-6">
                             <i class="fas fa-video text-2xl text-cyan-400"></i>
                         </div>
-                        <h3 class="text-2xl font-black text-white mb-1">B-CONNECT</h3>
+                        <h3 class="text-2xl font-black text-white mb-1">Bmydesk</h3>
                         <p class="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-4">Unified IT Workspace</p>
                         <p class="text-slate-400 text-sm leading-relaxed mb-6">Video calls, remote desktop, bug tracking, AI summaries, billing aur team collaboration — ek hi platform pe.</p>
                         <span class="inline-flex items-center gap-2 text-cyan-400 font-semibold text-sm group-hover:gap-3 transition-all">
-                            Visit B-CONNECT <i class="fas fa-arrow-right text-xs"></i>
+                            Visit Bmydesk <i class="fas fa-arrow-right text-xs"></i>
                         </span>
                     </div>
                 </a>
@@ -445,13 +456,13 @@
         </div>
     </section>
 
-    <!-- B-CONNECT SaaS Section -->
+    <!-- Bmydesk SaaS Section -->
     <section id="bconnect" class="py-24 bg-slate-900">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
              class="transition-all duration-700 ease-out">
             <div class="text-center mb-16">
                 <span class="text-cyan-400 font-semibold tracking-wider uppercase text-sm">SaaS Platform</span>
-                <h2 class="text-3xl md:text-4xl font-bold text-white mt-2">B-CONNECT — One Workspace for IT Teams</h2>
+                <h2 class="text-3xl md:text-4xl font-bold text-white mt-2">Bmydesk — One Workspace for IT Teams</h2>
                 <p class="text-slate-400 mt-4 max-w-2xl mx-auto">IT companies, developers aur clients ke liye global SaaS platform. Sab kuch ek hi jagah — meetings, remote support, projects, billing aur AI summaries.</p>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -486,7 +497,7 @@
             </div>
             <div class="text-center">
                 <a href="https://bc.believoo.com/register" class="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition shadow-lg shadow-cyan-500/25">
-                    Start Free on B-CONNECT <i class="fas fa-arrow-right text-sm"></i>
+                    Start Free on Bmydesk <i class="fas fa-arrow-right text-sm"></i>
                 </a>
                 <a href="https://bc.believoo.com/login" class="ml-4 inline-flex items-center gap-2 px-8 py-4 rounded-xl border border-slate-600 text-white font-semibold hover:bg-slate-800 transition">
                     Client Login
@@ -494,6 +505,7 @@
             </div>
         </div>
     </section>
+    --}}
 
     <!-- Testimonials -->
     @php
@@ -664,6 +676,7 @@
         '@type' => 'Organization',
         '@id' => url('/') . '#organization',
         'name' => $settings['site_name'] ?? 'Believoo',
+        'legalName' => $settings['company_legal_name'] ?? null,
         'url' => url('/'),
         'aggregateRating' => [
             '@type' => 'AggregateRating',

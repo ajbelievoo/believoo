@@ -6,9 +6,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-12">
             <h1 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">Our Services</h1>
-            <p class="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">VPS hosting, web hosting, live streaming and software solutions for businesses in India and worldwide.</p>
+            <p class="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">VPS hosting, web hosting and software solutions for businesses in India and worldwide.</p>
             <div class="mt-6 flex justify-center gap-4">
-                <a href="https://ghc.believoo.com/domain/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition">
+                <a href="{{ route('client.domains.search') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition">
                     <i class="fas fa-globe"></i> Register a Domain
                 </a>
             </div>

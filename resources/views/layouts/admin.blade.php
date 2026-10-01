@@ -13,7 +13,7 @@
             ['route' => 'admin.leads.index', 'icon' => 'fa-user-plus', 'label' => 'Leads'],
         ],
         'Brands' => [
-            ['route' => 'admin.bconnect.index', 'icon' => 'fa-rocket', 'label' => 'B-CONNECT'],
+            ['route' => 'admin.bconnect.index', 'icon' => 'fa-rocket', 'label' => 'Bmydesk'],
             ['route' => 'admin.ghc.index', 'icon' => 'fa-cloud', 'label' => 'GHC'],
             ['route' => 'admin.ovh-products.index', 'icon' => 'fa-cubes', 'label' => 'OVH Products'],
             ['route' => 'admin.ovh-pricing-rules.index', 'icon' => 'fa-sliders-h', 'label' => 'OVH Pricing Rules'],

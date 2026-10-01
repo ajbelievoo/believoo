@@ -1,9 +1,9 @@
 @extends('layouts.admin')
-@section('title', 'B-CONNECT Super Admin')
+@section('title', 'Bmydesk Super Admin')
 @section('content')
 <div class="page-header">
     <div>
-        <h1 class="page-title"><i class="fas fa-rocket" style="color:var(--admin-accent);margin-right:10px;"></i>B-CONNECT Super Admin</h1>
+        <h1 class="page-title"><i class="fas fa-rocket" style="color:var(--admin-accent);margin-right:10px;"></i>Bmydesk Super Admin</h1>
         <p class="page-subtitle">Unified brand and company management inside Believoo.</p>
     </div>
     <div class="page-actions">

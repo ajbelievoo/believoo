@@ -135,7 +135,7 @@ if (window.Echo && window.Echo.connector) {
             setStatus(`${e.member_name} drew a stroke`);
         });
 } else {
-    console.warn('[B-CONNECT Whiteboard] Real-time sync unavailable. Echo/Reverb not connected.');
+    console.warn('[Bmydesk Whiteboard] Real-time sync unavailable. Echo/Reverb not connected.');
 }
 
 clearBtn.addEventListener('click', () => { if(confirm('Clear whiteboard?')) { strokes=[]; redraw(); saveFull(); } });

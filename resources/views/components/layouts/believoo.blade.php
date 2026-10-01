@@ -13,8 +13,8 @@
         $settings = $settings ?? \App\Models\Setting::pluck('value', 'key');
         $siteName = $settings['site_name'] ?? config('app.name', 'Believoo');
         $siteTitle = $settings['meta_title'] ?? $siteName;
-        $siteDesc = $settings['meta_description'] ?? 'Premium VPS, web hosting and live streaming infrastructure.';
-        $siteKeywords = $settings['meta_keywords'] ?? 'vps, hosting, streaming, domains';
+        $siteDesc = $settings['meta_description'] ?? 'Premium VPS, web hosting and custom software development.';
+        $siteKeywords = $settings['meta_keywords'] ?? 'vps, hosting, cloud, domains, software development';
         $pageTitle = $title ?? $siteTitle;
         $pageDesc = $description ?? $siteDesc;
         $pageKeywords = $keywords ?? $siteKeywords;
@@ -847,7 +847,8 @@
         }
         #bel-announce-close:hover { opacity: 1; }
         body.bel-has-announce { padding-top: 42px; }
-        body.bel-has-announce header { top: 42px !important; }
+        body.bel-has-announce header,
+        body.bel-has-announce .bel-site-header { top: 42px !important; }
         body.bel-has-announce #bel-progress { top: 42px; }
 
         /* ===== Social proof popup ===== */
@@ -1010,6 +1011,29 @@
             'logo' => asset('favicon.ico'),
             'description' => $siteDesc,
         ];
+        if (!empty($settings['company_legal_name'])) {
+            $schema['legalName'] = $settings['company_legal_name'];
+        }
+        if (!empty($settings['company_cin'])) {
+            $schema['identifier'] = [
+                '@type' => 'PropertyValue',
+                'propertyID' => 'CIN',
+                'value' => $settings['company_cin'],
+            ];
+        }
+        if (!empty($settings['company_incorporation_date'])) {
+            $incDate = strtotime($settings['company_incorporation_date']);
+            if ($incDate) {
+                $schema['foundingDate'] = date('Y-m-d', $incDate);
+            }
+        }
+        if (!empty($settings['company_registered_office'])) {
+            $schema['address'] = [
+                '@type' => 'PostalAddress',
+                'streetAddress' => $settings['company_registered_office'],
+                'addressCountry' => 'IN',
+            ];
+        }
         if (!empty($socialLinks)) {
             $schema['sameAs'] = array_values($socialLinks);
         }
@@ -1204,7 +1228,8 @@
                     'item' => trim(($o->service_name ?? 'a service') . ' ' . ($o->tier_name ?? '')),
                     'time' => $o->paid_at ? $o->paid_at->diffForHumans() : '',
                 ];
-            })->filter(fn($o) => $o['name'] !== '' && $o['item'] !== '')->values();
+            })->filter(fn($o) => $o['name'] !== '' && $o['item'] !== ''
+                && !str_contains(strtolower($o['item']), 'stream'))->values(); // PAYU-REVIEW: hide streaming orders
     @endphp
     @if($belOrders->count() >= 2)
     <div id="bel-proof" aria-live="polite">
@@ -1248,7 +1273,7 @@
                 <div class="flex justify-between items-center">
                     <!-- B Hosting Logo -->
                     <div class="flex-shrink-0 flex items-center gap-3">
-                        <a href="{{ route('hosting') }}" class="flex items-center gap-3">
+                        <a href="{{ route('home') }}" class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
                                 <span class="text-black font-black text-xl">B</span>
                             </div>
@@ -1261,10 +1286,10 @@
                     
                     <!-- Desktop Navigation -->
                     <div class="hidden md:flex items-center space-x-8">
-                        <a href="{{ route('hosting') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('hosting') }}">Home</a>
-                        <a href="{{ route('web-hosting') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('web-hosting') }}">Web Hosting</a>
-                        <a href="{{ route('vps-hosting') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('vps-hosting') }}">VPS</a>
-                        <a href="https://ghc.believoo.com/domain/" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Domains</a>
+                        <a href="{{ route('home') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('hosting') }}">Home</a>
+                        <a href="{{ route('services.show', 'web-hosting-vps') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('web-hosting') }}">Web Hosting</a>
+                        <a href="{{ route('vps-plans.index') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('vps-hosting') }}">VPS</a>
+                        <a href="{{ route('client.domains.search') }}" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Domains</a>
                         <a href="https://support.believoo.com" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Support</a>
                         
                         <!-- Theme Toggle - All B Hosting Pages -->
@@ -1280,7 +1305,7 @@
                             </a>
                         @else
                             <a href="{{ route('login') }}" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Login</a>
-                            <a href="{{ route('vps-hosting') }}" class="px-5 py-2.5 rounded-lg bhosting-btn text-sm font-bold uppercase tracking-wide hover:shadow-lg hover:shadow-cyan-500/30 transition-all">
+                            <a href="{{ route('vps-plans.index') }}" class="px-5 py-2.5 rounded-lg bhosting-btn text-sm font-bold uppercase tracking-wide hover:shadow-lg hover:shadow-cyan-500/30 transition-all">
                                 Get Started
                             </a>
                         @endauth
@@ -1298,10 +1323,10 @@
             <!-- Mobile Menu -->
             <div x-show="mobileMenuOpen" x-cloak class="md:hidden bg-[#0a0a1a] border-t border-white/5">
                 <div class="px-4 py-4 space-y-2">
-                    <a href="{{ route('hosting') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-white font-bold">Home</a>
-                    <a href="{{ route('web-hosting') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Web Hosting</a>
-                    <a href="{{ route('vps-hosting') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">VPS Servers</a>
-                    <a href="https://ghc.believoo.com/domain/" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Domains</a>
+                    <a href="{{ route('home') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-white font-bold">Home</a>
+                    <a href="{{ route('services.show', 'web-hosting-vps') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Web Hosting</a>
+                    <a href="{{ route('vps-plans.index') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">VPS Servers</a>
+                    <a href="{{ route('client.domains.search') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Domains</a>
                     <a href="https://support.believoo.com" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Support</a>
                     <!-- Mobile Theme Toggle -->
                     <button onclick="window.toggleGlobalTheme()"
@@ -1319,7 +1344,7 @@
                             <a href="{{ route('client.dashboard') }}" class="block py-3 px-4 rounded-lg bg-cyan-500 text-black font-bold text-center">Dashboard</a>
                         @else
                             <a href="{{ route('login') }}" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300 text-center">Login</a>
-                            <a href="{{ route('vps-hosting') }}" class="block py-3 px-4 mt-2 rounded-lg bhosting-btn text-center font-bold">Get Started</a>
+                            <a href="{{ route('vps-plans.index') }}" class="block py-3 px-4 mt-2 rounded-lg bhosting-btn text-center font-bold">Get Started</a>
                         @endauth
                     </div>
                 </div>
@@ -1328,7 +1353,7 @@
     </header>
     @else
     <!-- BELIEVOO MAIN HEADER -->
-    <div class="sticky top-0 z-[100000000] bg-white shadow-sm">
+    <div class="bel-site-header sticky top-0 z-[100000000] bg-white shadow-sm">
         <div class="bg-slate-900 text-slate-300 text-xs py-2 border-b border-slate-800">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                 <div class="flex items-center gap-4">
@@ -1370,10 +1395,12 @@
                                     <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-500"></span>
                                 @endif
                             </a>
+                            {{-- PAYU-REVIEW: Bmydesk nav link hidden during payment-gateway review
                             <a href="https://bc.believoo.com" target="_blank"
                                class="relative text-sm font-bold text-brand hover:text-brandDark transition-colors">
-                                B-CONNECT
+                                Bmydesk
                             </a>
+                            --}}
                             <div class="relative group" x-data="{ open: false }">
                                 <button @click="open = !open" @mouseenter="open = true" class="hover:text-amber-600 transition-colors text-sm font-medium flex items-center gap-1 text-slate-600">
                                     Services <i class="fas fa-chevron-down text-[10px] transition-transform" :class="open ? 'rotate-180' : ''"></i>
@@ -1412,9 +1439,7 @@
                                 @endif
                             </a>
 
-                            <a href="https://ghc.believoo.com/domain/"
-                               target="_blank"
-                               rel="noopener noreferrer"
+                            <a href="{{ route('client.domains.search') }}"
                                class="relative text-sm font-medium transition-colors text-slate-600 hover:text-amber-600">
                                 Domains
                             </a>
@@ -1489,10 +1514,12 @@
                        class="flex items-center justify-between py-4 px-4 rounded-2xl hover:bg-slate-100 transition-colors text-slate-700 text-lg font-black uppercase tracking-widest min-h-[56px] {{ request()->routeIs('home') ? 'text-amber-600' : '' }}">
                         Home <i class="fas fa-arrow-right text-sm opacity-30"></i>
                     </a>
+                    {{-- PAYU-REVIEW: Bmydesk nav link hidden during payment-gateway review
                     <a href="https://bc.believoo.com" @click="mobileMenuOpen = false"
                        class="flex items-center justify-between py-4 px-4 rounded-2xl hover:bg-slate-100 transition-colors text-slate-700 text-lg font-black uppercase tracking-widest min-h-[56px]">
-                        B-CONNECT <i class="fas fa-arrow-right text-sm opacity-30 text-brand"></i>
+                        Bmydesk <i class="fas fa-arrow-right text-sm opacity-30 text-brand"></i>
                     </a>
+                    --}}
                     <div x-data="{ open: false }">
                         <button @click="open = !open"
                                 class="w-full flex items-center justify-between py-4 px-4 rounded-2xl hover:bg-slate-100 transition-colors text-slate-700 text-lg font-black uppercase tracking-widest min-h-[56px]">
@@ -1593,7 +1620,7 @@
                 <span class="text-gray-400">Believoo ecosystem:</span>
                 <a href="https://believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Believoo</a>
                 <a href="https://ghc.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">GHC</a>
-                <a href="https://bc.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">B-Connect</a>
+                <a href="https://bc.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Bmydesk</a>
                 <a href="https://mail.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Webmail</a>
             </div>
             <div>
@@ -1632,7 +1659,7 @@
             <div class="grid md:grid-cols-5 gap-8 mb-12">
                 <!-- Brand -->
                 <div class="md:col-span-2">
-                    <a href="{{ route('hosting') }}" class="flex items-center gap-3 mb-4">
+                    <a href="{{ route('home') }}" class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
                             <span class="text-black font-black text-xl">B</span>
                         </div>
@@ -1657,10 +1684,10 @@
                 <div>
                     <h4 class="text-white font-bold uppercase text-sm tracking-wider mb-4">Products</h4>
                     <ul class="space-y-3">
-                        <li><a href="{{ route('web-hosting') }}" class="bhosting-footer-link text-sm">Web Hosting</a></li>
-                        <li><a href="{{ route('vps-hosting') }}" class="bhosting-footer-link text-sm">VPS Servers</a></li>
-                        <li><a href="/dedicated-servers.html" class="bhosting-footer-link text-sm">Dedicated Servers</a></li>
-                        <li><a href="https://ghc.believoo.com/domain/" class="bhosting-footer-link text-sm">Domain Registration</a></li>
+                        <li><a href="{{ route('services.show', 'web-hosting-vps') }}" class="bhosting-footer-link text-sm">Web Hosting</a></li>
+                        <li><a href="{{ route('vps-plans.index') }}" class="bhosting-footer-link text-sm">VPS Servers</a></li>
+                        <li><a href="{{ route('vps-plans.index') }}" class="bhosting-footer-link text-sm">Dedicated Servers</a></li>
+                        <li><a href="{{ route('client.domains.search') }}" class="bhosting-footer-link text-sm">Domain Registration</a></li>
                     </ul>
                 </div>
                 
@@ -1696,16 +1723,24 @@
                         <span class="text-gray-400 text-xs font-medium">{{ $badge }}</span>
                     </div>
                 @endforeach
+                <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+                    <i class="fas fa-building text-cyan-400 text-sm"></i>
+                    <span class="text-gray-400 text-xs font-medium">MCA Registered Company</span>
+                </div>
             </div>
-            
+
             <!-- Bottom -->
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="text-gray-500 text-sm">
-                    © {{ date('Y') }} <span class="text-cyan-400 font-semibold">B Hosting</span> by Believoo Systems. All rights reserved.
+                <div class="text-gray-500 text-sm text-center md:text-left">
+                    © {{ date('Y') }} <span class="text-cyan-400 font-semibold">B Hosting</span> by {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}. All rights reserved.
+                    @if($settings['company_cin'] ?? false)
+                        <div class="text-gray-600 text-xs mt-1">CIN: {{ $settings['company_cin'] }} · Incorporated under the Companies Act, 2013, Govt. of India</div>
+                    @endif
                 </div>
                 <div class="flex gap-6">
                     <a href="{{ route('policy') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Privacy Policy</a>
                     <a href="{{ route('terms') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Terms of Service</a>
+                    <a href="{{ route('refund') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Refund Policy</a>
                     <a href="#" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">SLA</a>
                 </div>
             </div>
@@ -1774,20 +1809,63 @@
                     <ul class="space-y-3 text-sm">
                         <li><a href="{{ route('services.index') }}" class="hover:text-amber-500 transition-colors">Browse Services</a></li>
                         <li><a href="{{ route('client.dashboard') }}" class="hover:text-amber-500 transition-colors">My Portal</a></li>
-                        <li><a href="https://bc.believoo.com" class="hover:text-amber-500 transition-colors">B-CONNECT Workspace</a></li>
+                        {{-- PAYU-REVIEW: external brand links hidden during payment-gateway review
+                        <li><a href="https://bc.believoo.com" class="hover:text-amber-500 transition-colors">Bmydesk Workspace</a></li>
                         <li><a href="https://ghc.believoo.com" class="hover:text-amber-500 transition-colors">GHC Cloud Hosting</a></li>
+                        --}}
                         <li><a href="{{ route('login') }}" class="hover:text-amber-500 transition-colors">Account Login</a></li>
                         <li><a href="{{ route('home') }}#inquiry" class="hover:text-amber-500 transition-colors">Start Project</a></li>
                     </ul>
                 </div>
             </div>
 
+            <div class="border-t border-slate-800 pt-12 pb-4">
+                <h4 class="font-bold text-white mb-6 text-sm uppercase tracking-wider">All Products</h4>
+                @php
+                    // PAYU-REVIEW: external product links removed during payment-gateway review — restore after approval
+                    $allProducts = [
+                        ['Web Hosting', route('services.show', 'web-hosting-vps')],
+                        ['VPS Servers', route('vps-plans.index')],
+                        ['Website Builder', route('services.show', 'web-application-development')],
+                        ['Domains', route('client.domains.search')],
+                        ['Email Marketing', route('services.show', 'seo-digital-growth')],
+                        ['Reputation Management', route('services.show', 'seo-digital-growth')],
+                        ['SEO', route('services.show', 'seo-digital-growth')],
+                        ['Business Website', route('services.show', 'web-application-development')],
+                    ];
+                @endphp
+                <ul class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-8 gap-y-3 text-sm text-slate-400">
+                    @foreach($allProducts as [$label, $url])
+                        <li><a href="{{ $url }}" class="hover:text-amber-500 transition-colors">{{ $label }}</a></li>
+                    @endforeach
+                </ul>
+            </div>
+
+            @if(($settings['company_cin'] ?? false) || ($settings['company_legal_name'] ?? false))
+            <div class="border-t border-slate-800 pt-6 pb-2 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-certificate text-amber-500"></i>
+                    <span>{{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }} is incorporated under the Companies Act, 2013, Ministry of Corporate Affairs, Govt. of India.</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center">
+                    @if($settings['company_cin'] ?? false)<span>CIN: {{ $settings['company_cin'] }}</span>@endif
+                    @if($settings['company_pan'] ?? false)<span>PAN: {{ $settings['company_pan'] }}</span>@endif
+                </div>
+            </div>
+            @endif
+
             <div class="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
                 <a href="{{ route('home') }}" class="flex items-center">
                     <x-site-logo :settings="$settings" class="h-10 w-auto" mode="dark" />
                 </a>
-                <div class="text-slate-500 text-xs">
-                    &copy; {{ date('Y') }} Believoo. All rights reserved.
+                <div class="text-slate-500 text-xs text-center">
+                    &copy; {{ date('Y') }} {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}. All rights reserved.
+                    <div class="text-slate-600 text-[11px] mt-1">A brand of {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}.</div>
+                    <div class="flex gap-4 justify-center mt-2 text-[11px]">
+                        <a href="{{ route('policy') }}" class="hover:text-amber-500 transition-colors">Privacy Policy</a>
+                        <a href="{{ route('terms') }}" class="hover:text-amber-500 transition-colors">Terms of Service</a>
+                        <a href="{{ route('refund') }}" class="hover:text-amber-500 transition-colors">Refund Policy</a>
+                    </div>
                 </div>
                 <div class="flex gap-4">
                     @php

@@ -9,7 +9,7 @@
         <p class="page-subtitle">Welcome back! Here's what's happening today.</p>
     </div>
     <div class="page-actions">
-        <a href="{{ route('admin.bconnect.index') }}" class="btn btn-primary"><i class="fas fa-network-wired"></i>B-CONNECT</a>
+        <a href="{{ route('admin.bconnect.index') }}" class="btn btn-primary"><i class="fas fa-network-wired"></i>Bmydesk</a>
         <a href="{{ route('admin.ghc.index') }}" class="btn btn-secondary"><i class="fas fa-cloud"></i>GHC</a>
     </div>
 </div>

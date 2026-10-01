@@ -43,7 +43,11 @@
                     <!-- Footer -->
                     <tr>
                         <td style="padding:24px 40px 40px; text-align:center; border-top:1px solid #e2e8f0;">
-                            <p style="margin:0 0 8px; color:#94a3b8; font-size:12px;">© {{ date('Y') }} {{ config('app.name') }} — Growth Scale Partner. All rights reserved.</p>
+                            @php($emailCo = \App\Models\Setting::whereIn('key', ['company_legal_name','company_cin'])->pluck('value','key'))
+                            <p style="margin:0 0 8px; color:#94a3b8; font-size:12px;">© {{ date('Y') }} {{ $emailCo['company_legal_name'] ?? config('app.name') }} — Growth Scale Partner. All rights reserved.</p>
+                            @if($emailCo['company_cin'] ?? false)
+                            <p style="margin:0 0 8px; color:#b0b8c4; font-size:11px;">Incorporated under the Companies Act, 2013, Govt. of India · CIN: {{ $emailCo['company_cin'] }}</p>
+                            @endif
                             <p style="margin:0 0 8px; color:#94a3b8; font-size:12px;">
                                 <a href="{{ config('app.url') }}" style="color:#0077cc; text-decoration:underline;">Website</a> &middot;
                                 <a href="mailto:support@believoo.com" style="color:#0077cc; text-decoration:underline;">Support</a> &middot;

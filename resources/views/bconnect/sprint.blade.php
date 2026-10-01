@@ -64,7 +64,7 @@ $burndown = $sprint->burndown_data;
                 }
                 @endphp
                 <polyline fill="none" stroke="rgba(148,163,184,0.4)" stroke-width="2" stroke-dasharray="4,4" points="{{ $pointsIdeal }}" />
-                <polyline fill="none" stroke="#00b7ff" stroke-width="3" points="{{ $pointsActual }}" />
+                <polyline fill="none" stroke="{{ $bconnectBrand['brand_color_light'] ?? '#a78bfa' }}" stroke-width="3" points="{{ $pointsActual }}" />
                 @foreach($burndown['labels'] as $i => $label)
                 <text x="{{ $i * 60 + 30 }}" y="195" text-anchor="middle" font-size="10" fill="#64748b">{{ $label }}</text>
                 @endforeach

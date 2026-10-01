@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class BconnectDueDateReminders extends Command
 {
     protected $signature = 'bconnect:due-date-reminders';
-    protected $description = 'Send B-Connect notifications for tickets and sprints nearing due dates.';
+    protected $description = 'Send Bmydesk notifications for tickets and sprints nearing due dates.';
 
     public function handle(): int
     {
@@ -52,7 +52,7 @@ class BconnectDueDateReminders extends Command
             BconnectNotificationService::sendToCompanyAdmins($sprint->company_id, 'sprint', $title, $message, route('bconnect.sprints.show', $sprint->id));
         }
 
-        $this->info('B-Connect due date reminders sent.');
+        $this->info('Bmydesk due date reminders sent.');
         return 0;
     }
 }

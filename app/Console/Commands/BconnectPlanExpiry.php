@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class BconnectPlanExpiry extends Command
 {
     protected $signature = 'bconnect:plan-expiry';
-    protected $description = 'Downgrade B-CONNECT companies whose paid plan has expired';
+    protected $description = 'Downgrade Bmydesk companies whose paid plan has expired';
 
     public function handle()
     {

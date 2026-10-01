@@ -3,7 +3,7 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
                 <h1 class="text-4xl font-black text-slate-900 tracking-tight mb-1">Support Tickets</h1>
-                <p class="text-slate-500 text-sm">All your tickets from Believoo, GHC and B-Connect in one place.</p>
+                <p class="text-slate-500 text-sm">All your tickets from Believoo, GHC and Bmydesk in one place.</p>
             </div>
             <button wire:click="$toggle('showCreate')" class="px-6 py-3 rounded-full bg-[#00b7ff] text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-all shadow-lg shadow-blue-200">
                 <i class="fas fa-plus mr-1"></i> New Ticket
@@ -20,7 +20,7 @@
                             <select wire:model.live="category" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:border-[#00b7ff]">
                                 <option value="Believoo">Believoo</option>
                                 <option value="GHC">GHC Cloud</option>
-                                <option value="B-Connect">B-Connect</option>
+                                <option value="Bmydesk">Bmydesk</option>
                                 <option value="Webmail">Webmail</option>
                                 <option value="Other">Other</option>
                             </select>
@@ -85,7 +85,7 @@
                                 <span class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
                                     @if($ticket['platform'] === 'Believoo') bg-indigo-50 text-indigo-600 border-indigo-200
                                     @elseif($ticket['platform'] === 'GHC') bg-cyan-50 text-cyan-600 border-cyan-200
-                                    @elseif($ticket['platform'] === 'B-Connect') bg-emerald-50 text-emerald-600 border-emerald-200
+                                    @elseif($ticket['platform'] === 'Bmydesk') bg-emerald-50 text-emerald-600 border-emerald-200
                                     @else bg-slate-50 text-slate-600 border-slate-200 @endif">
                                     {{ $ticket['platform'] }}
                                 </span>

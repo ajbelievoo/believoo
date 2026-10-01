@@ -16,7 +16,7 @@
 
         if ($isBc) {
             $brand = \App\Helpers\BconnectHelper::brandData();
-            $brandName = $brand['brand_name'] ?? 'B-CONNECT';
+            $brandName = $brand['brand_name'] ?? 'Bmydesk';
             $logo = $brand['logo'] ?? '';
             $primary = $brand['primary_color'] ?? '#00B7FF';
             $bg = '#ffffff';

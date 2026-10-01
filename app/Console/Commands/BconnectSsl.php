@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\File;
 class BconnectSsl extends Command
 {
     protected $signature = 'bconnect:ssl {domain}';
-    protected $description = 'Create SSL certificate for a B-CONNECT custom domain';
+    protected $description = 'Create SSL certificate for a Bmydesk custom domain';
 
     public function handle()
     {

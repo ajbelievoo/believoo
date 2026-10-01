@@ -74,6 +74,12 @@ Route::get('/announcements.json', [\App\Http\Controllers\AnnouncementFeedControl
 Route::post('/push/subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.subscribe');
 Route::view('/offline', 'offline')->name('offline');
 
+// PNB non-individual account opening form (fill & print)
+Route::view('/forms/pnb-non-individual', 'forms.pnb.index')->name('forms.pnb-non-individual');
+
+// Image Studio - crop, resize & compress to target size (100% client-side)
+Route::view('/image-tools', 'tools.image-tools')->name('image-tools');
+
 Route::get('/', function () {
     $services = Service::where('is_active', true)
         ->whereNotIn('category', ['ovh_dedicated', 'ovh_web_hosting', 'ovh_vps'])
@@ -92,7 +98,9 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/services', ServiceIndex::class)->name('services.index');
-Route::get('/services/streaming', [\App\Http\Controllers\StreamingPlansController::class, 'index'])->name('services.streaming');
+// PAYU-REVIEW: streaming sales pages hidden during payment-gateway review — restore after approval
+Route::get('/services/streaming', fn() => redirect()->route('services.index'))
+    ->name('services.streaming');
 Route::get('/services/{service:slug}', ServiceDetail::class)->name('services.show');
 Route::get('/portfolio', PortfolioIndex::class)->name('portfolio.index');
 Route::get('/portfolio/{portfolio:slug}', PortfolioDetail::class)->name('portfolio.show');
@@ -108,6 +116,11 @@ Route::get('/policy', function() {
     $settings = App\Models\Setting::pluck('value', 'key');
     return view('policy', compact('settings'));
 })->name('policy');
+
+Route::get('/refund', function() {
+    $settings = App\Models\Setting::pluck('value', 'key');
+    return view('refund', compact('settings'));
+})->name('refund');
 
 // XML Sitemap
 Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap');
@@ -176,6 +189,13 @@ Route::post('/domains/search', [App\Http\Controllers\Client\DomainController::cl
 
 // Domain Registration Form (accessible to guests, will redirect to login if needed)
 Route::get('/domains/register', [App\Http\Controllers\Client\DomainController::class, 'showRegistrationForm'])->name('client.domains.register.form');
+
+// VPS Plans Routes (Public) — plan browsing is public; configure/order requires auth
+Route::prefix('vps')->name('vps-plans.')->group(function () {
+    Route::get('/', [App\Http\Controllers\VpsPlanController::class, 'index'])->name('index');
+    Route::get('/category/{category}', [App\Http\Controllers\VpsPlanController::class, 'category'])->name('category');
+    Route::get('/{vpsPlan:slug}', [App\Http\Controllers\VpsPlanController::class, 'show'])->name('show');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/client/dashboard', ClientDashboard::class)->name('client.dashboard')->middleware('check.phone');
@@ -299,11 +319,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{domain}/auto-renew', [App\Http\Controllers\Client\DomainController::class, 'toggleAutoRenew'])->name('auto-renew.toggle');
     });
 
-    // VPS Plans Routes (Public)
+    // VPS Plans Routes (auth-only actions)
     Route::prefix('vps')->name('vps-plans.')->group(function () {
-        Route::get('/', [App\Http\Controllers\VpsPlanController::class, 'index'])->name('index');
-        Route::get('/category/{category}', [App\Http\Controllers\VpsPlanController::class, 'category'])->name('category');
-        Route::get('/{vpsPlan:slug}', [App\Http\Controllers\VpsPlanController::class, 'show'])->name('show');
         Route::get('/{vpsPlan:slug}/configure', [App\Http\Controllers\VpsPlanController::class, 'configure'])->name('configure');
         Route::post('/{vpsPlan:slug}/set-os', [App\Http\Controllers\VpsPlanController::class, 'setOs'])->name('set-os');
     });
@@ -409,11 +426,11 @@ Route::get('/admin/login', [App\Http\Controllers\Auth\AuthenticatedSessionContro
 Route::post('/admin/login', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'store']);
 
 // ── Streaming Services Routes ────────────────────────────────────────
-Route::get('/services/streaming', [StreamingPlansController::class, 'index'])
-    ->name('services.streaming');
-Route::get('/services/streaming/checkout/{planSlug}', [StreamingPlansController::class, 'checkout'])
+// PAYU-REVIEW: public streaming sales pages redirected during payment-gateway review — restore controller routes after approval
+// (the '/services/streaming' index redirect lives next to the services routes so it wins over the {service:slug} wildcard)
+Route::get('/services/streaming/checkout/{planSlug}', fn() => redirect()->route('services.index'))
     ->name('services.streaming.checkout');
-Route::post('/services/streaming/process', [StreamingPlansController::class, 'processOrder'])
+Route::post('/services/streaming/process', fn() => redirect()->route('services.index'))
     ->name('services.streaming.process');
 
 // ── Streaming Engine — Auth-guarded client routes ────────────────────

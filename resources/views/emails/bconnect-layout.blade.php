@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $bconnectBrand['title'] ?? 'B-CONNECT' }}</title>
+    <title>{{ $bconnectBrand['title'] ?? 'Bmydesk' }}</title>
     <style type="text/css">
         body { margin:0; padding:0; background:#f4f9fd; }
         table { border-collapse:collapse; mso-table-lspace:0pt; mso-table-rspace:0pt; }
@@ -21,7 +21,7 @@
                     <tr>
                         <td style="background-color:#0a0a1a; background-image:linear-gradient(135deg,#0a0a1a 0%,#101c3a 55%,#0a2540 100%); padding:34px 30px 30px; text-align:center;">
                             <a href="https://bc.believoo.com" style="display:inline-block;">
-                                <img src="{{ $bconnectBrand['logo'] ?? 'https://bc.believoo.com/images/bconnect-logo.png' }}" alt="{{ $bconnectBrand['title'] ?? 'B-CONNECT' }}" style="max-width:180px; height:auto; display:block; margin:0 auto;">
+                                <img src="{{ $bconnectBrand['logo'] ?? 'https://bc.believoo.com/images/bconnect-logo.png' }}" alt="{{ $bconnectBrand['title'] ?? 'Bmydesk' }}" style="max-width:180px; height:auto; display:block; margin:0 auto;">
                             </a>
                         </td>
                     </tr>
@@ -37,7 +37,7 @@
                     <!-- Footer -->
                     <tr>
                         <td style="padding:24px 40px 40px; text-align:center; border-top:1px solid #e2e8f0;">
-                            <p style="margin:0 0 8px; color:#94a3b8; font-size:12px;">© {{ date('Y') }} {{ $bconnectBrand['title'] ?? 'B-CONNECT' }} — a Believoo workspace</p>
+                            <p style="margin:0 0 8px; color:#94a3b8; font-size:12px;">© {{ date('Y') }} {{ $bconnectBrand['title'] ?? 'Bmydesk' }} — a Believoo workspace</p>
                             <p style="margin:0 0 8px; color:#94a3b8; font-size:12px;">
                                 <a href="https://bc.believoo.com" style="color:#0077cc; text-decoration:underline;">Workspace</a> &middot;
                                 <a href="mailto:support@believoo.com" style="color:#0077cc; text-decoration:underline;">Support</a> &middot;

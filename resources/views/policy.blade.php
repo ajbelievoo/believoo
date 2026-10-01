@@ -9,7 +9,7 @@
             <div class="glass p-10 rounded-[2.5rem] space-y-12 text-gray-400 leading-relaxed text-lg">
                 <section>
                     <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tight">1. Information We Collect</h2>
-                    <p class="mb-4">At Believoo, we take your privacy seriously. We collect information that identifies, relates to, describes, or could reasonably be linked, directly or indirectly, with a particular consumer or device.</p>
+                    <p class="mb-4">At {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }} ("Believoo"), we take your privacy seriously. We collect information that identifies, relates to, describes, or could reasonably be linked, directly or indirectly, with a particular consumer or device.</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                         <div class="bg-white/5 p-6 rounded-2xl border border-white/10">
                             <h3 class="text-white font-bold mb-2">Personal Identifiers</h3>
@@ -66,7 +66,10 @@
                     <p class="mb-4">If you have any questions about this Privacy Policy, you can contact us:</p>
                     <ul class="list-none space-y-2">
                         <li><i class="fas fa-envelope text-electric-violet mr-2"></i> <strong>Email:</strong> legal@believoo.com</li>
-                        <li><i class="fas fa-map-marker-alt text-electric-violet mr-2"></i> <strong>Location:</strong> Bisauli, Rajpur, Baduan, Uttar Pradesh</li>
+                        <li><i class="fas fa-map-marker-alt text-electric-violet mr-2"></i> <strong>Registered Office:</strong> {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}, {{ $settings['company_registered_office'] ?? $settings['address'] ?? 'Bisauli, Rajpur, Budaun, Uttar Pradesh' }}</li>
+                        @if($settings['company_cin'] ?? false)
+                        <li><i class="fas fa-certificate text-electric-violet mr-2"></i> <strong>CIN:</strong> {{ $settings['company_cin'] }}</li>
+                        @endif
                     </ul>
                 </section>
             </div>

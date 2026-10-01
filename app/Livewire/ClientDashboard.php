@@ -2083,6 +2083,16 @@ class ClientDashboard extends Component
         Auth::user()->unreadNotifications->markAsRead();
     }
 
+    public function openNotification(string $id)
+    {
+        $notification = Auth::user()->notifications()->find($id);
+        if (!$notification) {
+            return;
+        }
+        $notification->markAsRead();
+        $this->redirect(\App\Support\NotificationLink::url($notification));
+    }
+
     public function createTicket()
     {
         $this->validate([

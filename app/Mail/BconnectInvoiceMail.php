@@ -25,12 +25,12 @@ class BconnectInvoiceMail extends Mailable
         $subject = match($this->type) {
             'paid' => 'Payment received: Invoice #' . $this->invoice->invoice_number,
             'reminder' => 'Invoice #' . $this->invoice->invoice_number . ' is due',
-            default => 'Invoice #' . $this->invoice->invoice_number . ' from Believoo B-CONNECT',
+            default => 'Invoice #' . $this->invoice->invoice_number . ' from Bmydesk by Believoo',
         };
 
         return new Envelope(
             subject: $subject,
-            from: new \Illuminate\Mail\Mailables\Address('bconnect@believoo.com', 'Believoo B-Connect'),
+            from: new \Illuminate\Mail\Mailables\Address('bconnect@believoo.com', 'Bmydesk by Believoo'),
             replyTo: [new \Illuminate\Mail\Mailables\Address('support@believoo.com', 'Believoo Support')],
         );
     }
@@ -62,7 +62,7 @@ class BconnectInvoiceMail extends Mailable
                     ->withMime('application/pdf'),
             ];
         } catch (\Throwable $e) {
-            \Log::error('B-Connect invoice PDF attachment failed: ' . $e->getMessage());
+            \Log::error('Bmydesk invoice PDF attachment failed: ' . $e->getMessage());
             return [];
         }
     }

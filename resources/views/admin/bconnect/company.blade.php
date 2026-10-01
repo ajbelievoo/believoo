@@ -1,5 +1,5 @@
 @extends('layouts.admin')
-@section('title', 'B-CONNECT Company')
+@section('title', 'Bmydesk Company')
 @section('content')
 <div class="page-header">
     <div>
@@ -7,7 +7,7 @@
         <p class="page-subtitle">Company profile, plan and billing overview.</p>
     </div>
     <div class="page-actions">
-        <a href="{{ route('admin.bconnect.index') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i>Back to B-CONNECT</a>
+        <a href="{{ route('admin.bconnect.index') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i>Back to Bmydesk</a>
     </div>
 </div>
 

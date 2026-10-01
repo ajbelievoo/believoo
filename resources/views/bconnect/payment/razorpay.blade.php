@@ -14,7 +14,7 @@ const options = {
     key: @json($key),
     amount: {{ $order['amount'] }},
     currency: @json($order['currency']),
-    name: 'Believoo B-CONNECT',
+    name: 'Believoo Bmydesk',
     description: 'Invoice #{{ $invoice->invoice_number }}',
     order_id: @json($order['id']),
     handler: function (response) {
@@ -30,7 +30,7 @@ const options = {
         document.body.appendChild(form);
         form.submit();
     },
-    prefill: { name: 'B-CONNECT Customer', email: 'customer@believoo.com' },
+    prefill: { name: 'Bmydesk Customer', email: 'customer@believoo.com' },
     theme: { color: '#06b6d4' }
 };
 const rzp = new Razorpay(options);

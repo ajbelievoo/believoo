@@ -11,11 +11,11 @@ class AgentController extends Controller {
         $r->validate(['os' => 'required|in:windows,macos', 'message' => 'nullable']);
         $companyId = $r->input('bconnect_company_id');
         $member = $r->input('bconnect_member');
-        $body = "B-CONNECT desktop agent beta request\n\nCompany ID: {$companyId}\nUser: {$member->user->name} ({$member->user->email})\nOS: {$r->os}\nMessage: " . ($r->message ?: 'N/A');
+        $body = "Bmydesk desktop agent beta request\n\nCompany ID: {$companyId}\nUser: {$member->user->name} ({$member->user->email})\nOS: {$r->os}\nMessage: " . ($r->message ?: 'N/A');
 
         try {
             Mail::raw($body, function ($m) {
-                $m->to('support@believoo.com')->subject('B-CONNECT Agent Beta Request');
+                $m->to('support@believoo.com')->subject('Bmydesk Agent Beta Request');
             });
         } catch (\Throwable $e) {
             \Log::warning('Agent beta request email failed: ' . $e->getMessage());

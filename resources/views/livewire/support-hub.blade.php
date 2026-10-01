@@ -785,7 +785,11 @@
                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
                 audio.play().catch(e => console.log('Audio play failed:', e));
                 if (window.Notification && Notification.permission === 'granted' && document.hidden) {
-                    new Notification('Believoo Support', { body: 'You have a new message from our team.', icon: '/favicon.ico' });
+                    const n = new Notification('Believoo Support', { body: 'You have a new message from our team.', icon: '/favicon.ico' });
+                    n.onclick = () => {
+                        window.focus();
+                        @this.set('isOpen', true);
+                    };
                 }
             });
 

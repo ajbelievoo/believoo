@@ -32,7 +32,7 @@
             <i class="fas fa-bell"></i> Push
         </button>
         <button type="button" onclick="showTab('bconnect')" class="settings-tab" data-tab="bconnect">
-            <i class="fas fa-rocket"></i> B-CONNECT
+            <i class="fas fa-rocket"></i> Bmydesk
         </button>
         <button type="button" onclick="showTab('email')" class="settings-tab" data-tab="email">
             <i class="fas fa-envelope"></i> Email/SMTP
@@ -752,7 +752,7 @@
             <div id="agora" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Agora Video/Voice Settings</h3>
-                    <p style="font-size: 0.875rem; color: var(--text-muted);">Configure Agora.io for B-CONNECT video conferences and audio calls.</p>
+                    <p style="font-size: 0.875rem; color: var(--text-muted);">Configure Agora.io for Bmydesk video conferences and audio calls.</p>
                 </div>
                 <div style="padding: 24px;">
                     <div style="border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; background: var(--bg-tertiary);">
@@ -772,7 +772,7 @@
                         <div style="margin-top: 16px;">
                             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                 <input type="checkbox" name="agora_enabled" value="1" {{ ($settings['agora_enabled'] ?? '0') == '1' ? 'checked' : '' }}>
-                                <span style="font-size: 0.875rem; color: var(--text-primary);">Enable Agora for B-CONNECT</span>
+                                <span style="font-size: 0.875rem; color: var(--text-primary);">Enable Agora for Bmydesk</span>
                             </label>
                         </div>
                         <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
@@ -809,7 +809,7 @@
             <div id="push" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Push Notification Settings</h3>
-                    <p style="font-size: 0.875rem; color: var(--text-muted);">VAPID keys for browser push on B-CONNECT</p>
+                    <p style="font-size: 0.875rem; color: var(--text-muted);">VAPID keys for browser push on Bmydesk</p>
                 </div>
                 <div style="padding: 24px;">
                     <div style="display: grid; grid-template-columns: repeat(1, 1fr); gap: 20px;">
@@ -825,27 +825,38 @@
                 </div>
             </div>
 
-            <!-- B-CONNECT Brand & SEO -->
+            <!-- Bmydesk Brand & SEO -->
             <div id="bconnect" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
-                    <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">B-CONNECT Brand & SEO</h3>
+                    <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Bmydesk Brand & SEO</h3>
                     <p style="font-size: 0.875rem; color: var(--text-muted);">Logo, title, favicon, meta tags and Google verification for bc.believoo.com</p>
                 </div>
                 <div style="padding: 24px;">
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
                         <div>
-                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">B-CONNECT Logo</label>
-                            @if(!empty($settings['bconnect_logo']))<img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($settings['bconnect_logo']) }}" class="h-10 mb-2 rounded" alt="B-CONNECT Logo">@endif
+                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Product Name</label>
+                            <input type="text" name="bconnect_name" value="{{ $settings['bconnect_name'] ?? 'Bmydesk' }}" placeholder="Bmydesk" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Brand Color</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" name="bconnect_brand_color" value="{{ $settings['bconnect_brand_color'] ?? '#7c3aed' }}" style="width: 52px; height: 44px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-tertiary); padding: 4px; cursor: pointer;">
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">Accent color used across the Bmydesk site & workspace</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Bmydesk Logo</label>
+                            @if(!empty($settings['bconnect_logo']))<img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($settings['bconnect_logo']) }}" style="display: block; max-height: 48px; max-width: 220px; width: auto; margin-bottom: 10px; border-radius: 8px; background: rgba(148,163,184,0.08); padding: 4px;" alt="Bmydesk Logo">@endif
                             <input type="file" name="bconnect_logo" accept="image/*" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; font-size: 0.85rem; color: var(--text-primary);">
                         </div>
                         <div>
-                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">B-CONNECT Favicon</label>
-                            @if(!empty($settings['bconnect_favicon']))<img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($settings['bconnect_favicon']) }}" class="h-8 mb-2 rounded" alt="B-CONNECT Favicon">@endif
+                            <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Bmydesk Favicon</label>
+                            @if(!empty($settings['bconnect_favicon']))<img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($settings['bconnect_favicon']) }}" style="display: block; max-height: 32px; max-width: 32px; width: auto; margin-bottom: 10px; border-radius: 6px; background: rgba(148,163,184,0.08); padding: 2px;" alt="Bmydesk Favicon">@endif
                             <input type="file" name="bconnect_favicon" accept="image/*" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; font-size: 0.85rem; color: var(--text-primary);">
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Open Graph Image</label>
-                            @if(!empty($settings['bconnect_og_image']))<img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($settings['bconnect_og_image']) }}" class="h-16 mb-2 rounded" alt="OG Image">@endif
+                            @if(!empty($settings['bconnect_og_image']))<img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($settings['bconnect_og_image']) }}" style="display: block; max-height: 110px; max-width: 220px; width: auto; margin-bottom: 10px; border-radius: 8px; background: rgba(148,163,184,0.08); padding: 4px;" alt="OG Image">@endif
                             <input type="file" name="bconnect_og_image" accept="image/*" style="width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; font-size: 0.85rem; color: var(--text-primary);">
                         </div>
                         <div>

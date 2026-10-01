@@ -34,6 +34,10 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/', [AdminController::class, 'dashboard']);
 
+    // Header notifications
+    Route::post('notifications/read-all', [AdminController::class, 'markAllNotificationsRead'])->name('notifications.read-all');
+    Route::post('notifications/{id}/read', [AdminController::class, 'markNotificationRead'])->name('notifications.read');
+
     // Unified brand management hub
     Route::get('/brands', [BrandController::class, 'index'])->name('brands.index');
 

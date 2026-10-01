@@ -46,7 +46,7 @@ class MemberController extends Controller {
             Mail::to($user->email)->send(new BconnectMemberInvite($user, $password));
             $msg = 'Member invited. Temporary password sent to ' . $user->email;
         } catch (\Throwable $e) {
-            \Log::warning('B-Connect member invite email failed: ' . $e->getMessage());
+            \Log::warning('Bmydesk member invite email failed: ' . $e->getMessage());
             $msg = 'Member created but email failed. Password: ' . $password;
         }
 

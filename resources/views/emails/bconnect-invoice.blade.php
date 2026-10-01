@@ -20,7 +20,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>B-CONNECT Invoice</h1>
+            <h1>Bmydesk Invoice</h1>
         </div>
         <div class="body">
             <p>Hi {{ $invoice->client?->user?->name ?? 'there' }},</p>
@@ -39,7 +39,7 @@
             <a href="{{ $payUrl }}" class="button">Pay Invoice</a>
         </div>
         <div class="footer">
-            B-CONNECT by Believoo &bull; support@believoo.com
+            Bmydesk by Believoo &bull; support@believoo.com
         </div>
     </div>
 </body>

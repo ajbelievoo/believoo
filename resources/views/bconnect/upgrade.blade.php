@@ -2,7 +2,7 @@
 @section('title', 'Upgrade Plan')
 @section('content')
 <div class="max-w-5xl mx-auto">
-    <h2 class="text-2xl font-bold text-white mb-2">Upgrade B-CONNECT Plan</h2>
+    <h2 class="text-2xl font-bold text-white mb-2">Upgrade Bmydesk Plan</h2>
     <p class="text-slate-400 mb-8">Current plan: <span class="text-cyan-400 font-bold">{{ ucfirst($company->plan) }}</span></p>
 
     <form method="POST" action="{{ route('bconnect.billing.upgrade.process') }}" class="space-y-6">

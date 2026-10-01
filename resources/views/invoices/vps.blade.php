@@ -239,7 +239,7 @@
         <div class="header">
             <div class="brand">
                 <div>
-                    <div class="brand-name">BELIEVOO</div>
+                    <div class="brand-name">{{ $settings['company_name'] ?? 'BELIEVOO' }}</div>
                     <div class="brand-tagline">Cloud Hosting Solutions</div>
                 </div>
             </div>
@@ -366,12 +366,18 @@
 
         {{-- Footer --}}
         <div class="footer">
-            <div class="footer-brand">BELIEVOO</div>
+            <div class="footer-brand">{{ $settings['company_name'] ?? 'BELIEVOO' }}</div>
             <div class="footer-text">{{ $settings['company_address'] ?? 'Your Company Address' }}</div>
             <div class="footer-text">
-                Email: {{ $settings['company_email'] ?? 'billing@believoo.com' }} | 
+                Email: {{ $settings['company_email'] ?? 'billing@believoo.com' }} |
                 Website: {{ $settings['company_website'] ?? 'https://believoo.com' }}
             </div>
+            @if($settings['company_cin'] ?? false)
+                <div class="footer-text" style="margin-top: 10px;">CIN: {{ $settings['company_cin'] }}</div>
+            @endif
+            @if($settings['company_pan'] ?? false)
+                <div class="footer-text">PAN: {{ $settings['company_pan'] }}</div>
+            @endif
             @if($settings['gst_number'] ?? false)
                 <div class="footer-text" style="margin-top: 10px;">GST Number: {{ $settings['gst_number'] }}</div>
             @endif

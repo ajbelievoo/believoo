@@ -25,7 +25,7 @@ class BconnectNotification extends Mailable
     {
         return new Envelope(
             subject: $this->emailSubject,
-            from: new \Illuminate\Mail\Mailables\Address('bconnect@believoo.com', 'Believoo B-Connect'),
+            from: new \Illuminate\Mail\Mailables\Address('bconnect@believoo.com', 'Bmydesk by Believoo'),
             replyTo: [new \Illuminate\Mail\Mailables\Address('support@believoo.com', 'Believoo Support')],
         );
     }

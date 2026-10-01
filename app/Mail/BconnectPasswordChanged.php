@@ -20,8 +20,8 @@ class BconnectPasswordChanged extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your B-Connect password was updated',
-            from: new Address('bconnect@believoo.com', 'Believoo B-Connect'),
+            subject: 'Your Bmydesk password was updated',
+            from: new Address('bconnect@believoo.com', 'Bmydesk by Believoo'),
             replyTo: [new Address('support@believoo.com', 'Believoo Support')],
         );
     }

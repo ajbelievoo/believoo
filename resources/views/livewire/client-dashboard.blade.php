@@ -132,11 +132,13 @@
                         </div>
                         <div class="p-2">
                             @forelse(Auth::user()->notifications()->latest()->take(5)->get() as $n)
-                                <div class="p-3 rounded-xl hover:bg-white/5 transition-all {{ $n->read_at ? 'opacity-50' : '' }}">
+                                <a href="{{ \App\Support\NotificationLink::url($n) }}"
+                                   wire:click.prevent="openNotification('{{ $n->id }}')"
+                                   class="block p-3 rounded-xl hover:bg-white/5 transition-all cursor-pointer {{ $n->read_at ? 'opacity-50' : '' }}">
                                     <p class="text-xs text-white font-bold">{{ $n->data['title'] ?? 'Notification' }}</p>
-                                    <p class="text-[10px] text-gray-400 mt-0.5">{{ $n->data['body'] ?? '' }}</p>
+                                    <p class="text-[10px] text-gray-400 mt-0.5">{{ $n->data['body'] ?? ($n->data['message'] ?? '') }}</p>
                                     <p class="text-[9px] text-gray-600 mt-1">{{ $n->created_at->diffForHumans() }}</p>
-                                </div>
+                                </a>
                             @empty
                                 <div class="p-6 text-center text-gray-500 text-xs">No notifications</div>
                             @endforelse
@@ -161,7 +163,7 @@
                                 <i class="fas fa-cloud text-cyan-400"></i> GHC Cloud
                             </a>
                             <a href="https://bc.believoo.com/dashboard" target="_blank" rel="noopener" class="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                                <i class="fas fa-comments text-emerald-400"></i> B-Connect
+                                <i class="fas fa-comments text-emerald-400"></i> Bmydesk
                             </a>
                             <a href="https://mail.believoo.com" target="_blank" rel="noopener" class="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                                 <i class="fas fa-envelope text-amber-400"></i> Webmail

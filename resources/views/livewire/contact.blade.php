@@ -32,13 +32,17 @@
                     </div>
 
                     <div class="pb-6 border-b border-slate-100">
-                        <h3 class="font-bold text-slate-900 mb-3">Office Address</h3>
+                        <h3 class="font-bold text-slate-900 mb-3">Registered Office</h3>
                         <div class="flex items-start gap-3">
                             <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 flex-shrink-0">
                                 <i class="fas fa-map-marker-alt text-sm"></i>
                             </div>
                             <div class="flex-1">
-                                <p class="text-slate-600 text-sm leading-relaxed">{{ $settings['address'] ?? 'London, United Kingdom' }}</p>
+                                <p class="text-slate-900 font-medium text-sm">{{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}</p>
+                                <p class="text-slate-600 text-sm leading-relaxed mt-1">{{ $settings['address'] ?? 'London, United Kingdom' }}</p>
+                                @if($settings['company_cin'] ?? false)
+                                    <p class="text-slate-500 text-xs mt-2">CIN: {{ $settings['company_cin'] }}</p>
+                                @endif
                                 <a href="https://maps.google.com/?q={{ urlencode($settings['address'] ?? 'London, UK') }}" target="_blank" class="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition">
                                     View on Map
                                 </a>

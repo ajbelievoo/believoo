@@ -26,7 +26,7 @@ class SupportTickets extends Component
         'subject' => 'required|min:5',
         'message' => 'required|min:10',
         'priority' => 'required|in:low,medium,high,urgent',
-        'category' => 'required|in:Believoo,GHC,B-Connect,Webmail,Other',
+        'category' => 'required|in:Believoo,GHC,Bmydesk,Webmail,Other',
         'attachment' => 'nullable|file|max:5120',
     ];
 
@@ -69,7 +69,7 @@ class SupportTickets extends Component
             \Illuminate\Support\Facades\Log::warning('Believoo tickets load failed: ' . $e->getMessage());
         }
 
-        // B-Connect tickets
+        // Bmydesk tickets
         try {
             BconnectTicket::whereHas('reporter', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
@@ -84,14 +84,14 @@ class SupportTickets extends Component
                     'subject' => $t->title,
                     'message' => $t->description,
                     'status' => $t->status,
-                    'platform' => 'B-Connect',
+                    'platform' => 'Bmydesk',
                     'created_at' => $t->created_at,
-                    'source' => 'B-Connect',
+                    'source' => 'Bmydesk',
                     'url' => 'https://bc.believoo.com/dashboard/tickets',
                 ]);
             });
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('B-Connect tickets load failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Bmydesk tickets load failed: ' . $e->getMessage());
         }
 
         // GHC tickets
@@ -178,8 +178,8 @@ class SupportTickets extends Component
             }
         }
 
-        // B-Connect -> create ticket in bconnect_tickets (or Believoo as fallback)
-        if ($this->category === 'B-Connect') {
+        // Bmydesk -> create ticket in bconnect_tickets (or Believoo as fallback)
+        if ($this->category === 'Bmydesk') {
             try {
                 $member = \App\Models\Bconnect\Member::where('user_id', $user->id)->first();
                 if ($member) {
@@ -199,12 +199,12 @@ class SupportTickets extends Component
                         ->send(new \App\Mail\SupportTicketExternal($mailData));
                 } else {
                     $ticket = $this->createBelievooTicket($user);
-                    $mailData['platform'] = 'B-Connect (via Believoo)';
+                    $mailData['platform'] = 'Bmydesk (via Believoo)';
                     \Illuminate\Support\Facades\Mail::to($this->getSupportEmail())
                         ->send(new \App\Mail\SupportTicketCreated($ticket));
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('B-Connect ticket creation failed: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('Bmydesk ticket creation failed: ' . $e->getMessage());
             }
         }
 

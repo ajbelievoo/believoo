@@ -32,7 +32,7 @@ class PushController extends Controller {
             $sub['endpoint'] = $s->endpoint;
             $webPush->queueNotification(
                 Subscription::create($sub),
-                json_encode(['title' => 'B-CONNECT', 'body' => 'Test notification', 'url' => 'https://bc.believoo.com'])
+                json_encode(['title' => 'Bmydesk', 'body' => 'Test notification', 'url' => 'https://bc.believoo.com'])
             );
         }
         return response()->json(['success' => true, 'sent' => $subs->count()]);

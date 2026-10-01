@@ -17,7 +17,7 @@
             {{-- Currency Toggle --}}
             <div class="inline-flex bg-dark-2 rounded-full p-1 mt-6 border border-white/10">
                 @php
-                    $userCurrency = session('currency', 'USD');
+                    $userCurrency = session('currency', $currentCurrency ?? 'INR');
                     $rate = \App\Models\ExchangeRate::getUsdToInrRate();
                 @endphp
                 <button 
@@ -125,9 +125,14 @@
                                         <span class="text-3xl font-bold text-white">{{ $priceSymbol }}{{ $priceFormatted }}</span>
                                         <span class="text-gray-400 text-sm">/mo</span>
                                     </div>
+                                    {{-- PAYU-REVIEW: secondary USD equivalent hidden during review
                                     @if($userCurrency === 'INR')
                                         <span class="text-xs text-gray-500">(${{ number_format($priceUsd, 2) }} USD)</span>
                                     @else
+                                        <span class="text-xs text-gray-500">(₹{{ number_format($priceInr, 0) }} INR)</span>
+                                    @endif
+                                    --}}
+                                    @if($userCurrency !== 'INR')
                                         <span class="text-xs text-gray-500">(₹{{ number_format($priceInr, 0) }} INR)</span>
                                     @endif
                                     @if($plan->installation_free)

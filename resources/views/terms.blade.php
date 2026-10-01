@@ -9,12 +9,12 @@
             <div class="glass p-10 rounded-[2.5rem] space-y-12 text-gray-400 leading-relaxed text-lg">
                 <section>
                     <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tight">1. Acceptance of Terms</h2>
-                    <p>By accessing and using Believoo's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.</p>
+                    <p>These Terms of Service govern your use of services provided by {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }} ("Believoo", "we", "us"), a company incorporated under the Companies Act, 2013, Government of India @if($settings['company_cin'] ?? false)(CIN: {{ $settings['company_cin'] }})@endif. By accessing and using Believoo's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.</p>
                 </section>
 
                 <section>
                     <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tight">2. Service Description</h2>
-                    <p>Believoo provides digital infrastructure, software development, and cloud architecture services. The specific scope of work for each project will be defined in a separate Service Agreement.</p>
+                    <p>{{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }} provides digital infrastructure, software development, and cloud architecture services. The specific scope of work for each project will be defined in a separate Service Agreement.</p>
                 </section>
 
                 <section>
@@ -40,6 +40,9 @@
                 <section>
                     <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tight">7. Contact</h2>
                     <p>For any questions regarding these terms, please contact us at legal@believoo.com</p>
+                    @if($settings['company_registered_office'] ?? $settings['address'] ?? false)
+                        <p class="mt-4 text-sm text-gray-500">Registered Office: {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}, {{ $settings['company_registered_office'] ?? $settings['address'] }}</p>
+                    @endif
                 </section>
             </div>
         </div>

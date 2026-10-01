@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\File;
 class BconnectCustomDomain extends Command
 {
     protected $signature = 'bconnect:domain {company_id} {domain}';
-    protected $description = 'Create Nginx vhost for a B-CONNECT company custom domain';
+    protected $description = 'Create Nginx vhost for a Bmydesk company custom domain';
 
     public function handle()
     {

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>B-CONNECT Setup</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Bmydesk Setup</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/css/bconnect.css">
 <script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'#00b7ff'}}}};</script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}}};</script>
 <style>body{background:var(--bc-bg);color:var(--bc-text);font-family:Inter,ui-sans-serif,system-ui,sans-serif;}</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 <div class="w-full max-w-lg">
     <div class="text-center mb-8">
-        <img src="{{ $bconnectBrand['logo'] ?? 'https://believoo.com/images/bconnect-logo.png' }}" class="h-16 w-16 rounded-xl mx-auto mb-4" alt="B-CONNECT">
+        <img src="{{ $bconnectBrand['logo'] ?? 'https://believoo.com/images/bconnect-logo.png' }}" class="h-16 w-auto max-w-[220px] mx-auto mb-4 object-contain" alt="Bmydesk">
         <h1 class="text-3xl font-black text-cyan-400 mb-2">Create your workspace</h1>
-        <p class="text-slate-400 text-sm">Set up your B-CONNECT company in seconds.</p>
+        <p class="text-slate-400 text-sm">Set up your Bmydesk company in seconds.</p>
     </div>
     <div class="bc-card p-8">
         @if(session('error'))<div class="mb-4 p-3 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-sm"><i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}</div>@endif

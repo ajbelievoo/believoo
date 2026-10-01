@@ -122,3 +122,56 @@ Examples:
 - End-of-meeting `POST /meetings/{room}/end` now stores the final transcript and triggers `MeetingAiService` for structured notes.
 - Notes view at `/meetings/{room}/notes` shows transcript and AI notes.
 - Requires `ai_gemini_api_key` (notes) and `ai_openai_api_key` (Whisper) in Settings; falls back gracefully if missing.
+
+## PHP/cURL TLS for modern payment APIs (PayU / Razorpay)
+
+- The PHP 8.2 build links libcurl against OpenSSL 1.1.1o (`/usr/local/openssl111`). Some endpoints (Razorpay `api.razorpay.com`) fail TLS handshake from PHP unless libcurl uses the system OpenSSL 3.x library.
+- Fix: `env[LD_LIBRARY_PATH] = /usr/lib/x86_64-linux-gnu` is set in `/www/server/php/82/etc/php-fpm.conf` and `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu` is exported in `/etc/cron.d/believoo-ecosystem` and `/etc/profile.d/believoo_php_openssl.sh` so FPM, cron, and shell `php82` calls use system OpenSSL for cURL.
+- After editing `php-fpm.conf`, restart with `sudo systemctl restart php-fpm-82`.
+- Payment credentials live in `/www/wwwroot/.payment.env` and are loaded into each platform's settings by the appropriate loader command (Believoo `payment:load-credentials`, Music `scripts/load_payment_env.php`, GHC restart, ZonixPanel manual sync).
+
+## hitune.in brand site & rv.hitune.in (added 2026-09-22)
+
+- `hitune.in` now serves a static brand/landing site from `/www/wwwroot/hitunesite/` (index + privacy-policy/terms/copyright/refund pages, Tailwind CDN, dark navy `#0a0a1a` + `#00b7ff`/`#8b5cf6` accents, panda logo copied from `/www/wwwroot/music/logo.png`). vhost: `/www/server/panel/vhost/nginx/hitune.in.conf`.
+- The previous hitune.in site — the **Hitune VIBE** Laravel blog (`/www/wwwroot/hitune`, DB `hitune_blog`) — moved to `rv.hitune.in` (vhost `rv.hitune.in.conf`, same webroot `/www/wwwroot/hitune/public`, `APP_URL=https://rv.hitune.in` in its `.env`; `SESSION_DOMAIN=.hitune.in` still covers it).
+- `rv.hitune.in` cert issued via `/root/.acme.sh/acme.sh` (Let's Encrypt, webroot `/www/wwwroot/acme-challenge`), installed to `/www/server/panel/vhost/cert/rv.hitune.in/` with `nginx -s reload` reloadcmd. The `hitune.in` vhost has an acme-challenge fallback to the old Laravel webroot so aaPanel/LE renewals keep working.
+- hitune.in DNS is on Cloudflare with a wildcard record (`rv.hitune.in` resolved before any DNS change was needed).
+- SSL audit 2026-09-23: `web`, `rtc`, `live`, `withdrax`, `panel`.hitune.in certs were expired/missing (CF error 526). All re-issued via acme.sh (Let's Encrypt, shared webroot `/www/wwwroot/acme-challenge` — each vhost has `location ^~ /.well-known/acme-challenge/`). panel.hitune.in got a new `listen 443` block. Note: `/www/wwwroot/panel`, `/www/wwwroot/live`, `/www/wwwroot/hitune/withdrax` webroots do NOT exist — those vhosts 404 at app level (dead sites, not an SSL issue).
+
+## Hitune unified login + distribution domain (2026-09-23)
+
+- `distribution.hitune.in` now serves the **web distribution app** (`/www/wwwroot/web`, PHP 7.4 via `php-cgi-74.sock`) — same dark site as `web.hitune.in`. The old BOF `distribution.php` page is no longer reachable at that host (acme.sh renewal still uses `-w /www/wwwroot/music`; the vhost maps `/.well-known/acme-challenge/` back to that webroot).
+- **Single login across Hitune Music + Distribution**: `web/includes/sso_sync.php` bridges `web.users` ↔ `musicpro._u_list` (BusyOwl user table; bcrypt-compatible `password_verify`, login requires `time_verify`).
+  - `login.php`: falls back to music creds, auto-provisions local row, syncs password on mismatch.
+  - `signup.php` / `google_callback.php`: mirror new accounts into `_u_list` (role_ids='2'; google users get a random hash, verified).
+  - `verify_email.php`: sets `_u_list.time_verify` after web verification. `reset_password.php`: syncs new password to music.
+  - MySQL: `web`@`localhost`/`127.0.0.1` granted `SELECT, INSERT` + `UPDATE(password)` on `musicpro._u_list` only. MySQL root password is in panel `default.db` config (`mysql_root` key).
+
+## Hitune Distribution app (web.hitune.in / distribution.hitune.in) — 2026-09-28
+
+- Custom PHP app at `/www/wwwroot/web` — see **`/www/wwwroot/web/AGENTS.md`** for full notes.
+- Release workflow: `draft→submitted→in_progress→ready→live` + `rejected`/`takedown_requested`/`taken_down`; admin status changes email the artist (`includes/email_helper.php::sendReleaseStatusEmail`); per-platform `delivery_status`+`store_url` in `release_platforms`.
+- Payments: Cashfree PG v3 verified server-to-server (`GET /orders/{id}` → PAID), webhook checks `x-webhook-signature`; Razorpay signature + plan resolved from payments row.
+- Royalties: admin CSV import (`royalty_imports` batch table, file-hash dedupe) → `track_royalties` → user balance → `payouts` (admin approves in `admin/payouts.php`; `withdrawal_requests` is legacy/unused).
+- ISRC/UPC auto-assign gated by `settings.auto_assign_codes` (`includes/code_assign.php`), runs on ready/live.
+- Debug/setup files moved out of docroot → `/www/wwwroot/_removed_debug/`.
+
+## Auth & Email state (2026-09-28 audit)
+
+- `enable_social_login` settings key now `1` — register page Google button uses it; login page uses `google_login_enabled`.
+- `.env` `GOOGLE_CLIENT_ID` was empty (only settings table had it) — now set so **B-Connect** (`bc.believoo.com`) Socialite login works; `GOOGLE_REDIRECT_BCONNECT_URL=https://bc.believoo.com/auth/google/callback` added.
+- Google OAuth client `759752024135-...t067bne` is shared across believoo.com, bc.believoo.com, ghc.believoo.com, market.believoo.com, distribution.hitune.in, web.hitune.in, music.hitune.in, rv.hitune.in — every domain's redirect URI + JS origin must exist in the Google Cloud console OAuth client.
+- Queue worker: `believoo-queue.service` (systemd). Restart it after `.env` changes (`queue:restart` alone doesn't reload env until a job runs).
+
+## PayU/Razorpay/Cashfree gateway review mode (2026-09-30)
+
+- PayU rejected website verification ("LOB not supported") — site is temporarily cleaned to present a single LOB: **web hosting + IT services, INR pricing**.
+- All temporary changes are marked `PAYU-REVIEW` in code — grep for it to restore after approval:
+  - `resources/views/welcome.blade.php` — hero copy de-streamed, Brands + B-CONNECT sections commented out, service prices shown in ₹ (USD×rate).
+  - `resources/views/components/layouts/believoo.blade.php` — B-CONNECT nav links, external footer links, streaming orders in social-proof popup hidden; hosting nav/footer repointed to on-domain routes.
+  - `routes/web.php` — `/services/streaming*` now redirects to `/services` (route names kept so `route()` helpers don't break); `/vps` plan browsing moved OUT of auth group (public), configure/set-os still authed.
+  - `app/Http/Controllers/SitemapController.php` — streaming + external brand URLs removed.
+  - `resources/views/vps-plans/{index,category}.blade.php` — default currency INR, USD-equivalent annotation hidden.
+  - DB `settings`: meta_title/meta_description/meta_keywords no longer mention "Live Streaming" or brand names.
+- Checkout already charges INR (`PaymentController` converts USD→INR via `ExchangeRate::getUsdToInrRate()` × 1.18 GST).
+- After approval: revert PAYU-REVIEW blocks, restore meta in Admin → Site Settings.

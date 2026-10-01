@@ -111,7 +111,7 @@ class BillingController extends Controller
                 Mail::to($client->user->email)->send(new BconnectInvoiceMail($invoice, 'created'));
             }
         } catch (\Throwable $e) {
-            Log::warning('B-Connect time invoice email failed: ' . $e->getMessage());
+            Log::warning('Bmydesk time invoice email failed: ' . $e->getMessage());
         }
 
         return redirect()->route('bconnect.billing.pay', $invoice->id)->with('success', 'Invoice #' . $invoice->invoice_number . ' created for ₹' . number_format($amount, 2));
@@ -147,7 +147,7 @@ class BillingController extends Controller
             'status' => 'pending',
             'due_at' => now()->addDays(7),
             'is_subscription' => true,
-            'description' => "B-CONNECT {$cycle} plan upgrade to " . BconnectSubscriptionService::$plans[$plan]['name'],
+            'description' => "Bmydesk {$cycle} plan upgrade to " . BconnectSubscriptionService::$plans[$plan]['name'],
             'metadata' => [
                 'plan_upgrade' => $plan,
                 'billing_cycle' => $cycle,
@@ -157,7 +157,7 @@ class BillingController extends Controller
         try {
             Mail::to($r->input('bconnect_member')->user->email)->send(new BconnectInvoiceMail($invoice, 'created'));
         } catch (\Throwable $e) {
-            Log::warning('B-Connect invoice creation email failed: ' . $e->getMessage());
+            Log::warning('Bmydesk invoice creation email failed: ' . $e->getMessage());
         }
 
         return redirect()->route('bconnect.billing.pay', $invoice->id)->with('info', 'Please complete payment to activate the plan.');
@@ -193,7 +193,7 @@ class BillingController extends Controller
                 Mail::to($client->user->email)->send(new BconnectInvoiceMail($inv, 'created'));
             }
         } catch (\Throwable $e) {
-            Log::warning('B-Connect invoice creation email failed: ' . $e->getMessage());
+            Log::warning('Bmydesk invoice creation email failed: ' . $e->getMessage());
         }
 
         \App\Services\BconnectNotificationService::send($client, 'invoice', 'Invoice created', 'Invoice #' . $inv->invoice_number . ' for ₹' . number_format($inv->amount, 2), route('bconnect.billing'), $inv->company_id);
@@ -233,7 +233,7 @@ class BillingController extends Controller
                 'orderId' => $orderId,
                 'orderAmount' => $inv->amount,
                 'orderCurrency' => strtoupper($inv->currency ?? 'INR'),
-                'orderNote' => $inv->description ?: 'B-CONNECT invoice payment',
+                'orderNote' => $inv->description ?: 'Bmydesk invoice payment',
                 'customerName' => Auth::user()?->name ?? 'Customer',
                 'customerEmail' => Auth::user()?->email ?? 'customer@believoo.com',
                 'customerPhone' => '9999999999',
@@ -396,7 +396,7 @@ class BillingController extends Controller
                 Mail::to($email)->send(new BconnectInvoiceMail($inv, 'paid'));
             }
         } catch (\Throwable $e) {
-            Log::warning('B-Connect paid email failed: ' . $e->getMessage());
+            Log::warning('Bmydesk paid email failed: ' . $e->getMessage());
         }
     }
 

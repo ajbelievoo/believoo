@@ -39,7 +39,7 @@
             <a href="{{ route('bconnect.billing') }}" class="button">View Billing</a>
         </div>
         <div class="footer">
-            B-CONNECT by Believoo &bull; support@believoo.com
+            Bmydesk by Believoo &bull; support@believoo.com
         </div>
     </div>
 </body>

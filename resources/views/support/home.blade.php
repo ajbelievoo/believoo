@@ -11,7 +11,7 @@
                 <i class="fas fa-life-ring text-3xl text-white"></i>
             </div>
             <h1 class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">How can we help?</h1>
-            <p class="text-slate-500 max-w-xl mx-auto mb-8">Find answers, check system status, create a support ticket, or chat with our team. All support for Believoo, GHC, B-Connect and Webmail in one place.</p>
+            <p class="text-slate-500 max-w-xl mx-auto mb-8">Find answers, check system status, create a support ticket, or chat with our team. All support for Believoo, GHC, Bmydesk and Webmail in one place.</p>
 
             <form action="{{ route('support.kb.index') }}" method="GET" class="max-w-2xl mx-auto relative">
                 <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>

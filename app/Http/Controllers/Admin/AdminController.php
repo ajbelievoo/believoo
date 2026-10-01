@@ -170,4 +170,36 @@ class AdminController extends Controller
             'inventoryStatus'
         ));
     }
+
+    public function markAllNotificationsRead()
+    {
+        auth()->user()->unreadNotifications->markAsRead();
+        return back();
+    }
+
+    public function markNotificationRead(string $id)
+    {
+        $notification = auth()->user()->notifications()->find($id);
+        if (!$notification) {
+            return back();
+        }
+
+        $notification->markAsRead();
+
+        $data = $notification->data ?? [];
+        $url = $data['action_url'] ?? $data['url'] ?? null;
+        if (!$url && isset($data['actions']) && is_array($data['actions'])) {
+            foreach ($data['actions'] as $action) {
+                if (!empty($action['url'])) {
+                    $url = $action['url'];
+                    break;
+                }
+            }
+        }
+        if (!$url && isset($data['ticket_id'])) {
+            $url = route('admin.tickets.index');
+        }
+
+        return $url ? redirect($url) : back();
+    }
 }

@@ -8,7 +8,7 @@
 
 @section('content')
 @php
-    $userCurrency = session('currency', 'USD');
+    $userCurrency = session('currency', $currentCurrency ?? 'INR');
     $rate = \App\Models\ExchangeRate::getUsdToInrRate();
 @endphp
 <div style="background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); min-height: 100vh;">
@@ -107,9 +107,14 @@
                             {{ $priceSymbol }}{{ $priceFormatted }}
                         </div>
                         <div style="font-size: 0.8rem; color: #666;">ex. GST/month</div>
+                        {{-- PAYU-REVIEW: secondary USD equivalent hidden during review
                         @if($userCurrency === 'INR')
                             <div style="font-size: 0.75rem; color: #666; margin-top: 4px;">(${{ number_format($priceUsd, 2) }} USD)</div>
                         @else
+                            <div style="font-size: 0.75rem; color: #666; margin-top: 4px;">(₹{{ number_format($priceInr, 0) }} INR)</div>
+                        @endif
+                        --}}
+                        @if($userCurrency !== 'INR')
                             <div style="font-size: 0.75rem; color: #666; margin-top: 4px;">(₹{{ number_format($priceInr, 0) }} INR)</div>
                         @endif
                         @if($plan->installation_free)

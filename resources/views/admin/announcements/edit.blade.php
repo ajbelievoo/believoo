@@ -70,7 +70,7 @@
                     <select name="audience" id="audience" class="form-select">
                         <option value="all" {{ old('audience', $announcement->audience) == 'all' ? 'selected' : '' }}>All users</option>
                         <option value="clients" {{ old('audience', $announcement->audience) == 'clients' ? 'selected' : '' }}>Clients only</option>
-                        <option value="bconnect" {{ old('audience', $announcement->audience) == 'bconnect' ? 'selected' : '' }}>B-Connect users</option>
+                        <option value="bconnect" {{ old('audience', $announcement->audience) == 'bconnect' ? 'selected' : '' }}>Bmydesk users</option>
                         <option value="ghc" {{ old('audience', $announcement->audience) == 'ghc' ? 'selected' : '' }}>GHC users</option>
                     </select>
                 </div>
@@ -135,7 +135,7 @@
             </div>
 
             <div id="audience-note" style="margin-bottom: 18px; padding: 12px 16px; background: var(--bg-tertiary); border-left: 4px solid var(--accent); border-radius: 0 10px 10px 0; font-size: 0.85rem; color: var(--text-secondary);">
-                This announcement will be sent to all Believoo, B-Connect and GHC users.
+                This announcement will be sent to all Believoo, Bmydesk and GHC users.
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 18px;">
@@ -230,9 +230,9 @@ form.addEventListener('submit', function() {
 });
 
 const notes = {
-    'all': 'This announcement will be sent to all Believoo, B-Connect and GHC users.',
+    'all': 'This announcement will be sent to all Believoo, Bmydesk and GHC users.',
     'clients': 'This announcement will be sent to Believoo client users only.',
-    'bconnect': 'This announcement will be sent to B-Connect workspace members.',
+    'bconnect': 'This announcement will be sent to Bmydesk workspace members.',
     'ghc': 'This announcement will be sent to GHC users only.'
 };
 

@@ -14,7 +14,7 @@ class BconnectMail
         try {
             Mail::to($email)->send(new BconnectNotification($subject, $heading, $lines, $url, $button));
         } catch (\Throwable $e) {
-            \Log::warning('B-Connect email failed for ' . $email . ': ' . $e->getMessage());
+            \Log::warning('Bmydesk email failed for ' . $email . ': ' . $e->getMessage());
         }
     }
 

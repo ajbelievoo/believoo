@@ -38,7 +38,7 @@
             <a href="{{ $payUrl }}" class="button">Pay Now</a>
         </div>
         <div class="footer">
-            B-CONNECT by Believoo &bull; support@believoo.com
+            Bmydesk by Believoo &bull; support@believoo.com
         </div>
     </div>
 </body>

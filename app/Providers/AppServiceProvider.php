@@ -123,7 +123,7 @@ class AppServiceProvider extends ServiceProvider
                      ]);
                  }
 
-                 // B-CONNECT brand & SEO data to all views
+                 // Bmydesk brand & SEO data to all views
                  View::share('bconnectBrand', \App\Helpers\BconnectHelper::brandData());
             }
         } catch (\Throwable $e) {
@@ -238,7 +238,7 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register B-Connect model event observers to send branded emails
+     * Register Bmydesk model event observers to send branded emails
      * for ticket, project, meeting, file, remote, invoice, member and chat events.
      */
     protected function registerBconnectObservers(): void
@@ -247,15 +247,15 @@ class AppServiceProvider extends ServiceProvider
             // New ticket
             Ticket::created(function ($ticket) {
                 $ticket->load(['reporter.user', 'project']);
-                $subject = 'New B-Connect ticket: ' . $ticket->title;
+                $subject = 'New Bmydesk ticket: ' . $ticket->title;
                 $lines = [
                     'A new ticket has been created in your workspace.',
                     'Project: ' . ($ticket->project?->name ?? 'N/A'),
                     'Priority: ' . ($ticket->priority ?? 'normal'),
                 ];
                 $url = route('bconnect.tickets.show', $ticket->id);
-                BconnectMail::toMember($ticket->reporter, $subject, 'New B-Connect ticket created', $lines, $url, 'View Ticket');
-                BconnectMail::toCompanyAdmins($ticket->company_id, $subject, 'New B-Connect ticket created', $lines, $url, 'View Ticket');
+                BconnectMail::toMember($ticket->reporter, $subject, 'New Bmydesk ticket created', $lines, $url, 'View Ticket');
+                BconnectMail::toCompanyAdmins($ticket->company_id, $subject, 'New Bmydesk ticket created', $lines, $url, 'View Ticket');
             });
 
             // New ticket comment
@@ -298,7 +298,7 @@ class AppServiceProvider extends ServiceProvider
             // Project created
             Project::created(function ($project) {
                 $project->load(['client.user', 'company']);
-                $subject = 'New B-Connect project: ' . $project->name;
+                $subject = 'New Bmydesk project: ' . $project->name;
                 $lines = ['A new project has been created in your workspace.'];
                 $url = route('bconnect.projects.index');
                 BconnectMail::toMember($project->client, $subject, 'New project created', $lines, $url, 'View Project');
@@ -321,7 +321,7 @@ class AppServiceProvider extends ServiceProvider
             // Meeting created
             Meeting::created(function ($meeting) {
                 $meeting->load(['creator.user', 'project']);
-                $subject = 'B-Connect meeting created: ' . $meeting->title;
+                $subject = 'Bmydesk meeting created: ' . $meeting->title;
                 $lines = ['A meeting room has been created. Room ID: ' . $meeting->room_id];
                 $url = route('bconnect.meeting.room', $meeting->room_id);
                 BconnectMail::toMember($meeting->creator, $subject, 'Meeting room created', $lines, $url, 'Join Meeting');
@@ -334,7 +334,7 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
                 $meeting->load(['creator.user']);
-                $subject = 'B-Connect meeting ended: ' . $meeting->title;
+                $subject = 'Bmydesk meeting ended: ' . $meeting->title;
                 $lines = ['The meeting has ended. Summary and action items are available.'];
                 $url = route('bconnect.meeting.room', $meeting->room_id);
                 BconnectMail::toMember($meeting->creator, $subject, 'Meeting ended', $lines, $url, 'View Meeting');
@@ -344,7 +344,7 @@ class AppServiceProvider extends ServiceProvider
             // New file upload
             BconnectFile::created(function ($file) {
                 $file->load(['member.user', 'project']);
-                $subject = 'New file uploaded to B-Connect';
+                $subject = 'New file uploaded to Bmydesk';
                 $lines = ['A new file has been uploaded: <strong>' . e($file->name ?? basename($file->path ?? 'file')) . '</strong>'];
                 $url = route('bconnect.files');
                 BconnectMail::toMember($file->member, $subject, 'New file uploaded', $lines, $url, 'View Files');
@@ -383,7 +383,7 @@ class AppServiceProvider extends ServiceProvider
             // New invoice
             Invoice::created(function ($invoice) {
                 $invoice->load(['client.user']);
-                $subject = 'New B-Connect invoice #' . $invoice->id;
+                $subject = 'New Bmydesk invoice #' . $invoice->id;
                 $lines = [
                     'Amount: ' . ($invoice->amount ?? 0),
                     'Due: ' . ($invoice->due_date ? $invoice->due_date->format('d M Y') : 'N/A'),
@@ -404,20 +404,20 @@ class AppServiceProvider extends ServiceProvider
                 BconnectMail::toMember($invoice->client, $subject, 'Invoice paid', $lines, $url, 'View Invoice');
             });
 
-            // Member added / B-Connect welcome
+            // Member added / Bmydesk welcome
             Member::created(function ($member) {
                 $member->load('user');
                 if (!$member->user) {
                     return;
                 }
                 $company = $member->company;
-                $subject = 'Welcome to B-Connect' . ($company ? ' — ' . $company->name : '');
+                $subject = 'Welcome to Bmydesk' . ($company ? ' — ' . $company->name : '');
                 $lines = [
-                    'Your B-Connect workspace is ready.',
+                    'Your Bmydesk workspace is ready.',
                     'Role: ' . ($member->role ?? 'member'),
                 ];
                 $url = route('bconnect.dashboard');
-                BconnectMail::toMember($member, $subject, 'Welcome to B-Connect', $lines, $url, 'Open B-Connect');
+                BconnectMail::toMember($member, $subject, 'Welcome to Bmydesk', $lines, $url, 'Open Bmydesk');
             });
 
             // Chat message
@@ -452,7 +452,7 @@ class AppServiceProvider extends ServiceProvider
                 }
             });
         } catch (\Throwable $e) {
-            \Log::warning('B-Connect observers failed to register: ' . $e->getMessage());
+            \Log::warning('Bmydesk observers failed to register: ' . $e->getMessage());
         }
     }
 }

@@ -43,7 +43,7 @@ class AuthController extends Controller {
         try {
             Mail::to($user->email)->send(new BconnectWelcome($user));
         } catch (\Throwable $e) {
-            \Log::warning('B-Connect welcome email failed: ' . $e->getMessage());
+            \Log::warning('Bmydesk welcome email failed: ' . $e->getMessage());
         }
         Auth::login($user);
         session(['bconnect_company_id' => $company->id, 'bconnect_role' => 'company_admin']);
@@ -81,7 +81,7 @@ class AuthController extends Controller {
                 try {
                     Mail::to($user->email)->send(new BconnectWelcome($user));
                 } catch (\Throwable $e) {
-                    \Log::warning('B-Connect welcome email failed: ' . $e->getMessage());
+                    \Log::warning('Bmydesk welcome email failed: ' . $e->getMessage());
                 }
             }
             $member = Member::where('user_id', $user->id)->where('is_active', true)->first();

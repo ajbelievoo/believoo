@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 class BconnectSubscriptionLifecycle extends Command
 {
     protected $signature = 'bconnect:subscription-lifecycle';
-    protected $description = 'Renewal invoices, reminders, grace period and expiry handling for B-CONNECT subscriptions';
+    protected $description = 'Renewal invoices, reminders, grace period and expiry handling for Bmydesk subscriptions';
 
     public function handle()
     {
@@ -70,7 +70,7 @@ class BconnectSubscriptionLifecycle extends Command
                     }
                     $invoice->update(['metadata' => array_merge($invoice->metadata ?? [], ['reminder_email_sent' => now()->toDateTimeString()])]);
                 } catch (\Throwable $e) {
-                    \Log::warning('B-Connect renewal invoice email failed: ' . $e->getMessage());
+                    \Log::warning('Bmydesk renewal invoice email failed: ' . $e->getMessage());
                 }
 
                 $this->info("Created renewal invoice {$invoice->invoice_number} for company {$company->id}");
@@ -106,7 +106,7 @@ class BconnectSubscriptionLifecycle extends Command
                 $invoice->update(['metadata' => array_merge($meta, ['last_reminder_sent' => $now->toDateTimeString()])]);
                 $this->info("Reminder sent for invoice {$invoice->invoice_number}");
             } catch (\Throwable $e) {
-                \Log::warning('B-Connect invoice reminder failed: ' . $e->getMessage());
+                \Log::warning('Bmydesk invoice reminder failed: ' . $e->getMessage());
             }
         }
 
@@ -177,7 +177,7 @@ class BconnectSubscriptionLifecycle extends Command
             $this->info("Downgraded company {$company->id} from {$oldPlan} to free");
         }
 
-        $this->info('B-CONNECT subscription lifecycle run complete.');
+        $this->info('Bmydesk subscription lifecycle run complete.');
 
         return 0;
     }

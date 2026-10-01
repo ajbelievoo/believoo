@@ -64,6 +64,19 @@ class SettingController extends Controller
             'business_opening_hours' => 'nullable|string',
             'google_maps' => 'nullable|string',
 
+            // Company Legal / Registration
+            'company_legal_name' => 'nullable|string|max:255',
+            'company_cin' => 'nullable|string|max:50',
+            'company_pan' => 'nullable|string|max:20',
+            'company_tan' => 'nullable|string|max:20',
+            'company_incorporation_date' => 'nullable|string|max:50',
+            'company_registered_office' => 'nullable|string',
+            'company_address' => 'nullable|string',
+            'company_email' => 'nullable|email|max:255',
+            'company_phone' => 'nullable|string|max:50',
+            'company_website' => 'nullable|string|max:255',
+            'gst_number' => 'nullable|string|max:20',
+
             // Social
             'facebook' => 'nullable|url|max:255',
             'twitter' => 'nullable|url|max:255',
@@ -116,7 +129,7 @@ class SettingController extends Controller
             'payu_enabled' => 'nullable|boolean',
             'payu_mode' => 'nullable|in:sandbox,production',
 
-            // Agora for B-CONNECT
+            // Agora for Bmydesk
             'agora_app_id' => 'nullable|string',
             'agora_app_certificate' => 'nullable|string',
             'agora_enabled' => 'nullable|boolean',
@@ -131,7 +144,9 @@ class SettingController extends Controller
             'vapid_public_key' => 'nullable|string',
             'vapid_private_key' => 'nullable|string',
 
-            // B-CONNECT Brand & SEO
+            // Bmydesk Brand & SEO
+            'bconnect_name' => 'nullable|string|max:100',
+            'bconnect_brand_color' => 'nullable|string|max:20',
             'bconnect_logo' => 'nullable',
             'bconnect_favicon' => 'nullable',
             'bconnect_title' => 'nullable|string',
@@ -277,7 +292,7 @@ class SettingController extends Controller
             }
         }
 
-        // B-CONNECT brand file uploads
+        // Bmydesk brand file uploads
         foreach (['bconnect_logo', 'bconnect_favicon', 'bconnect_og_image'] as $f) {
             if ($request->hasFile($f)) {
                 $path = $request->file($f)->store('settings', 'public');

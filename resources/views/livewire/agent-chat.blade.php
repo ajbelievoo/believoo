@@ -12,7 +12,8 @@
         notify(from, preview) {
             this.playNotification();
             if (window.Notification && Notification.permission === 'granted') {
-                new Notification('New message from ' + from, { body: preview, icon: '/favicon.ico' });
+                const n = new Notification('New message from ' + from, { body: preview, icon: '/favicon.ico' });
+                n.onclick = () => window.focus();
             }
         },
         sidebarOpen: true

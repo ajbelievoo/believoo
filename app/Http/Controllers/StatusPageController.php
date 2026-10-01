@@ -16,7 +16,7 @@ class StatusPageController extends Controller
             'url' => 'https://ghc.believoo.com',
         ],
         'bconnect' => [
-            'name' => 'B-Connect',
+            'name' => 'Bmydesk',
             'url' => 'https://bc.believoo.com',
         ],
         'webmail' => [

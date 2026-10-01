@@ -26,7 +26,7 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-white text-lg mb-1">Full Desktop Agent</h3>
-                        <p class="text-slate-400 text-sm mb-4">Unlock full mouse and keyboard control, multi-monitor support, and background access with the B-CONNECT desktop agent.</p>
+                        <p class="text-slate-400 text-sm mb-4">Unlock full mouse and keyboard control, multi-monitor support, and background access with the Bmydesk desktop agent.</p>
                         <div class="flex flex-wrap gap-3">
                             <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-windows mr-1"></i>Windows Agent (Beta)</button>
                             <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-apple mr-1"></i>macOS Agent (Beta)</button>

@@ -23,8 +23,8 @@ class BconnectResetPassword extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Password reset for your B-Connect account',
-            from: new Address('bconnect@believoo.com', 'Believoo B-Connect'),
+            subject: 'Password reset for your Bmydesk account',
+            from: new Address('bconnect@believoo.com', 'Bmydesk by Believoo'),
             replyTo: [new Address('support@believoo.com', 'Believoo Support')],
         );
     }

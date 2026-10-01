@@ -38,7 +38,7 @@ class BrandController extends Controller
             ],
             [
                 'key' => 'bconnect',
-                'name' => 'B-CONNECT',
+                'name' => 'Bmydesk',
                 'tagline' => 'Company & workspace management, projects, invoices.',
                 'icon' => 'fa-rocket',
                 'color' => '#22c55e',

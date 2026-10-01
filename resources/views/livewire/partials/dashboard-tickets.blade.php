@@ -8,7 +8,7 @@
         All support tickets, history, knowledge base and status are now in one place.
     </p>
     <p class="text-gray-500 text-xs mb-8 max-w-lg mx-auto">
-        Create tickets for Believoo, GHC, B-Connect, Webmail or anything else from the support portal.
+        Create tickets for Believoo, GHC, Bmydesk, Webmail or anything else from the support portal.
     </p>
     <a href="https://support.believoo.com/tickets" target="_blank" rel="noopener"
        class="inline-flex items-center gap-2 btn-primary text-sm px-8 py-4">

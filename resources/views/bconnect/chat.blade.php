@@ -270,7 +270,7 @@ async function fetchNewMessages() {
             if (m.id > lastMessageId) lastMessageId = m.id;
         });
     } catch (err) {
-        console.warn('[B-CONNECT Chat] Poll failed', err);
+        console.warn('[Bmydesk Chat] Poll failed', err);
     }
 }
 
@@ -288,7 +288,7 @@ if (window.Echo && window.Echo.connector) {
             }
         });
 } else {
-    console.warn('[B-CONNECT Chat] Reverb not connected, falling back to polling');
+    console.warn('[Bmydesk Chat] Reverb not connected, falling back to polling');
 }
 
 // Always use lightweight polling as a fallback / sync layer
