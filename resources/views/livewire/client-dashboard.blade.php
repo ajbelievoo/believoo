@@ -162,7 +162,7 @@
                             <a href="https://ghc.believoo.com/dashboard" target="_blank" rel="noopener" class="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                                 <i class="fas fa-cloud text-cyan-400"></i> GHC Cloud
                             </a>
-                            <a href="https://bc.believoo.com/dashboard" target="_blank" rel="noopener" class="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                            <a href="https://bmydesk.believoo.com/dashboard" target="_blank" rel="noopener" class="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                                 <i class="fas fa-comments text-emerald-400"></i> Bmydesk
                             </a>
                             <a href="https://mail.believoo.com" target="_blank" rel="noopener" class="w-full flex items-center gap-3 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-all">

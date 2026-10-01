@@ -10,14 +10,14 @@
 <meta property="og:title" content="{{ $bconnectBrand['title'] }}">
 <meta property="og:description" content="{{ $bconnectBrand['description'] }}">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://bc.believoo.com">
+<meta property="og:url" content="https://bmydesk.believoo.com">
 <meta property="og:site_name" content="{{ $bconnectBrand['name'] }} by Believoo">
 <meta property="og:image" content="{{ $bconnectBrand['og_image'] }}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ $bconnectBrand['title'] }}">
 <meta name="twitter:description" content="{{ $bconnectBrand['description'] }}">
 <meta name="twitter:image" content="{{ $bconnectBrand['og_image'] }}">
-<link rel="canonical" href="https://bc.believoo.com{{ request()->getPathInfo() }}">
+<link rel="canonical" href="https://bmydesk.believoo.com{{ request()->getPathInfo() }}">
 @if($bconnectBrand['google_site_verification'])
 <meta name="google-site-verification" content="{{ $bconnectBrand['google_site_verification'] }}">
 @endif

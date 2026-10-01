@@ -1396,7 +1396,7 @@
                                 @endif
                             </a>
                             {{-- PAYU-REVIEW: Bmydesk nav link hidden during payment-gateway review
-                            <a href="https://bc.believoo.com" target="_blank"
+                            <a href="https://bmydesk.believoo.com" target="_blank"
                                class="relative text-sm font-bold text-brand hover:text-brandDark transition-colors">
                                 Bmydesk
                             </a>
@@ -1515,7 +1515,7 @@
                         Home <i class="fas fa-arrow-right text-sm opacity-30"></i>
                     </a>
                     {{-- PAYU-REVIEW: Bmydesk nav link hidden during payment-gateway review
-                    <a href="https://bc.believoo.com" @click="mobileMenuOpen = false"
+                    <a href="https://bmydesk.believoo.com" @click="mobileMenuOpen = false"
                        class="flex items-center justify-between py-4 px-4 rounded-2xl hover:bg-slate-100 transition-colors text-slate-700 text-lg font-black uppercase tracking-widest min-h-[56px]">
                         Bmydesk <i class="fas fa-arrow-right text-sm opacity-30 text-brand"></i>
                     </a>
@@ -1620,7 +1620,7 @@
                 <span class="text-gray-400">Believoo ecosystem:</span>
                 <a href="https://believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Believoo</a>
                 <a href="https://ghc.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">GHC</a>
-                <a href="https://bc.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Bmydesk</a>
+                <a href="https://bmydesk.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Bmydesk</a>
                 <a href="https://mail.believoo.com" class="hover:text-[#00b7ff] transition-colors font-bold">Webmail</a>
             </div>
             <div>
@@ -1810,7 +1810,7 @@
                         <li><a href="{{ route('services.index') }}" class="hover:text-amber-500 transition-colors">Browse Services</a></li>
                         <li><a href="{{ route('client.dashboard') }}" class="hover:text-amber-500 transition-colors">My Portal</a></li>
                         {{-- PAYU-REVIEW: external brand links hidden during payment-gateway review
-                        <li><a href="https://bc.believoo.com" class="hover:text-amber-500 transition-colors">Bmydesk Workspace</a></li>
+                        <li><a href="https://bmydesk.believoo.com" class="hover:text-amber-500 transition-colors">Bmydesk Workspace</a></li>
                         <li><a href="https://ghc.believoo.com" class="hover:text-amber-500 transition-colors">GHC Cloud Hosting</a></li>
                         --}}
                         <li><a href="{{ route('login') }}" class="hover:text-amber-500 transition-colors">Account Login</a></li>

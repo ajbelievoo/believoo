@@ -6,9 +6,9 @@ return new class extends Migration {
     public function up(): void {
         $defaults = [
             ['key' => 'bconnect_name', 'value' => 'Bmydesk'],
-            ['key' => 'bconnect_brand_color', 'value' => '#7c3aed'],
-            ['key' => 'bconnect_brand_color_dark', 'value' => '#6d28d9'],
-            ['key' => 'bconnect_brand_color_light', 'value' => '#a78bfa'],
+            ['key' => 'bconnect_brand_color', 'value' => '#e11d48'],
+            ['key' => 'bconnect_brand_color_dark', 'value' => '#be123c'],
+            ['key' => 'bconnect_brand_color_light', 'value' => '#fb7185'],
             ['key' => 'bconnect_logo', 'value' => ''],
             ['key' => 'bconnect_favicon', 'value' => ''],
             ['key' => 'bconnect_title', 'value' => 'Bmydesk — Unified IT Workspace for Teams & Clients'],

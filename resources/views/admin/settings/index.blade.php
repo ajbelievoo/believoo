@@ -829,7 +829,7 @@
             <div id="bconnect" class="settings-content" style="display: none;">
                 <div style="padding: 24px; border-bottom: 1px solid var(--border-color);">
                     <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">Bmydesk Brand & SEO</h3>
-                    <p style="font-size: 0.875rem; color: var(--text-muted);">Logo, title, favicon, meta tags and Google verification for bc.believoo.com</p>
+                    <p style="font-size: 0.875rem; color: var(--text-muted);">Logo, title, favicon, meta tags and Google verification for bmydesk.believoo.com</p>
                 </div>
                 <div style="padding: 24px;">
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
@@ -840,7 +840,7 @@
                         <div>
                             <label style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Brand Color</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="color" name="bconnect_brand_color" value="{{ $settings['bconnect_brand_color'] ?? '#7c3aed' }}" style="width: 52px; height: 44px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-tertiary); padding: 4px; cursor: pointer;">
+                                <input type="color" name="bconnect_brand_color" value="{{ $settings['bconnect_brand_color'] ?? '#e11d48' }}" style="width: 52px; height: 44px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-tertiary); padding: 4px; cursor: pointer;">
                                 <span style="font-size: 0.8rem; color: var(--text-muted);">Accent color used across the Bmydesk site & workspace</span>
                             </div>
                         </div>

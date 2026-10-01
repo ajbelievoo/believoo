@@ -54,7 +54,7 @@ class AuthController extends Controller {
     {
         $clientId = Setting::getValue('google_client_id') ?: config('services.google.client_id');
         $clientSecret = Setting::getValue('google_client_secret') ?: config('services.google.client_secret');
-        $redirectUrl = Setting::getValue('google_redirect_url_bconnect') ?: config('services.google.redirect_bconnect', 'https://bc.believoo.com/auth/google/callback');
+        $redirectUrl = Setting::getValue('google_redirect_url_bconnect') ?: config('services.google.redirect_bconnect', 'https://bmydesk.believoo.com/auth/google/callback');
 
         if ($clientId) Config::set('services.google.client_id', $clientId);
         if ($clientSecret) Config::set('services.google.client_secret', $clientSecret);

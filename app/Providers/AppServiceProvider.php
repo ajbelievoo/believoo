@@ -79,7 +79,7 @@ class AppServiceProvider extends ServiceProvider
                          'services.google.client_id' => $settings['google_client_id'],
                          'services.google.client_secret' => $settings['google_client_secret'] ?? null,
                          'services.google.redirect' => $settings['google_redirect_url'] ?? 'https://believoo.com/auth/google/callback',
-                         'services.google.redirect_bconnect' => $settings['google_redirect_bconnect_url'] ?? 'https://bc.believoo.com/auth/google/callback',
+                         'services.google.redirect_bconnect' => $settings['google_redirect_bconnect_url'] ?? 'https://bmydesk.believoo.com/auth/google/callback',
                      ]);
                  }
 
@@ -183,7 +183,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(\Illuminate\Auth\Events\PasswordReset::class, function (\Illuminate\Auth\Events\PasswordReset $event) {
             $host = request()->getHost();
             try {
-                if ($host && str_ends_with($host, 'bc.believoo.com')) {
+                if ($host && str_ends_with($host, 'bmydesk.believoo.com')) {
                     \Illuminate\Support\Facades\Mail::to($event->user->email)
                         ->send(new \App\Mail\BconnectPasswordChanged($event->user));
                 } else {

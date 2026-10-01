@@ -39,7 +39,7 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URL', 'https://believoo.com/auth/google/callback'),
-        'redirect_bconnect' => env('GOOGLE_REDIRECT_BCONNECT_URL', 'https://bc.believoo.com/auth/google/callback'),
+        'redirect_bconnect' => env('GOOGLE_REDIRECT_BCONNECT_URL', 'https://bmydesk.believoo.com/auth/google/callback'),
     ],
 
     'facebook' => [

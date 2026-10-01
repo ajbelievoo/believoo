@@ -8,7 +8,7 @@
     <meta name="keywords" content="{{ $bconnectBrand['keywords'] }}">
     <meta name="author" content="Believoo">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://bc.believoo.com">
+    <link rel="canonical" href="https://bmydesk.believoo.com">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -19,7 +19,7 @@
     <meta property="og:title" content="{{ $bconnectBrand['title'] }}">
     <meta property="og:description" content="{{ $bconnectBrand['description'] }}">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://bc.believoo.com">
+    <meta property="og:url" content="https://bmydesk.believoo.com">
     <meta property="og:site_name" content="{{ $bconnectBrand['name'] }} by Believoo">
     <meta property="og:image" content="{{ $bconnectBrand['og_image'] }}">
     <meta property="og:locale" content="en_IN">
@@ -41,7 +41,13 @@
     <script>
         tailwind.config = { theme: { extend: { colors: { brand: '{{ $bconnectBrand['brand_color'] }}', brandDark: '{{ $bconnectBrand['brand_color_dark'] }}', dark: '#0a0a1a' } }, fontFamily: { sans: ['Figtree','Inter','sans-serif'] } } };
     </script>
-    <style>html,body{font-family:Figtree,Inter,sans-serif;scroll-behavior:smooth;}</style>
+    <style>
+        html,body{font-family:Figtree,Inter,sans-serif;scroll-behavior:smooth;}
+        .btn-gradient{background:linear-gradient(135deg,#f59e0b 0%,#e11d48 55%,#7c3aed 100%);}
+        .btn-gradient:hover{background:linear-gradient(135deg,#d97706 0%,#be123c 55%,#6d28d9 100%);}
+        .text-gradient{background:linear-gradient(90deg,#f59e0b,#e11d48,#8b5cf6);-webkit-background-clip:text;background-clip:text;color:transparent;}
+        .icon-gradient{background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(225,29,72,0.12),rgba(139,92,246,0.12));}
+    </style>
 </head>
 <body class="bg-white text-slate-900 antialiased">
 
@@ -61,7 +67,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <a href="{{ route('bconnect.login') }}" class="text-sm font-semibold text-slate-700 hover:text-brand">Log in</a>
-                <a href="{{ route('bconnect.register') }}" class="px-5 py-2.5 text-sm font-bold text-white bg-brand hover:bg-brandDark rounded-full transition shadow-lg shadow-brand/30">Get Started Free</a>
+                <a href="{{ route('bconnect.register') }}" class="px-5 py-2.5 text-sm font-bold text-white btn-gradient rounded-full transition shadow-lg shadow-rose-500/30">Get Started Free</a>
             </div>
         </div>
     </div>
@@ -76,13 +82,13 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <span class="inline-block px-4 py-1.5 mb-6 text-xs font-bold tracking-wide text-brand bg-brand/10 rounded-full">#1 IT Team Workspace</span>
         <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-6 text-slate-900">
-            One workspace for<br><span class="text-brand">calls, code & clients</span>
+            One workspace for<br><span class="text-gradient">calls, code & clients</span>
         </h1>
         <p class="max-w-2xl mx-auto text-lg text-slate-600 mb-10">
             Bmydesk unifies video conferencing, remote desktop, bug tracking, AI summaries, client billing and real-time team chat — built for IT companies, developers and global clients.
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-4">
-            <a href="{{ route('bconnect.register') }}" class="px-8 py-4 text-lg font-bold text-white bg-brand hover:bg-brandDark rounded-full transition shadow-xl shadow-brand/30">Start Free Workspace</a>
+            <a href="{{ route('bconnect.register') }}" class="px-8 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Start Free Workspace</a>
             <a href="{{ route('bconnect.login') }}" class="px-8 py-4 text-lg font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition">Login to Dashboard</a>
         </div>
         <div class="mt-12 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden bg-slate-900">
@@ -152,7 +158,7 @@
                 <a href="{{ route('bconnect.register') }}" class="block text-center py-3 rounded-lg border border-slate-300 font-bold hover:bg-slate-50">Start Free</a>
             </div>
             <div class="p-8 rounded-2xl border-2 border-brand bg-slate-900 text-white relative">
-                <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-brand text-white text-xs font-bold rounded-full">POPULAR</div>
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 btn-gradient text-white text-xs font-bold rounded-full">POPULAR</div>
                 <h3 class="text-xl font-bold">Pro / Developer</h3>
                 <div class="text-4xl font-extrabold my-4">₹1,999<span class="text-base font-normal text-slate-400">/mo</span></div>
                 <ul class="space-y-3 text-slate-300 text-sm mb-8">
@@ -161,7 +167,7 @@
                     <li><i class="fas fa-check text-brand mr-2"></i>Remote control</li>
                     <li><i class="fas fa-check text-brand mr-2"></i>Basic bug tracking</li>
                 </ul>
-                <a href="{{ route('bconnect.register') }}" class="block text-center py-3 rounded-lg bg-brand hover:bg-brandDark font-bold">Get Pro</a>
+                <a href="{{ route('bconnect.register') }}" class="block text-center py-3 rounded-lg btn-gradient text-white font-bold">Get Pro</a>
             </div>
             <div class="p-8 rounded-2xl border border-slate-200 bg-white">
                 <h3 class="text-xl font-bold">Enterprise</h3>
@@ -300,7 +306,7 @@
     <div class="max-w-4xl mx-auto px-4 text-center">
         <h2 class="text-3xl lg:text-5xl font-extrabold mb-6">Ready to unify your IT workflow?</h2>
         <p class="text-slate-400 mb-10 text-lg">Join companies already using Bmydesk to ship faster and support clients better.</p>
-        <a href="{{ route('bconnect.register') }}" class="inline-block px-10 py-4 text-lg font-bold text-slate-900 bg-brand hover:bg-brandDark rounded-full transition shadow-xl shadow-brand/30">Create Free Workspace</a>
+        <a href="{{ route('bconnect.register') }}" class="inline-block px-10 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Create Free Workspace</a>
     </div>
 </section>
 

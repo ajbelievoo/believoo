@@ -15,7 +15,7 @@ class SupportPortalController extends Controller
         $products = [
             ['key' => 'believoo', 'name' => 'Believoo', 'icon' => 'fa-briefcase', 'url' => 'https://believoo.com', 'desc' => 'Hosting, domains & digital services'],
             ['key' => 'ghc', 'name' => 'GHC Cloud', 'icon' => 'fa-cloud', 'url' => 'https://ghc.believoo.com', 'desc' => 'VPS, dedicated & cloud servers'],
-            ['key' => 'bconnect', 'name' => 'Bmydesk', 'icon' => 'fa-comments', 'url' => 'https://bc.believoo.com', 'desc' => 'Team collaboration & meetings'],
+            ['key' => 'bconnect', 'name' => 'Bmydesk', 'icon' => 'fa-comments', 'url' => 'https://bmydesk.believoo.com', 'desc' => 'Team collaboration & meetings'],
             ['key' => 'mail', 'name' => 'Webmail', 'icon' => 'fa-envelope', 'url' => 'https://mail.believoo.com', 'desc' => 'Email access for your domain'],
         ];
 
@@ -101,7 +101,7 @@ class SupportPortalController extends Controller
         $list = [
             ['key' => 'believoo', 'name' => 'Believoo Website', 'url' => 'https://believoo.com'],
             ['key' => 'ghc', 'name' => 'GHC Cloud', 'url' => 'https://ghc.believoo.com'],
-            ['key' => 'bconnect', 'name' => 'Bmydesk', 'url' => 'https://bc.believoo.com'],
+            ['key' => 'bconnect', 'name' => 'Bmydesk', 'url' => 'https://bmydesk.believoo.com'],
             ['key' => 'webmail', 'name' => 'Webmail', 'url' => 'https://mail.believoo.com'],
             ['key' => 'mail-server', 'name' => 'Mail Server (SMTP/IMAP)', 'url' => 'mail.believoo.com:587'],
             ['key' => 'dns', 'name' => 'DNS & Domains', 'url' => 'https://believoo.com'],

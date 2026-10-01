@@ -134,14 +134,14 @@ class TicketController extends Controller {
             'Ticket received: ' . $ticket->title,
             'Your ticket has been created',
             ['Hi ' . ($reporter->user->name ?? 'there') . ',', 'We received your ticket <strong>' . e($ticket->title) . '</strong>. Our team typically replies within 24 hours.'],
-            url('https://bc.believoo.com' . $ticketUrl),
+            url('https://bmydesk.believoo.com' . $ticketUrl),
             'View Ticket'
         );
         BconnectMail::toCompanyAdmins($r->input('bconnect_company_id'),
             'New Bmydesk ticket: ' . $ticket->title,
             'New ticket created',
             ['A new ticket has been created in your workspace.', 'Title: <strong>' . e($ticket->title) . '</strong><br>Priority: ' . e($ticket->priority) . '<br>Type: ' . e($ticket->type)],
-            url('https://bc.believoo.com' . $ticketUrl),
+            url('https://bmydesk.believoo.com' . $ticketUrl),
             'View Ticket'
         );
 
@@ -184,10 +184,10 @@ class TicketController extends Controller {
                 'New comment on: ' . $ticket->title,
                 'A new comment has been added',
                 ['Hi ' . ($member->user->name ?? 'there') . ',', 'There is a new comment on ticket <strong>' . e($ticket->title) . '</strong>:', '<blockquote style="border-left:4px solid #00b7ff;padding-left:12px;margin:12px 0;color:#334155;">' . e($data['message']) . '</blockquote>'],
-                url('https://bc.believoo.com' . $ticketUrl),
+                url('https://bmydesk.believoo.com' . $ticketUrl),
                 'View Ticket'
             );
-            \App\Services\BconnectNotificationService::send($member, 'ticket_comment', 'New comment', $commenter->user->name . ' commented on ' . $ticket->title, url('https://bc.believoo.com' . $ticketUrl), $ticket->company_id);
+            \App\Services\BconnectNotificationService::send($member, 'ticket_comment', 'New comment', $commenter->user->name . ' commented on ' . $ticket->title, url('https://bmydesk.believoo.com' . $ticketUrl), $ticket->company_id);
         }
 
         return back()->with('success', 'Comment added');

@@ -390,7 +390,7 @@
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
 
                 <!-- Bmydesk -->
-                <a href="https://bc.believoo.com/" target="_blank" rel="noopener" class="bel-tilt group relative bg-slate-900 rounded-3xl p-8 overflow-hidden border border-slate-800 hover:border-cyan-400/50 transition-all block">
+                <a href="https://bmydesk.believoo.com/" target="_blank" rel="noopener" class="bel-tilt group relative bg-slate-900 rounded-3xl p-8 overflow-hidden border border-slate-800 hover:border-cyan-400/50 transition-all block">
                     <div class="absolute -top-16 -right-16 w-48 h-48 bg-cyan-400/10 rounded-full blur-3xl group-hover:bg-cyan-400/20 transition-colors"></div>
                     <div class="relative">
                         <div class="w-14 h-14 rounded-2xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center mb-6">
@@ -496,10 +496,10 @@
                 </div>
             </div>
             <div class="text-center">
-                <a href="https://bc.believoo.com/register" class="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition shadow-lg shadow-cyan-500/25">
+                <a href="https://bmydesk.believoo.com/register" class="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition shadow-lg shadow-cyan-500/25">
                     Start Free on Bmydesk <i class="fas fa-arrow-right text-sm"></i>
                 </a>
-                <a href="https://bc.believoo.com/login" class="ml-4 inline-flex items-center gap-2 px-8 py-4 rounded-xl border border-slate-600 text-white font-semibold hover:bg-slate-800 transition">
+                <a href="https://bmydesk.believoo.com/login" class="ml-4 inline-flex items-center gap-2 px-8 py-4 rounded-xl border border-slate-600 text-white font-semibold hover:bg-slate-800 transition">
                     Client Login
                 </a>
             </div>

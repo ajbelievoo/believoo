@@ -33,7 +33,7 @@ use App\Http\Controllers\Auth\SocialLoginController;
 use App\Http\Controllers\StreamingPlansController;
 use App\Livewire\StreamingManagement;
 
-// ── B-CONNECT (subdomain: bc.believoo.com) ────────────────────────
+// ── B-CONNECT (subdomain: bmydesk.believoo.com) ────────────────────────
 require __DIR__.'/bconnect.php';
 
 Route::get('auth/google', [SocialLoginController::class, 'redirectToGoogle'])->name('auth.google');

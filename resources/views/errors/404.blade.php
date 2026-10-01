@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     @php
         $host = request()->getHost();
-        $isBc = str_contains($host, 'bc.believoo.com');
+        $isBc = str_contains($host, 'bmydesk.believoo.com');
         $isGhc = str_contains($host, 'ghc.believoo.com');
         $isSupport = str_contains($host, 'support.believoo.com');
 
@@ -22,7 +22,7 @@
             $bg = '#ffffff';
             $text = '#0f172a';
             $muted = '#64748b';
-            $homeUrl = 'https://bc.believoo.com';
+            $homeUrl = 'https://bmydesk.believoo.com';
         } elseif ($isGhc) {
             $brandName = 'GHC';
             $logo = '';

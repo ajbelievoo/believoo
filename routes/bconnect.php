@@ -3,10 +3,10 @@
 use Illuminate\Support\Facades\Route;
 
 // Public B-CONNECT routes
-Route::domain('bc.believoo.com')->group(function () {
+Route::domain('bmydesk.believoo.com')->group(function () {
     Route::get('/robots.txt', [\App\Http\Controllers\Bconnect\SeoController::class, 'robots'])->name('bconnect.robots');
     Route::get('/sitemap.xml', [\App\Http\Controllers\Bconnect\SeoController::class, 'sitemap'])->name('bconnect.sitemap');
-    Route::get('/sitemaps.xml', function () { return redirect()->to('https://bc.believoo.com/sitemap.xml', 301); });
+    Route::get('/sitemaps.xml', function () { return redirect()->to('https://bmydesk.believoo.com/sitemap.xml', 301); });
     Route::get('/', [\App\Http\Controllers\Bconnect\AuthController::class, 'landing'])->name('bconnect.home');
     Route::get('/login', [\App\Http\Controllers\Bconnect\AuthController::class, 'showLogin'])->name('bconnect.login');
     Route::post('/login', [\App\Http\Controllers\Bconnect\AuthController::class, 'login']);
@@ -21,7 +21,7 @@ Route::domain('bc.believoo.com')->group(function () {
 });
 
 // Authenticated B-CONNECT workspace
-Route::domain('bc.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audit'])->group(function () {
+Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect.audit'])->group(function () {
 
     // Common workspace views
     Route::get('/dashboard', [\App\Http\Controllers\Bconnect\DashboardController::class, 'index'])->name('bconnect.dashboard');

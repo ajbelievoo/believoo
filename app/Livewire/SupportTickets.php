@@ -87,7 +87,7 @@ class SupportTickets extends Component
                     'platform' => 'Bmydesk',
                     'created_at' => $t->created_at,
                     'source' => 'Bmydesk',
-                    'url' => 'https://bc.believoo.com/dashboard/tickets',
+                    'url' => 'https://bmydesk.believoo.com/dashboard/tickets',
                 ]);
             });
         } catch (\Throwable $e) {
@@ -194,7 +194,7 @@ class SupportTickets extends Component
                         'project_id' => $project?->id ?? $member->company_id,
                     ]);
 
-                    $mailData['url'] = 'https://bc.believoo.com/dashboard/tickets';
+                    $mailData['url'] = 'https://bmydesk.believoo.com/dashboard/tickets';
                     \Illuminate\Support\Facades\Mail::to($this->getSupportEmail())
                         ->send(new \App\Mail\SupportTicketExternal($mailData));
                 } else {
