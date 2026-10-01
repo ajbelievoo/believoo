@@ -76,17 +76,23 @@ function dbg(step) {
 }
 function whisper(evt, data) { try { channel.whisper(evt, data); } catch (e) { console.warn(e); } }
 
+const CAN_SHARE = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+
+function showMobileHostNotice() {
+    setStatus('Use the BMyDesk app on this device', 'bc-badge-amber');
+    document.getElementById('previewPlaceholder').innerHTML =
+        '<i class="fab fa-android text-4xl mb-3 text-green-500"></i>' +
+        '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
+        '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
+        '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
+        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-1.0.3.apk" class="text-cyan-400 underline">Download APK</a></p>';
+    const btn = document.getElementById('shareBtn');
+    btn.disabled = true;
+    btn.classList.add('opacity-40');
+}
+
 document.getElementById('shareBtn').addEventListener('click', async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        setStatus('Browser screen share not supported on this device', 'bc-badge-amber');
-        document.getElementById('previewPlaceholder').innerHTML =
-            '<i class="fab fa-android text-4xl mb-3 text-green-500"></i>' +
-            '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
-            '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
-            '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
-            '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-1.0.3.apk" class="text-cyan-400 underline">Download APK</a></p>';
-        return;
-    }
+    if (!CAN_SHARE) { showMobileHostNotice(); return; }
     try {
         stream = await navigator.mediaDevices.getDisplayMedia({
             video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -154,10 +160,11 @@ function initChannel() {
     }
     channel = window.Echo.private(channelName);
 
-    channel.subscribed(() => { dbg('channel subscribed'); setStatus('Waiting for viewer…', 'bc-badge-amber'); });
+    channel.subscribed(() => { dbg('channel subscribed'); if (!CAN_SHARE) showMobileHostNotice(); else setStatus('Waiting for viewer…', 'bc-badge-amber'); });
 
     channel.listenForWhisper('join-request', (m) => {
         dbg('join-request received');
+        if (!CAN_SHARE) { showMobileHostNotice(); whisper('join-reject', { reason: 'device' }); return; }
         document.getElementById('joinName').textContent = m.name || 'Someone';
         document.getElementById('joinRequest').classList.remove('hidden');
         setStatus('Join request', 'bc-badge-amber');

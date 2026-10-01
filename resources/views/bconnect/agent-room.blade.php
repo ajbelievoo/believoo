@@ -211,10 +211,12 @@ function initChannel() {
         dbg('host accepted');
         startPeer();
     });
-    channel.listenForWhisper('join-reject', () => {
+    channel.listenForWhisper('join-reject', (m) => {
         setStatus('Host rejected the request', 'text-red-400');
         document.getElementById('waitTitle').textContent = 'Connection declined';
-        document.getElementById('waitSub').textContent = 'The host declined your request.';
+        document.getElementById('waitSub').textContent = (m && m.reason === 'device')
+            ? 'The host device cannot share its screen from a browser. Ask them to use the BMyDesk Agent app.'
+            : 'The host declined your request.';
     });
     channel.listenForWhisper('signal', (m) => onSignal(m));
     channel.listenForWhisper('end', () => {
