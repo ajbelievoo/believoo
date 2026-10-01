@@ -1592,6 +1592,26 @@ function showTab(tabName) {
 
     // Add active class to clicked tab
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+    // Update URL hash for deep-linking
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tabName);
+        history.replaceState(null, '', url);
+    } catch (e) {}
 }
+
+// Open tab from URL param or hash
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab') || window.location.hash.replace('#', '');
+    const validTabs = ['general', 'contact', 'social', 'seo', 'payment', 'agora', 'push', 'bconnect', 'email', 'appearance', 'maintenance', 'security', 'notifications', 'backup', 'server', 'ghc', 'ai', 'integrations'];
+    if (tabParam && validTabs.includes(tabParam)) {
+        document.querySelectorAll('.settings-content').forEach(s => s.style.display = 'none');
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(tabParam).style.display = 'block';
+        document.querySelector(`[data-tab="${tabParam}"]`).classList.add('active');
+    }
+})();
 </script>
 @endsection

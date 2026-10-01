@@ -6,6 +6,10 @@
         <h1 class="page-title"><i class="fas fa-rocket" style="color:var(--admin-accent);margin-right:10px;"></i>B-CONNECT Super Admin</h1>
         <p class="page-subtitle">Unified brand and company management inside Believoo.</p>
     </div>
+    <div class="page-actions">
+        <a href="{{ route('admin.settings.index') }}?tab=bconnect" class="btn btn-secondary"><i class="fas fa-cog"></i>Brand & SEO Settings</a>
+        <a href="{{ url('/panel') }}" class="btn btn-secondary"><i class="fas fa-tools"></i>Advanced Tools</a>
+    </div>
 </div>
 
 <div class="stats-grid mb-6">
