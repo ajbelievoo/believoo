@@ -45,7 +45,7 @@ async function register() {
     } catch (e) {
         console.error('register failed:', e);
         setStatus('Register failed: ' + (e.message || 'network'), 'off');
-        $('code').textContent = 'ERROR';
+        if (!session) $('code').textContent = 'ERROR';
         setTimeout(register, 5000);
     }
 }

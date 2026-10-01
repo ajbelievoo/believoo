@@ -41,7 +41,7 @@ const CAN_CONTROL = @json($canControl);
 const END_URL = @json(route('bconnect.remote.code.end', $session->session_code));
 const channelName = 'remote-agent.' + CODE;
 
-let pc = null, dc = null, channel = null, connected = false;
+let pc = null, dc = null, channel = null, connected = false, streamTimeout = null;
 const video = document.getElementById('remoteVideo');
 const statusEl = document.getElementById('connStatus');
 const iceQueue = [];
@@ -63,6 +63,7 @@ async function startPeer() {
         if (CAN_CONTROL) document.getElementById('clickHint').classList.remove('hidden');
         setStatus('Connected', 'text-green-400');
         connected = true;
+        if (streamTimeout) clearTimeout(streamTimeout);
         startPing();
     };
 
@@ -72,7 +73,11 @@ async function startPeer() {
 
     pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'connected') setStatus('Connected', 'text-green-400');
-        if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+        if (pc.connectionState === 'failed' && pc) {
+            setStatus('Reconnecting…', 'text-amber-400');
+            try { pc.restartIce(); } catch (e) {}
+        }
+        if (['disconnected', 'closed'].includes(pc.connectionState)) {
             setStatus('Connection lost', 'text-red-400');
         }
     };
@@ -91,6 +96,15 @@ async function startPeer() {
     await pc.setLocalDescription(offer);
     whisper('signal', { kind: 'offer', sdp: pc.localDescription.sdp });
     setStatus('Connecting…', 'text-amber-400');
+    if (streamTimeout) clearTimeout(streamTimeout);
+    streamTimeout = setTimeout(() => {
+        if (!connected) {
+            setStatus('Host did not respond', 'text-red-400');
+            document.getElementById('waitTitle').textContent = 'No response from host';
+            document.getElementById('waitSub').textContent = 'The host accepted but the screen stream never arrived. It may have closed — ask them to reopen the agent and try again.';
+            document.getElementById('waitOverlay').classList.remove('hidden');
+        }
+    }, 25000);
 }
 
 function startPing() {

@@ -63,6 +63,21 @@ class MainActivity : Activity() {
     private val signaling = SignalingClient()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Show the real crash instead of silently dying — screenshot it and share.
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            val trace = android.util.Log.getStackTraceString(e)
+            android.util.Log.e("BMyDesk", "crash", e)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                runCatching {
+                    android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("BMyDesk crashed")
+                        .setMessage("${e.javaClass.simpleName}: ${e.message}\n\n${trace.take(1200)}")
+                        .setPositiveButton("Close") { _, _ -> android.os.Process.killProcess(android.os.Process.myPid()) }
+                        .setCancelable(false)
+                        .show()
+                }
+            }
+        }
         super.onCreate(savedInstanceState)
         buildUi()
         register()
@@ -193,7 +208,10 @@ class MainActivity : Activity() {
             }
             override fun onEnd() { ui { endSession() } }
         }
-        thread { signaling.connect(r.channel, r.agentToken) }
+        thread {
+            try { signaling.connect(r.channel, r.agentToken) }
+            catch (e: Throwable) { ui { setStatus("Realtime failed: ${e.message}", "#ef4444") } }
+        }
     }
 
     // ── Accept flow: projection permission → service → capture ─────
