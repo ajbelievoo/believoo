@@ -113,10 +113,15 @@ class MainActivity : Activity() {
 
     // ── UI ─────────────────────────────────────────────────────────
     private fun buildUi() {
-        val bg = Color.parseColor("#0b1220")
-        val panel = Color.parseColor("#0f172a")
-        val rose = Color.parseColor("#fb7185")
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        val dark = prefs.getBoolean("dark", true)
+        val bg = Color.parseColor(if (dark) "#0b1220" else "#f1f5f9")
+        val panel = Color.parseColor(if (dark) "#0f172a" else "#ffffff")
+        val rose = Color.parseColor(if (dark) "#fb7185" else "#e11d48")
         val green = Color.parseColor("#22c55e")
+        val txtMain = Color.parseColor(if (dark) "#ffffff" else "#0f172a")
+        val txtSub = Color.parseColor(if (dark) "#94a3b8" else "#64748b")
+        val txtDim = Color.parseColor(if (dark) "#64748b" else "#94a3b8")
 
         val frame = android.widget.FrameLayout(this).apply { setBackgroundColor(bg) }
         val scroll = ScrollView(this)
@@ -128,14 +133,21 @@ class MainActivity : Activity() {
         scroll.addView(col)
         frame.addView(scroll)
 
+        // theme toggle (top-right)
+        col.addView(TextView(this).apply {
+            text = if (dark) "☀ Light mode" else "☾ Dark mode"
+            setTextColor(txtSub); textSize = 12f; gravity = Gravity.END
+            setOnClickListener { prefs.edit().putBoolean("dark", !dark).apply(); recreate() }
+        })
+
         col.addView(TextView(this).apply {
             text = "BMyDesk Agent"
-            setTextColor(Color.WHITE); textSize = 22f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(txtMain); textSize = 22f; typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
         })
         col.addView(TextView(this).apply {
             text = "Share your screen with a session code"
-            setTextColor(Color.parseColor("#94a3b8")); textSize = 12f; gravity = Gravity.CENTER
+            setTextColor(txtSub); textSize = 12f; gravity = Gravity.CENTER
             setPadding(0, 6, 0, 30)
         })
 
@@ -217,6 +229,44 @@ class MainActivity : Activity() {
         remoteCard.addView(row)
         col.addView(remoteCard)
 
+        // ── Account: sign in with BMyDesk workspace credentials ──
+        val acct = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 20, 0, 0) }
+        val memberName = prefs.getString("member_name", null)
+        if (memberName != null) {
+            acct.addView(TextView(this).apply {
+                text = "✓ Signed in as $memberName — tap to sign out"
+                setTextColor(green); textSize = 12f; gravity = Gravity.CENTER
+                setOnClickListener { prefs.edit().remove("member_token").remove("member_name").apply(); recreate() }
+            })
+        } else {
+            val emailIn = android.widget.EditText(this).apply {
+                hint = "Workspace email"; setTextColor(txtMain); textSize = 13f
+                setHintTextColor(txtDim); inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                setPadding(20, 10, 20, 10)
+                background = GradientDrawable().apply { setColor(if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")); cornerRadius = 14f }
+            }
+            val passIn = android.widget.EditText(this).apply {
+                hint = "Password"; setTextColor(txtMain); textSize = 13f
+                setHintTextColor(txtDim); inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setPadding(20, 10, 20, 10)
+                background = GradientDrawable().apply { setColor(if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")); cornerRadius = 14f }
+            }
+            val loginBtn = Button(this).apply { text = "Sign in" }
+            acct.addView(emailIn); acct.addView(passIn); acct.addView(loginBtn)
+            loginBtn.setOnClickListener {
+                thread {
+                    try {
+                        val l = api.login(emailIn.text.toString().trim(), passIn.text.toString())
+                        prefs.edit().putString("member_token", l.memberToken).putString("member_name", l.name).apply()
+                        ui { recreate() }
+                    } catch (e: Exception) {
+                        ui { setStatus("Login failed: ${e.message}", "#ef4444") }
+                    }
+                }
+            }
+        }
+        col.addView(acct)
+
         col.addView(TextView(this).apply {
             text = "Viewer enters this code at\nbmydesk.believoo.com → Remote → Connect"
             setTextColor(Color.parseColor("#64748b")); textSize = 12f; gravity = Gravity.CENTER
@@ -267,7 +317,10 @@ class MainActivity : Activity() {
     private fun register() {
         thread {
             try {
-                val r = api.register(android.os.Build.MODEL ?: "android-device", "android")
+                val r = api.register(
+                    android.os.Build.MODEL ?: "android-device", "android",
+                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_token", null)
+                )
                 reg = r
                 ui { codeView.text = r.code; setStatus("Ready — share your code", "#22c55e"); spinner.visibility = View.GONE }
                 connectSignaling(r)

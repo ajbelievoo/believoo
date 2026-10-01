@@ -31,7 +31,7 @@ async function register() {
         const r = await fetch(API + '/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ host_name: require_os_name(), version: APP_VERSION, os: window.agent?.platform || 'unknown' }),
+            body: JSON.stringify({ host_name: require_os_name(), version: APP_VERSION, os: window.agent?.platform || 'unknown', member_token: localStorage.getItem('bmydesk_member_token') || undefined }),
         });
         const data = await r.json();
         if (!data.ok) throw new Error(data.error || 'register failed');
@@ -255,9 +255,10 @@ async function connectToPartner() {
         });
         vCh = p2.subscribe('private-remote-agent.' + code);
 
+        vStatus('Subscribing…');
         vCh.bind('pusher:subscription_succeeded', () => {
             vStatus('Waiting for host approval…');
-            vCh.trigger('client-join-request', { name: require_os_name() + ' (agent)' });
+            vCh.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)' });
         });
         vCh.bind('pusher:subscription_error', () => { vStatus('Channel auth failed'); exitViewer(3000); });
         vCh.bind('client-join-accept', () => startViewerPeer());
@@ -336,6 +337,45 @@ $('connectBtn').addEventListener('click', connectToPartner);
 $('remoteCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') connectToPartner(); });
 $('viewerEnd').addEventListener('click', () => exitViewer());
 bindViewerInput();
+
+// ═══════════ Theme toggle + login ═══════════
+const themeBtn = $('themeBtn');
+function applyTheme(t) { document.body.classList.toggle('light', t === 'light'); themeBtn.textContent = t === 'light' ? '☀' : '☾'; }
+themeBtn.onclick = () => { const t = document.body.classList.contains('light') ? 'dark' : 'light'; localStorage.setItem('bmydesk_theme', t); applyTheme(t); };
+applyTheme(localStorage.getItem('bmydesk_theme') || 'dark');
+
+const savedName = localStorage.getItem('bmydesk_member_name');
+if (savedName) { $('signedAs').textContent = '✓ Signed in as ' + savedName + ' — click to sign out'; $('signedAs').classList.remove('hidden'); $('loginToggle').classList.add('hidden'); }
+
+$('loginToggle').onclick = () => $('loginCard').classList.toggle('hidden');
+$('signedAs').onclick = () => {
+    localStorage.removeItem('bmydesk_member_token'); localStorage.removeItem('bmydesk_member_name');
+    $('signedAs').classList.add('hidden'); $('loginToggle').classList.remove('hidden');
+};
+$('loginBtn').onclick = async () => {
+    const email = $('loginEmail').value.trim(), pass = $('loginPass').value;
+    if (!email || !pass) return;
+    $('loginBtn').disabled = true; $('loginBtn').textContent = 'Signing in…'; $('loginErr').classList.add('hidden');
+    try {
+        const r = await fetch(API + '/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ email, password: pass }),
+        });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'Login failed');
+        localStorage.setItem('bmydesk_member_token', d.member_token);
+        localStorage.setItem('bmydesk_member_name', d.name);
+        $('signedAs').textContent = '✓ Signed in as ' + d.name + ' — click to sign out';
+        $('signedAs').classList.remove('hidden');
+        $('loginCard').classList.add('hidden'); $('loginToggle').classList.add('hidden');
+        $('loginPass').value = '';
+    } catch (e) {
+        $('loginErr').textContent = e.message || 'Login failed';
+        $('loginErr').classList.remove('hidden');
+    } finally {
+        $('loginBtn').disabled = false; $('loginBtn').textContent = 'Sign In';
+    }
+};
 
 register();
 checkUpdate();

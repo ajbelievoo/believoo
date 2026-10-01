@@ -31,6 +31,31 @@ class AgentApiController extends Controller
         return $token && $session->viewer_token && hash_equals((string) $session->viewer_token, (string) $token);
     }
 
+    // POST /api/v1/bmydesk/agent/login — sign in with BMyDesk workspace credentials.
+    // Returns a member token the apps store and send on later calls.
+    public function login(Request $r)
+    {
+        $data = $r->validate(['email' => 'required|email', 'password' => 'required|string']);
+        $user = \App\Models\User::where('email', $data['email'])->first();
+        if (!$user || !\Illuminate\Support\Facades\Hash::check($data['password'], (string) $user->password)) {
+            return response()->json(['ok' => false, 'error' => 'Invalid email or password'], 401);
+        }
+        $member = \App\Models\Bconnect\Member::where('user_id', $user->id)->where('is_active', true)->first();
+        if (!$member) {
+            return response()->json(['ok' => false, 'error' => 'No BMyDesk workspace membership'], 403);
+        }
+        if (!$member->api_token) {
+            $member->api_token = Str::random(48);
+            $member->save();
+        }
+        return response()->json([
+            'ok' => true,
+            'name' => $user->name,
+            'company' => $member->company?->name,
+            'member_token' => $member->api_token,
+        ]);
+    }
+
     // POST /api/v1/bmydesk/agent/register — desktop agent calls this to get a session code
     public function register(Request $r)
     {
@@ -38,18 +63,24 @@ class AgentApiController extends Controller
             'host_name' => 'nullable|string|max:120',
             'version' => 'nullable|string|max:30',
             'os' => 'nullable|string|max:40',
+            'member_token' => 'nullable|string|max:80',
         ]);
+
+        $member = null;
+        if (!empty($data['member_token'])) {
+            $member = \App\Models\Bconnect\Member::where('api_token', $data['member_token'])->where('is_active', true)->first();
+        }
 
         do {
             $code = strtoupper(Str::random(3) . rand(100, 999) . Str::random(2));
         } while (RemoteSession::where('session_code', $code)->exists());
 
         $session = RemoteSession::create([
-            'company_id' => null,
-            'requested_by' => null,
+            'company_id' => $member?->company_id,
+            'requested_by' => $member?->id,
             'target_id' => null,
             'host_kind' => 'agent',
-            'host_label' => $data['host_name'] ?? 'BMyDesk Agent',
+            'host_label' => $member?->user?->name ?? $data['host_name'] ?? 'BMyDesk Agent',
             'session_code' => $code,
             'agent_token' => Str::random(48),
             'status' => 'waiting',

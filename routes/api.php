@@ -56,6 +56,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/{code}/end', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'end']);
         Route::post('/broadcast-auth', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'broadcastAuth']);
         Route::get('/version', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'version']);
+        Route::post('/login', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'login']);
         Route::post('/{code}/join', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'join']);
     });
 

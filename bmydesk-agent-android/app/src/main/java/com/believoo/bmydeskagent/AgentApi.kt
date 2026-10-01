@@ -26,8 +26,10 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         val iceServers: com.google.gson.JsonArray?,
     )
 
-    fun register(hostName: String, os: String = "android"): Registration {
-        val body = gson.toJson(mapOf("host_name" to hostName, "version" to BuildConfig.VERSION_NAME, "os" to os))
+    fun register(hostName: String, os: String = "android", memberToken: String? = null): Registration {
+        val fields = mutableMapOf<String, String>("host_name" to hostName, "version" to BuildConfig.VERSION_NAME, "os" to os)
+        memberToken?.let { fields["member_token"] = it }
+        val body = gson.toJson(fields)
             .toRequestBody(json)
         val req = Request.Builder().url("$base/register").post(body).build()
         http.newCall(req).execute().use { res ->
@@ -52,6 +54,18 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
                 if (o.get("ok").asBoolean) o.get("latest").asString to o.get("url").asString else null
             }
         }.getOrNull()
+    }
+
+    data class LoginResult(val name: String, val company: String?, val memberToken: String)
+
+    fun login(email: String, password: String): LoginResult {
+        val body = gson.toJson(mapOf("email" to email, "password" to password)).toRequestBody(json)
+        val req = Request.Builder().url("$base/login").post(body).build()
+        http.newCall(req).execute().use { res ->
+            val obj = gson.fromJson(res.body!!.string(), JsonObject::class.java)
+            if (!obj.get("ok").asBoolean) throw RuntimeException(obj.get("error")?.asString ?: "login failed")
+            return LoginResult(obj.get("name").asString, obj.get("company")?.asString, obj.get("member_token").asString)
+        }
     }
 
     data class JoinResult(val viewerToken: String, val channel: String, val hostLabel: String?, val iceServers: com.google.gson.JsonArray?)

@@ -6,6 +6,26 @@
 <style>
     * { box-sizing: border-box; margin: 0; font-family: 'Segoe UI', Inter, system-ui, sans-serif; }
     body { background: #0b1220; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; }
+    /* light theme */
+    body.light { background: #f1f5f9; color: #0f172a; }
+    body.light .code-card, body.light .remote-card { background: #fff; border-color: #e2e8f0; }
+    body.light .label { color: #64748b; }
+    body.light .hint { color: #94a3b8; }
+    body.light .foot { color: #94a3b8; }
+    body.light .code-input { background: #f1f5f9; color: #e11d48; border-color: #e2e8f0; }
+    body.light .btn-reject { background: #e2e8f0; color: #0f172a; }
+    body.light .screens button { background: #f1f5f9; border-color: #e2e8f0; color: #0f172a; }
+    .theme-toggle { position: absolute; top: 14px; right: 14px; background: none; border: 1px solid rgba(148,163,184,.3); color: #94a3b8; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 15px; }
+    body.light .theme-toggle { border-color: #cbd5e1; color: #475569; }
+    .login-link { font-size: 11px; color: #64748b; text-align: center; margin-top: 10px; cursor: pointer; }
+    .login-link:hover { color: #fb7185; }
+    .login-card { background: #0f172a; border: 1px solid rgba(148,163,184,.12); border-radius: 16px; padding: 16px; margin-top: 14px; }
+    body.light .login-card { background: #fff; border-color: #e2e8f0; }
+    .login-card input { width: 100%; background: #131c2e; border: 1px solid rgba(148,163,184,.2); border-radius: 8px; padding: 9px 10px; color: #e2e8f0; font-size: 12px; margin-bottom: 8px; }
+    body.light .login-card input { background: #f1f5f9; color: #0f172a; }
+    .login-card input:focus { outline: none; border-color: #fb7185; }
+    .login-card .btn { width: 100%; background: linear-gradient(135deg,#f59e0b,#e11d48,#7c3aed); color: #fff; border: 0; border-radius: 8px; padding: 10px; font-weight: 700; font-size: 12px; cursor: pointer; }
+    .signed { font-size: 11px; color: #4ade80; text-align: center; margin-top: 10px; }
     .wrap { flex: 1; display: flex; flex-direction: column; padding: 28px; }
     .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
     .brand img { height: 34px; width: auto; }
@@ -47,8 +67,9 @@
 </head>
 <body>
 <div class="wrap">
+    <button class="theme-toggle" id="themeBtn" title="Toggle theme">☾</button>
     <div class="brand">
-        <img id="logoImg" src="https://bmydesk.believoo.com/images/bconnect-logo.png" alt="BMyDesk" onerror="this.style.display='none'">
+        <img id="logoImg" src="../assets/icon.png" alt="BMyDesk" style="border-radius:8px">
         <div>
             <div style="font-weight:900;font-size:16px;">BMyDesk Agent</div>
             <div style="font-size:10.5px;color:#64748b;">Remote access by Believoo</div>
@@ -79,6 +100,17 @@
             <input class="code-input" id="remoteCode" maxlength="8" placeholder="ABC123XY" autocomplete="off" spellcheck="false">
             <button class="btn-connect" id="connectBtn">Connect</button>
         </div>
+    </div>
+
+    <div id="loginArea">
+        <p class="login-link" id="loginToggle">🔑 Sign in with your BMyDesk account</p>
+        <div class="login-card hidden" id="loginCard">
+            <input id="loginEmail" type="email" placeholder="Email">
+            <input id="loginPass" type="password" placeholder="Password">
+            <button class="btn" id="loginBtn">Sign In</button>
+            <p class="login-link hidden" id="loginErr" style="color:#f87171;"></p>
+        </div>
+        <p class="signed hidden" id="signedAs"></p>
     </div>
 
     <p class="hint">Share this code with your support engineer.<br>They enter it at <b style="color:#94a3b8">bmydesk.believoo.com → Remote → Connect</b>.</p>

@@ -24,7 +24,8 @@
         "productName": "BMyDesk Agent",
         "directories": { "output": "dist" },
         "win": {
-            "target": ["nsis", "zip"]
+            "target": ["nsis", "zip"],
+            "icon": "assets/icon.png"
         },
         "nsis": {
             "oneClick": true,
