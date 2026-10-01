@@ -82,7 +82,9 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
         document.getElementById('previewPlaceholder').innerHTML =
             '<i class="fab fa-android text-4xl mb-3 text-green-500"></i>' +
             '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
-            '<p class="text-xs text-slate-500 mt-1">Install the <a href="/remote/agent" class="text-cyan-400 underline">BMyDesk Agent app</a> on this device to host from it — or open this page on a computer.</p>';
+            '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
+            '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
+            '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-1.0.3.apk" class="text-cyan-400 underline">Download APK</a></p>';
         return;
     }
     try {
