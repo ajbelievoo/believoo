@@ -274,6 +274,7 @@ class RemoteController extends Controller {
     }
 
     protected function queueRelay(string $code, string $toRole, array $payload): void {
+        $payload['at'] = $payload['at'] ?? now()->toIso8601String();
         $key = $this->relayKey($code, $toRole);
         $list = \Illuminate\Support\Facades\Cache::get($key, []);
         $list[] = $payload;

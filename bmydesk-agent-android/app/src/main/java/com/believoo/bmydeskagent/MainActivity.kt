@@ -78,6 +78,14 @@ class MainActivity : Activity() {
         if (seenNonces.size > 600) seenNonces.clear()
         return true
     }
+    // queued signals carry a server timestamp — drop stale ones so leftovers
+    // from a dead pairing can't kill a fresh session
+    private fun sigFresh(p: JsonObject): Boolean {
+        val at = p.get("at")?.asString ?: return true
+        return runCatching {
+            System.currentTimeMillis() - java.time.Instant.parse(at).toEpochMilli() < 45_000
+        }.getOrDefault(true)
+    }
     // set when the host answers a join request — polled requests older than
     // this are not re-shown (fixes the "accept loop").
     @Volatile private var respondedAtMs = 0L
@@ -407,7 +415,7 @@ class MainActivity : Activity() {
             Thread.sleep(15000)
             while (reg != null) {
                 try {
-                    api.drainSignals(r.code, r.agentToken).forEach { p -> if (sigNew(p)) handleHostSignal(p) }
+                    api.drainSignals(r.code, r.agentToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleHostSignal(p) }
                     if (!signaling.hostSubscribed) {
                         val s = api.status(r.code, r.agentToken)
                         if (s?.get("ok")?.asBoolean == true) {
@@ -517,7 +525,7 @@ class MainActivity : Activity() {
         thread {
             while (vJoin != null) {
                 try {
-                    api.drainSignals(code, j.viewerToken).forEach { p -> if (sigNew(p)) handleViewerSignal(j, p) }
+                    api.drainSignals(code, j.viewerToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleViewerSignal(j, p) }
                     if (remoteViewer == null) {
                         val st = api.status(code, j.viewerToken)
                         val stv = st?.get("status")?.asString

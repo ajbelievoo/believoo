@@ -11,8 +11,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.0.6';
-    const AGENT_LATEST_ANDROID = '1.0.6';
+    const AGENT_LATEST_WINDOWS = '1.0.7';
+    const AGENT_LATEST_ANDROID = '1.0.7';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -254,6 +254,7 @@ class AgentApiController extends Controller
 
     protected function queueSignal(string $code, string $toRole, array $payload): void
     {
+        $payload['at'] = $payload['at'] ?? now()->toIso8601String();
         $key = $this->signalKey($code, $toRole);
         $list = \Illuminate\Support\Facades\Cache::get($key, []);
         $list[] = $payload;

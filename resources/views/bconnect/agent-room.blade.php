@@ -70,6 +70,7 @@ function sigNew(m) {
     seenSig.add(n); if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
     return true;
 }
+const sigFresh = (m) => !m.at || (Date.now() - Date.parse(m.at)) < 45000; // drop stale queued signals
 const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 function postJson(url, body) {
     return fetch(url, { method: 'POST', credentials: 'same-origin', headers: {
@@ -114,7 +115,7 @@ function startViewerPoll() {
         try {
             const r = await fetch(API + '/signals', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
             const d = await r.json();
-            (d.signals || []).forEach((m) => { if (sigNew(m)) { dbg('poll sig: ' + (m.kind || '?')); dispatchViewerSignal(m); } });
+            (d.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) { dbg('poll sig: ' + (m.kind || '?')); dispatchViewerSignal(m); } });
             if (!pc) {
                 const s = await fetch(API + '/session-status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
                 const sd = await s.json();

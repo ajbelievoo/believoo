@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -128,6 +128,9 @@ function sigNew(m) {
     if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
     return true;
 }
+// queued signals get a server timestamp — drop stale ones so a leftover
+// "end"/"offer" from a dead pairing can't kill a fresh session.
+const sigFresh = (m) => !m.at || (Date.now() - Date.parse(m.at)) < 45000;
 const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 function postSignal(code, token, msg) {
     msg.n = nonce();
@@ -165,7 +168,7 @@ function startStatusPoll() {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
             });
             const sd = await sr.json();
-            (sd.signals || []).forEach((m) => { if (sigNew(m)) dispatchHostSignal(m); });
+            (sd.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) dispatchHostSignal(m); });
         } catch (e) {}
     }, 3000);
 }
@@ -410,7 +413,7 @@ function startViewerPoll() {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },
             });
             const d = await r.json();
-            (d.signals || []).forEach((m) => { if (sigNew(m)) dispatchViewerSignal(m); });
+            (d.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) dispatchViewerSignal(m); });
             // queued accept may be missed mid-flight — status poll is the backup
             const st = await fetch(`${API}/${vJoinedCode}/status`, {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },

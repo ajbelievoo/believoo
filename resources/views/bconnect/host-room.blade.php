@@ -88,6 +88,7 @@ function sigNew(m) {
     seenSig.add(n); if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
     return true;
 }
+const sigFresh = (m) => !m.at || (Date.now() - Date.parse(m.at)) < 45000; // drop stale queued signals
 const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 function postJson(url, body) {
     return fetch(url, { method: 'POST', credentials: 'same-origin', headers: {
@@ -107,7 +108,7 @@ function showMobileHostNotice() {
         '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
         '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
         '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
-        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-v1.0.6.apk" class="text-cyan-400 underline">Download APK</a></p>';
+        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-v1.0.7.apk" class="text-cyan-400 underline">Download APK</a></p>';
     const btn = document.getElementById('shareBtn');
     btn.disabled = true;
     btn.classList.add('opacity-40');
@@ -239,7 +240,7 @@ function startHostPoll() {
         try {
             const sr = await fetch(API + '/signals', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
             const sd = await sr.json();
-            (sd.signals || []).forEach((m) => { if (sigNew(m)) { dbg('poll sig: ' + (m.kind || '?')); onSignal(m); } });
+            (sd.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) { dbg('poll sig: ' + (m.kind || '?')); onSignal(m); } });
             const st = await fetch(API + '/session-status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
             const sd2 = await st.json();
             const jt = sd2.ok && sd2.viewer_joined_at ? Date.parse(sd2.viewer_joined_at) : 0;
