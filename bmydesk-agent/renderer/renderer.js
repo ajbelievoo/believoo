@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -41,7 +41,7 @@ async function register() {
             pcConfig = { iceServers: data.ice_servers };
         }
         $('code').textContent = data.session_code;
-        setStatus('Ready — share your code', 'wait');
+        setStatus('Connecting realtime…', 'wait');
         try { connectChannel(); }
         catch (e) { console.error('channel setup failed:', e); setStatus('Realtime failed: ' + (e.message || e), 'off'); }
     } catch (e) {
@@ -75,6 +75,11 @@ function require_os_name() {
 // host channels use agent_token, joined sessions use their viewer_token.
 const channelTokens = {};
 
+function hdbg(step) {
+    const el = $('hostDebug');
+    if (el) el.textContent = (el.textContent + ' › ' + step).slice(-120);
+}
+
 function getPusher() {
     if (pusher) return pusher;
     pusher = new Pusher(REVERB_KEY, {
@@ -86,20 +91,27 @@ function getPusher() {
         // custom authorizer — POSTs socket_id+channel_name to our API
         authorizer: (channel) => ({
             authorize: (socketId, callback) => {
+                hdbg('auth ' + channel.name.split('.').pop());
+                const ctl = new AbortController();
+                const t = setTimeout(() => ctl.abort(), 10000);
                 fetch(API + '/broadcast-auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ socket_id: socketId, channel_name: channel.name, agent_token: channelTokens[channel.name] || '' }),
+                    signal: ctl.signal,
                 })
                     .then(r => r.json())
-                    .then(d => d.auth ? callback(null, d) : callback(new Error(d.error || 'auth failed'), null))
-                    .catch(e => callback(e, null));
+                    .then(d => { clearTimeout(t); d.auth ? (hdbg('auth ok'), callback(null, d)) : (hdbg('auth fail ' + (d.error || '')), callback(new Error(d.error || 'auth failed'), null)); })
+                    .catch(e => { clearTimeout(t); hdbg('auth err ' + (e.name === 'AbortError' ? 'timeout' : e.message || 'net')); callback(e, null); });
             },
         }),
     });
+    pusher.connection.bind('state_change', (s) => hdbg('ws:' + s.current));
+    pusher.connection.bind('error', (e) => hdbg('wserr:' + (e?.error?.data?.code || e?.type || 'net')));
     return pusher;
 }
 
+let chRetryTimer = null;
 function connectChannel() {
     if (typeof Pusher === 'undefined') {
         setStatus('Realtime lib missing — reinstall the agent', 'off');
@@ -107,8 +119,20 @@ function connectChannel() {
     }
     channelTokens[session.channel] = session.agent_token;
     ch = getPusher().subscribe(session.channel);
-    ch.bind('pusher:subscription_succeeded', () => setStatus('Ready — share your code', 'on'));
-    ch.bind('pusher:subscription_error', (e) => setStatus('Channel auth failed', 'off'));
+    hdbg('subscribing ' + session.channel.split('.').pop());
+
+    // watchdog — if subscribe doesn't complete, tear the channel down and retry
+    if (chRetryTimer) clearTimeout(chRetryTimer);
+    chRetryTimer = setTimeout(() => {
+        if (!ch.subscribed) {
+            hdbg('sub timeout — retrying');
+            try { getPusher().unsubscribe(session.channel); } catch (e) {}
+            connectChannel();
+        }
+    }, 15000);
+
+    ch.bind('pusher:subscription_succeeded', () => { clearTimeout(chRetryTimer); hdbg('subscribed'); setStatus('Ready — share your code', 'on'); });
+    ch.bind('pusher:subscription_error', (e) => { clearTimeout(chRetryTimer); hdbg('sub err'); setStatus('Channel auth failed — retrying…', 'off'); setTimeout(connectChannel, 5000); });
 
     ch.bind('client-join-request', (m) => {
         $('reqName').textContent = m.name || 'Someone';
