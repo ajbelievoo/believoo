@@ -23,7 +23,7 @@ class AuthController extends Controller {
 
     public function login(Request $r) {
         $r->validate(['email' => 'required|email', 'password' => 'required']);
-        if (Auth::attempt($r->only('email', 'password'))) {
+        if (Auth::attempt($r->only('email', 'password'), $r->boolean('remember'))) {
             $member = Member::where('user_id', Auth::id())->where('is_active', true)->first();
             if ($member) {
                 session(['bconnect_company_id' => $member->company_id, 'bconnect_role' => $member->role]);
@@ -45,7 +45,7 @@ class AuthController extends Controller {
         } catch (\Throwable $e) {
             \Log::warning('Bmydesk welcome email failed: ' . $e->getMessage());
         }
-        Auth::login($user);
+        Auth::login($user, true);
         session(['bconnect_company_id' => $company->id, 'bconnect_role' => 'company_admin']);
         return redirect()->route('bconnect.dashboard');
     }
@@ -88,7 +88,7 @@ class AuthController extends Controller {
                 }
             }
             $member = Member::where('user_id', $user->id)->where('is_active', true)->first();
-            Auth::login($user);
+            Auth::login($user, true);
             // Agent-app login: OAuth started from the desktop/mobile app —
             // return the member token through the bmydesk:// deep link.
             if ($member && session()->pull('bconnect_agent_auth')) {

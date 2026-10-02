@@ -21,7 +21,10 @@
     <form method="POST" action="{{ route('bconnect.login') }}" class="space-y-4">@csrf
         <input type="email" name="email" placeholder="Email" required class="bc-input" autocomplete="email">
         <input type="password" name="password" placeholder="Password" required class="bc-input" autocomplete="current-password">
-        <div class="text-right">
+        <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                <input type="checkbox" name="remember" value="1" checked class="accent-rose-500">Keep me signed in
+            </label>
             <a href="{{ route('bconnect.forgot-password') }}" class="text-sm text-cyan-400 hover:underline">Forgot password?</a>
         </div>
         <button type="submit" class="bc-btn bc-btn-primary w-full"><i class="fas fa-sign-in-alt"></i>Login</button>

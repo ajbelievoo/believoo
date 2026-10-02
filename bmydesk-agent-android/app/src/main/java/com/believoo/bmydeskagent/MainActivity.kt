@@ -215,6 +215,14 @@ class MainActivity : Activity() {
             text = "…"
             setTextColor(rose); textSize = 42f; typeface = Typeface.MONOSPACE; letterSpacing = 0.15f
             setTextIsSelectable(true); setPadding(0, 16, 0, 16)
+            // long-press = mint a fresh code (clears the device identity)
+            setOnLongClickListener {
+                getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().remove("device_id").apply()
+                reg = null
+                ui { text = "…"; setStatus("Registering…", "#f59e0b") }
+                register()
+                true
+            }
         }
         card.addView(codeView)
         spinner = ProgressBar(this)
@@ -372,12 +380,26 @@ class MainActivity : Activity() {
     }
 
     // ── Register + signaling ───────────────────────────────────────
+    // Stable device identity — generated once, kept forever; the server maps
+    // it to ONE permanent session code (AnyDesk-style). A new code only comes
+    // from the user tapping the code → "New code".
+    private fun deviceId(): String {
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        var id = prefs.getString("device_id", null)
+        if (id == null) {
+            id = java.util.UUID.randomUUID().toString()
+            prefs.edit().putString("device_id", id).apply()
+        }
+        return id
+    }
+
     private fun register() {
         thread {
             try {
                 val r = api.register(
                     android.os.Build.MODEL ?: "android-device", "android",
-                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_token", null)
+                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_token", null),
+                    deviceId()
                 )
                 reg = r
                 ui { codeView.text = r.code; setStatus("Connecting realtime…", "#f59e0b"); spinner.visibility = View.GONE }
@@ -412,7 +434,7 @@ class MainActivity : Activity() {
         if (statusPollRunning) return
         statusPollRunning = true
         thread {
-            Thread.sleep(15000)
+            Thread.sleep(4000)
             while (reg != null) {
                 try {
                     api.drainSignals(r.code, r.agentToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleHostSignal(p) }

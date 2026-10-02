@@ -30,16 +30,16 @@
                         <ul class="text-xs text-slate-500 space-y-1.5 mb-4">
                             <li><i class="fas fa-check text-green-400 mr-1"></i>Screen stream + input control over P2P WebRTC (low latency)</li>
                             <li><i class="fas fa-check text-green-400 mr-1"></i>Host approves every connection — no silent access</li>
-                            <li><i class="fas fa-check text-green-400 mr-1"></i>Codes expire after 60 minutes</li>
+                            <li><i class="fas fa-check text-green-400 mr-1"></i>Your code stays the same — like an AnyDesk ID</li>
                         </ul>
                         <div class="flex flex-wrap gap-3">
-                            <a href="/downloads/BMyDesk-Agent-Setup-1.0.7.exe" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-windows mr-1"></i>Windows (Beta)</a>
-                            <a href="/downloads/BMyDesk-Agent-v1.0.7.apk" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-android mr-1"></i>Android APK (Beta)</a>
-                            <a href="/downloads/BMyDesk-Agent-1.0.7-win.zip" download class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                            <a href="/downloads/BMyDesk-Agent-Setup-1.0.8.exe" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-windows mr-1"></i>Windows (Beta)</a>
+                            <a href="/downloads/BMyDesk-Agent-v1.0.8.apk" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-android mr-1"></i>Android APK (Beta)</a>
+                            <a href="/downloads/BMyDesk-Agent-1.0.8-win.zip" download class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
                             <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-apple mr-1"></i>iOS (Soon)</button>
                         </div>
-                        <p class="text-[11px] text-slate-500 mt-2">Exe download slow ya ruk jaye? <a href="/downloads/BMyDesk-Agent-Setup-1.0.7.zip" download class="text-cyan-400 hover:underline">Zipped installer</a> ya <a href="/downloads/BMyDesk-Agent-1.0.7-win.zip" download class="text-cyan-400 hover:underline">portable ZIP</a> try karo — Chrome mein resume bhi hota hai.</p>
-                        <p class="text-[11px] text-slate-600 mt-3">v1.0.7 Beta — Windows installer unsigned (SmartScreen → "More info → Run anyway"); Android is a debug-signed APK (allow "Install unknown apps"). Android host is view-only; control-from-mobile works via the Windows agent.</p>
+                        <p class="text-[11px] text-slate-500 mt-2">Exe download slow ya ruk jaye? <a href="/downloads/BMyDesk-Agent-Setup-1.0.8.zip" download class="text-cyan-400 hover:underline">Zipped installer</a> ya <a href="/downloads/BMyDesk-Agent-1.0.8-win.zip" download class="text-cyan-400 hover:underline">portable ZIP</a> try karo — Chrome mein resume bhi hota hai.</p>
+                        <p class="text-[11px] text-slate-600 mt-3">v1.0.8 — Windows installer is code-signed; Android APK signed (allow "Install unknown apps"). Android host is view-only; control-from-mobile works via the Windows agent.</p>
                         <p class="text-[11px] mt-2"><a href="{{ route('bconnect.remote.applogin') }}" class="text-cyan-400 hover:underline"><i class="fas fa-sign-in-alt mr-1"></i>Already installed? Sign in to the app with this account</a></p>
                     </div>
                 </div>

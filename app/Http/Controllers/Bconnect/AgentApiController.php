@@ -11,8 +11,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.0.7';
-    const AGENT_LATEST_ANDROID = '1.0.7';
+    const AGENT_LATEST_WINDOWS = '1.0.8';
+    const AGENT_LATEST_ANDROID = '1.0.8';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -57,7 +57,10 @@ class AgentApiController extends Controller
         ]);
     }
 
-    // POST /api/v1/bmydesk/agent/register — desktop agent calls this to get a session code
+    // POST /api/v1/bmydesk/agent/register — desktop agent calls this to get a session code.
+    // With device_id the code is STABLE (like an AnyDesk ID): the server reuses
+    // the device's session row, rotates the token, and resets it to a fresh
+    // waiting state — reconnects never need a new code.
     public function register(Request $r)
     {
         $data = $r->validate([
@@ -65,11 +68,41 @@ class AgentApiController extends Controller
             'version' => 'nullable|string|max:30',
             'os' => 'nullable|string|max:40',
             'member_token' => 'nullable|string|max:80',
+            'device_id' => 'nullable|string|max:64',
         ]);
 
         $member = null;
         if (!empty($data['member_token'])) {
             $member = \App\Models\Bconnect\Member::where('api_token', $data['member_token'])->where('is_active', true)->first();
+        }
+
+        if (!empty($data['device_id'])) {
+            $existing = RemoteSession::where('device_id', $data['device_id'])
+                ->where('host_kind', 'agent')->latest()->first();
+            if ($existing) {
+                $existing->update([
+                    'company_id' => $member?->company_id ?? $existing->company_id,
+                    'requested_by' => $member?->id ?? $existing->requested_by,
+                    'host_label' => $member?->user?->name ?? $data['host_name'] ?? $existing->host_label,
+                    'agent_token' => Str::random(48),
+                    'viewer_token' => null,
+                    'viewer_member_id' => null,
+                    'viewer_joined_at' => null,
+                    'status' => 'waiting',
+                    'started_at' => null,
+                    'ended_at' => null,
+                    'expires_at' => now()->addHours(48),
+                ]);
+                return response()->json([
+                    'ok' => true,
+                    'session_code' => $existing->session_code,
+                    'agent_token' => $existing->agent_token,
+                    'channel' => 'private-remote-agent.' . $existing->session_code,
+                    'expires_at' => $existing->expires_at->toIso8601String(),
+                    'connect_url' => 'https://bmydesk.believoo.com/remote/connect',
+                    'ice_servers' => \App\Services\TurnCredentialService::iceServers('agent-' . $existing->id),
+                ]);
+            }
         }
 
         do {
@@ -81,12 +114,13 @@ class AgentApiController extends Controller
             'requested_by' => $member?->id,
             'target_id' => null,
             'host_kind' => 'agent',
+            'device_id' => $data['device_id'] ?? null,
             'host_label' => $member?->user?->name ?? $data['host_name'] ?? 'BMyDesk Agent',
             'session_code' => $code,
             'agent_token' => Str::random(48),
             'status' => 'waiting',
             'permission' => 'control',
-            'expires_at' => now()->addMinutes(60),
+            'expires_at' => now()->addHours(48),
         ]);
 
         return response()->json([
@@ -123,9 +157,26 @@ class AgentApiController extends Controller
     public function join(Request $r, string $code)
     {
         $session = $this->findByCode($code);
-        if (!$session || $session->status === 'expired' || $session->status === 'ended'
-            || ($session->expires_at && $session->expires_at->isPast())) {
+        if (!$session) {
             return response()->json(['ok' => false, 'error' => 'invalid or expired code'], 404);
+        }
+
+        $dead = in_array($session->status, ['ended', 'rejected', 'expired'])
+            || ($session->expires_at && $session->expires_at->isPast());
+        if ($dead) {
+            // Agent codes are permanent (AnyDesk-style): a fresh join revives
+            // the session — but only if the host device is actually live
+            // (its poll loop heartbeats via updated_at).
+            if ($session->host_kind !== 'agent') {
+                return response()->json(['ok' => false, 'error' => 'session ended — ask the host for a new code'], 404);
+            }
+            if (!$session->updated_at || $session->updated_at->lt(now()->subMinutes(3))) {
+                return response()->json(['ok' => false, 'error' => 'host offline — ask them to open the BMyDesk Agent'], 404);
+            }
+            // clear the previous viewer so the busy-check below passes and a
+            // fresh viewer_token is minted for this join
+            $session->update(['status' => 'connecting', 'ended_at' => null,
+                'viewer_token' => null, 'viewer_joined_at' => null, 'viewer_name' => null]);
         }
 
         // One viewer at a time: refuse if a viewer joined within the last 2 min
@@ -137,6 +188,7 @@ class AgentApiController extends Controller
         $session->update([
             'viewer_token' => Str::random(48),
             'viewer_joined_at' => now(),
+            'viewer_name' => Str::limit((string) $r->input('name', ''), 60, '') ?: null,
             'status' => $session->status === 'waiting' ? 'connecting' : $session->status,
         ]);
 
@@ -160,13 +212,19 @@ class AgentApiController extends Controller
             }
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
         }
+        // host heartbeat — touches updated_at so join() knows the device is
+        // alive, and rolls the expiry forward while the agent runs.
+        $session->touch();
+        if ($session->expires_at && $session->expires_at->lt(now()->addHours(24))) {
+            $session->update(['expires_at' => now()->addHours(48)]);
+        }
         if ($session->expires_at && $session->expires_at->isPast() && $session->status === 'waiting') {
             $session->update(['status' => 'expired']);
         }
         return response()->json([
             'ok' => true,
             'status' => $session->status,
-            'viewer' => $session->viewer?->user?->name,
+            'viewer' => $session->viewer?->user?->name ?: $session->viewer_name,
             'viewer_joined_at' => $session->viewer_joined_at?->toIso8601String(),
             'expires_at' => $session->expires_at?->toIso8601String(),
         ]);
@@ -239,6 +297,10 @@ class AgentApiController extends Controller
         }
         if ($this->checkToken($r, $session)) {
             $role = 'h';
+            $session->touch(); // host heartbeat — join() refuses dead hosts
+            if ($session->expires_at && $session->expires_at->lt(now()->addHours(24))) {
+                $session->update(['expires_at' => now()->addHours(48)]);
+            }
         } elseif ($this->checkViewerToken($r, $session)) {
             $role = 'v';
         } else {

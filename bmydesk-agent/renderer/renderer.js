@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.7';
+const APP_VERSION = '1.0.8';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -32,7 +32,7 @@ async function register() {
         const r = await fetch(API + '/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ host_name: require_os_name(), version: APP_VERSION, os: window.agent?.platform || 'unknown', member_token: localStorage.getItem('bmydesk_member_token') || undefined }),
+            body: JSON.stringify({ host_name: require_os_name(), version: APP_VERSION, os: window.agent?.platform || 'unknown', member_token: localStorage.getItem('bmydesk_member_token') || undefined, device_id: deviceId() }),
         });
         const data = await r.json();
         if (!data.ok) throw new Error(data.error || 'register failed');
@@ -68,6 +68,18 @@ function checkUpdate() {
 
 function require_os_name() {
     return (window.agent?.platform || 'pc') + '-' + (navigator.userAgent.match(/Windows|Mac|Linux/)?.[0] || 'host');
+}
+
+// Stable device identity — generated once, kept forever. The server maps it
+// to ONE session code, so this device's code never changes on its own
+// (same model as an AnyDesk ID).
+function deviceId() {
+    let id = localStorage.getItem('bmydesk_device_id');
+    if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() : 'dev-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+        localStorage.setItem('bmydesk_device_id', id);
+    }
+    return id;
 }
 
 // One ws connection multiplexes all channel subscriptions (host + viewer).
@@ -182,6 +194,7 @@ function connectChannel() {
     channelTokens[session.channel] = session.agent_token;
     ch = getPusher().subscribe(session.channel);
     hdbg('subscribing ' + session.channel.split('.').pop());
+    startStatusPoll(); // always on — drains the signal queue + heartbeats the host
 
     // watchdog — if subscribe doesn't complete, rebuild the whole connection.
     // (pusher-js reinstates a cancelled pending channel WITHOUT resending the
@@ -194,7 +207,6 @@ function connectChannel() {
             hdbg('sub timeout — fresh reconnect ' + subAttempts);
             try { pusher.disconnect(); } catch (e) {}
             pusher = null; ch = null;
-            if (subAttempts >= 2) startStatusPoll();
             connectChannel();
         }
     }, 15000);
@@ -215,7 +227,6 @@ function connectChannel() {
         setStatus('Channel auth failed — retrying…', 'off');
         try { pusher.disconnect(); } catch (err) {}
         pusher = null; ch = null;
-        if (subAttempts >= 2) startStatusPoll();
         setTimeout(connectChannel, 5000);
     });
 
@@ -520,6 +531,16 @@ const themeBtn = $('themeBtn');
 function applyTheme(t) { document.body.classList.toggle('light', t === 'light'); themeBtn.textContent = t === 'light' ? '☀' : '☾'; }
 themeBtn.onclick = () => { const t = document.body.classList.contains('light') ? 'dark' : 'light'; localStorage.setItem('bmydesk_theme', t); applyTheme(t); };
 applyTheme(localStorage.getItem('bmydesk_theme') || 'dark');
+
+// Manual "new code" — clears the device identity so the next register mints
+// a fresh code. Without this, the code stays permanent (AnyDesk-style).
+$('newCodeLink').onclick = (e) => {
+    e.preventDefault();
+    localStorage.removeItem('bmydesk_device_id');
+    session = null;
+    setStatus('Registering…', 'wait');
+    register();
+};
 
 const savedName = localStorage.getItem('bmydesk_member_name');
 if (savedName) { $('signedAs').textContent = '✓ Signed in as ' + savedName + ' — click to sign out'; $('signedAs').classList.remove('hidden'); $('loginToggle').classList.add('hidden'); }

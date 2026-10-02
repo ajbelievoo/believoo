@@ -26,9 +26,10 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         val iceServers: com.google.gson.JsonArray?,
     )
 
-    fun register(hostName: String, os: String = "android", memberToken: String? = null): Registration {
+    fun register(hostName: String, os: String = "android", memberToken: String? = null, deviceId: String? = null): Registration {
         val fields = mutableMapOf<String, String>("host_name" to hostName, "version" to BuildConfig.VERSION_NAME, "os" to os)
         memberToken?.let { fields["member_token"] = it }
+        deviceId?.let { fields["device_id"] = it }
         val body = gson.toJson(fields)
             .toRequestBody(json)
         val req = Request.Builder().url("$base/register").post(body).build()

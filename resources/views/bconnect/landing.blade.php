@@ -66,6 +66,7 @@
                 <a href="https://believoo.com" class="hover:text-brand transition">Believoo</a>
             </div>
             <div class="flex items-center gap-3">
+                <a href="{{ route('bconnect.remote.guest') }}" class="text-sm font-bold text-brand hover:underline">Remote Access</a>
                 <a href="{{ route('bconnect.login') }}" class="text-sm font-semibold text-slate-700 hover:text-brand">Log in</a>
                 <a href="{{ route('bconnect.register') }}" class="px-5 py-2.5 text-sm font-bold text-white btn-gradient rounded-full transition shadow-lg shadow-rose-500/30">Get Started Free</a>
             </div>
@@ -91,6 +92,25 @@
             <a href="{{ route('bconnect.register') }}" class="px-8 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Start Free Workspace</a>
             <a href="{{ route('bconnect.login') }}" class="px-8 py-4 text-lg font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition">Login to Dashboard</a>
         </div>
+
+        <!-- Remote Desktop Access — public quick connect, no login needed -->
+        <div id="remote-access" class="mt-10 max-w-xl mx-auto">
+            <div class="bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-700/60 text-left">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-400 text-lg"><i class="fas fa-desktop"></i></div>
+                    <div>
+                        <h3 class="font-extrabold text-white text-lg leading-tight">Remote Desktop Access</h3>
+                        <p class="text-xs text-slate-400">Enter the code on the remote device — connect instantly, no account needed.</p>
+                    </div>
+                </div>
+                <form action="{{ route('bconnect.remote.guest') }}" method="GET" onsubmit="event.preventDefault(); const c=this.code.value.trim().toUpperCase(); if(c) location.href='{{ route('bconnect.remote.guest') }}/'+c;" class="flex gap-3">
+                    <input name="code" maxlength="8" placeholder="e.g. ABC123XY" autocomplete="off" spellcheck="false"
+                        class="flex-1 min-w-0 text-center text-xl font-mono tracking-[0.3em] uppercase bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-cyan-300 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
+                    <button type="submit" class="px-6 py-3 font-bold text-white btn-gradient rounded-xl shadow-lg shadow-rose-500/30 whitespace-nowrap">Connect <i class="fas fa-arrow-right ml-1"></i></button>
+                </form>
+            </div>
+        </div>
+
         <div class="mt-12 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden bg-slate-900">
             <img src="{{ $bconnectBrand['og_image'] }}" alt="Bmydesk Dashboard" class="w-full h-64 lg:h-96 object-cover opacity-90">
         </div>

@@ -16,6 +16,16 @@ class RemoteController extends Controller {
         }
     }
 
+    // GET /remote/guest/{code?} — public "Remote Desktop Access" page.
+    // No login: the guest joins an agent session with a viewer_token from the
+    // public agent API, so this works for hosts running the desktop/mobile app.
+    public function guestRoom(string $code = null) {
+        return view('bconnect.guest-remote', [
+            'prefillCode' => $code ? strtoupper(preg_replace('/[^A-Z0-9]/i', '', $code)) : null,
+            'reverbKey' => config('broadcasting.connections.reverb.key'),
+        ]);
+    }
+
     public function index(Request $r) {
         $this->ensureRemote($r->input('bconnect_company_id'));
         $sessions = RemoteSession::where('company_id', $r->input('bconnect_company_id'))

@@ -18,6 +18,10 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     Route::post('/reset-password', [\App\Http\Controllers\Bconnect\AuthController::class, 'reset'])->name('bconnect.password.update');
     Route::get('/auth/google', [\App\Http\Controllers\Bconnect\AuthController::class, 'redirectToGoogle'])->name('bconnect.google');
     Route::get('/auth/google/callback', [\App\Http\Controllers\Bconnect\AuthController::class, 'handleGoogleCallback'])->name('bconnect.google.callback');
+
+    // Public remote-desktop access — no login needed. A guest enters a
+    // device's code, the host approves, WebRTC screen share runs.
+    Route::get('/remote/guest/{code?}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'guestRoom'])->name('bconnect.remote.guest');
 });
 
 // Authenticated B-CONNECT workspace
