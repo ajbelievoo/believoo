@@ -22,6 +22,9 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     // Public remote-desktop access — no login needed. A guest enters a
     // device's code, the host approves, WebRTC screen share runs.
     Route::get('/remote/guest/{code?}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'guestRoom'])->name('bconnect.remote.guest');
+    // Note: /downloads/* is served directly by nginx (public/downloads/) —
+    // BMyDesk-Agent.apk / BMyDesk-Agent-Setup.exe are symlinks to the latest
+    // builds so links never need version bumps.
 });
 
 // Authenticated B-CONNECT workspace

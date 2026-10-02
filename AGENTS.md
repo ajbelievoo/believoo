@@ -185,3 +185,14 @@ Examples:
 - **Electron agent**: source in `bmydesk-agent/` (register → Reverb → WebRTC answer → DataChannel input → `@nut-tree-fork/nut-js` OS injection). NOTE: package is `@nut-tree-fork/nut-js` — `@nut-tree/nut-js` is 404.
 - **Windows builds**: built on the IyolMe build server (`/opt/build/apps/bmydesk-agent`, wine32+wine64 installed; NSIS + zip targets work). `rcedit-ia32.exe` in `~/.cache/electron-builder/winCodeSign` was replaced with the x64 binary (wine64-only fix). Artifacts served from `public/downloads/` (gitignored).
 - Unsigned build — Windows SmartScreen warning is expected until code signing cert is added.
+
+## BMyDesk Agent — release procedure (added 2026-10-02)
+
+- Builds happen on the remote build server `root@15.235.170.222` under `/opt/build/apps/` (`bmydesk-agent` Electron, `bmydesk-agent-android` Gradle). Gradle binary: `/root/.gradle/wrapper/dists/gradle-8.14.3-all/10utluxaxniiv4wxiphsi49nj/gradle-8.14.3/bin/gradle assembleRelease` with `ANDROID_HOME=/opt/android-sdk` and `local.properties` → `sdk.dir=/opt/android-sdk`.
+- Windows signing: `CSC_LINK=file:///opt/build/keys/bmydesk-win.pfx CSC_KEY_PASSWORD=bmydesk-sign-2026 npx electron-builder --win` (self-signed CN=BMyDesk cert lives in `/opt/build/keys/` — back it up off-server).
+- Android release APK is signed with `app/bmydesk-release.keystore` (CN=BMyDesk) — the keystore is committed in-repo so updates keep the same signature.
+- **Publish**: copy artifacts to `public/downloads/` as `BMyDesk-Agent-Setup-<ver>.exe`, `BMyDesk-Agent-v<ver>.apk`, `BMyDesk-Agent-<ver>-win.zip`, `BMyDesk-Agent-Setup-<ver>.zip`, then refresh the stable symlinks `BMyDesk-Agent.apk` → latest apk and `BMyDesk-Agent-Setup.exe` → latest exe (website links point at the symlinks).
+- nginx serves `/downloads/` statically — Laravel routes under that path are unreachable.
+- Version sources of truth: `AgentApiController::AGENT_LATEST_WINDOWS/ANDROID` (update-check API), `bmydesk-agent/package.json`, `renderer.js` APP_VERSION, Android `build.gradle` versionCode/versionName.
+- Bump the version on every publish — Cloudflare caches `/downloads/*` aggressively (immutable-ish), and stale-file bugs have bitten twice already.
+- Disk on this box is ~97GB and nearly full — delete old-version artifacts after publishing.
