@@ -134,8 +134,20 @@ class SignalingClient(
         })
     }
 
+    // Optional HTTP relays — signal payloads are ALSO POSTed to the API so
+    // they reach a peer whose ws is dead (server broadcasts + queues). The
+    // shared "n" nonce lets the receiver dedupe ws + queued copies.
+    var relay: ((payload: JsonObject) -> Unit)? = null
+    var viewerRelay: ((payload: JsonObject) -> Unit)? = null
+    private fun nonce() = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+
     fun sendViewer(event: String, payload: JsonObject) {
+        if (event == "signal" && !payload.has("n")) payload.addProperty("n", nonce())
         runCatching { viewerChannel?.trigger("client-$event", gson.toJson(payload)) }
+        when (event) {
+            "signal" -> viewerRelay?.invoke(payload)
+            "end" -> viewerRelay?.invoke(JsonObject().apply { addProperty("kind", "end") })
+        }
     }
 
     fun disconnectViewer() {
@@ -146,7 +158,10 @@ class SignalingClient(
     }
 
     fun send(event: String, payload: JsonObject) {
+        if (event == "signal" && !payload.has("n")) payload.addProperty("n", nonce())
         runCatching { channel?.trigger("client-$event", gson.toJson(payload)) }
+        if (event == "signal") relay?.invoke(payload)
+        else if (event == "end") relay?.invoke(JsonObject().apply { addProperty("kind", "end") })
     }
 
     fun disconnect() {

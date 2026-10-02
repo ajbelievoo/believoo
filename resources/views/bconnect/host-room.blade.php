@@ -75,7 +75,28 @@ function dbg(step) {
     el.textContent = (el.textContent + ' › ' + step).slice(-140);
     console.log('[bmydesk-host]', step);
 }
+const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+const API = '/remote/code/' + CODE;
+
+// ws whisper for speed + HTTP relay (server broadcasts AND queues for a
+// dead-ws peer). Shared nonce dedupes the double delivery.
+const seenSig = new Set();
+function sigNew(m) {
+    const n = m && m.n;
+    if (!n) return true;
+    if (seenSig.has(n)) return false;
+    seenSig.add(n); if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
+    return true;
+}
+const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+function postJson(url, body) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin', headers: {
+        'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+        body: JSON.stringify(body || {}) }).catch(() => {});
+}
 function whisper(evt, data) { try { channel.trigger('client-' + evt, data); } catch (e) { console.warn(e); } }
+function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); postJson(API + '/signal', msg); }
+let respondedAt = 0; // polled join-requests older than this aren't re-shown
 
 const CAN_SHARE = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
 
@@ -86,7 +107,7 @@ function showMobileHostNotice() {
         '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
         '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
         '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
-        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-v1.0.5.apk" class="text-cyan-400 underline">Download APK</a></p>';
+        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-v1.0.6.apk" class="text-cyan-400 underline">Download APK</a></p>';
     const btn = document.getElementById('shareBtn');
     btn.disabled = true;
     btn.classList.add('opacity-40');
@@ -118,7 +139,7 @@ async function handleOffer(m) {
     try {
         pc = new RTCPeerConnection(pcConfig);
 
-        pc.onicecandidate = (e) => { if (e.candidate) whisper('signal', { kind: 'ice', candidate: e.candidate }); };
+        pc.onicecandidate = (e) => { if (e.candidate) sendSignal({ kind: 'ice', candidate: e.candidate }); };
         pc.onconnectionstatechange = () => {
             dbg('peer ' + pc.connectionState);
             if (pc.connectionState === 'connected') setStatus('Viewer connected', 'bc-badge-green');
@@ -138,7 +159,7 @@ async function handleOffer(m) {
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        whisper('signal', { kind: 'answer', sdp: pc.localDescription.sdp });
+        sendSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
         dbg('answer sent');
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
         iceQueue.length = 0;
@@ -193,26 +214,56 @@ function initChannel() {
 
     channel.bind('client-join-request', (m) => {
         dbg('join-request received');
-        if (!CAN_SHARE) { showMobileHostNotice(); whisper('join-reject', { reason: 'device' }); return; }
-        document.getElementById('joinName').textContent = m.name || 'Someone';
-        document.getElementById('joinRequest').classList.remove('hidden');
-        setStatus('Join request', 'bc-badge-amber');
+        showJoinRequest(m.name || 'Someone');
     });
-    channel.bind('client-signal', (m) => { dbg('signal: ' + (m.kind || '?')); onSignal(m); });
-    channel.bind('client-end', () => {
+    channel.bind('client-signal', (m) => { if (sigNew(m)) { dbg('signal: ' + (m.kind || '?')); onSignal(m); } });
+    channel.bind('client-end', (m) => {
+        if (!sigNew(m)) return;
         setStatus('Viewer disconnected', 'bc-badge-amber');
         if (pc) { pc.close(); pc = null; }
     });
+    startHostPoll();
+}
+
+function showJoinRequest(name) {
+    if (!CAN_SHARE) { showMobileHostNotice(); postJson(API + '/respond', { action: 'reject' }); whisper('join-reject', { reason: 'device' }); return; }
+    document.getElementById('joinName').textContent = name;
+    document.getElementById('joinRequest').classList.remove('hidden');
+    setStatus('Join request', 'bc-badge-amber');
+}
+
+// HTTP fallback — drains queued signals and shows join requests even when
+// this tab's ws subscription is dead.
+function startHostPoll() {
+    setInterval(async () => {
+        try {
+            const sr = await fetch(API + '/signals', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+            const sd = await sr.json();
+            (sd.signals || []).forEach((m) => { if (sigNew(m)) { dbg('poll sig: ' + (m.kind || '?')); onSignal(m); } });
+            const st = await fetch(API + '/session-status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+            const sd2 = await st.json();
+            const jt = sd2.ok && sd2.viewer_joined_at ? Date.parse(sd2.viewer_joined_at) : 0;
+            if (jt && jt > respondedAt && (Date.now() - jt < 120000)
+                && document.getElementById('joinRequest').classList.contains('hidden') && !pc) {
+                dbg('poll join-request');
+                showJoinRequest(sd2.viewer || 'Someone');
+            }
+        } catch (e) {}
+    }, 3000);
 }
 
 document.getElementById('acceptBtn').addEventListener('click', () => {
     document.getElementById('joinRequest').classList.add('hidden');
+    respondedAt = Date.now();
     whisper('join-accept', {});
+    postJson(API + '/respond', { action: 'accept' });
     setStatus('Accepted — connecting…', 'bc-badge-cyan');
 });
 document.getElementById('rejectBtn').addEventListener('click', () => {
     document.getElementById('joinRequest').classList.add('hidden');
+    respondedAt = Date.now();
     whisper('join-reject', {});
+    postJson(API + '/respond', { action: 'reject' });
     setStatus('Request rejected', 'bc-badge-amber');
 });
 
@@ -221,12 +272,16 @@ document.getElementById('endBtn').addEventListener('click', async () => {
     whisper('end', {});
     try {
         await fetch(END_URL, { method: 'POST', credentials: 'same-origin',
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content} });
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF} });
     } catch (e) {}
     window.location.href = backUrl;
 });
 
-window.addEventListener('beforeunload', () => { whisper('end', {}); if (pc) pc.close(); if (stream) stream.getTracks().forEach(t => t.stop()); });
+window.addEventListener('beforeunload', () => {
+    whisper('end', {});
+    try { fetch(END_URL, { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF } }); } catch (e) {}
+    if (pc) pc.close(); if (stream) stream.getTracks().forEach(t => t.stop());
+});
 
 initChannel();
 </script>

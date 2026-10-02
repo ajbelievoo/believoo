@@ -69,6 +69,30 @@ class MainActivity : Activity() {
 
     private val signaling = SignalingClient()
     @Volatile private var statusPollRunning = false
+    // nonce dedupe — signals arrive via ws AND the HTTP queue; the shared
+    // "n" field collapses double delivery.
+    private val seenNonces = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private fun sigNew(p: JsonObject): Boolean {
+        val n = p.get("n")?.asString ?: return true
+        if (!seenNonces.add(n)) return false
+        if (seenNonces.size > 600) seenNonces.clear()
+        return true
+    }
+    // set when the host answers a join request — polled requests older than
+    // this are not re-shown (fixes the "accept loop").
+    @Volatile private var respondedAtMs = 0L
+
+    private fun handleHostSignal(p: JsonObject) {
+        when (p.get("kind")?.asString) {
+            "offer" -> {
+                val sdp = p.get("sdp").asString
+                if (pendingProjection) waitingOfferSdp = sdp
+                else ui { handleOffer(sdp) }
+            }
+            "ice" -> p.getAsJsonObject("candidate")?.let { service?.addIce(it) }
+            "end" -> ui { endSession() }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Show the real crash instead of silently dying — screenshot it and share.
@@ -365,47 +389,44 @@ class MainActivity : Activity() {
             override fun onJoinRequest(name: String) {
                 ui { reqName.text = "$name wants to view this device"; reqBox.visibility = View.VISIBLE }
             }
-            override fun onSignal(p: JsonObject) {
-                when (p.get("kind")?.asString) {
-                    "offer" -> {
-                        val sdp = p.get("sdp").asString
-                        if (pendingProjection) waitingOfferSdp = sdp
-                        else ui { handleOffer(sdp) }
-                    }
-                    "ice" -> p.getAsJsonObject("candidate")?.let { service?.addIce(it) }
-                }
-            }
+            override fun onSignal(p: JsonObject) { if (sigNew(p)) handleHostSignal(p) }
             override fun onEnd() { ui { endSession() } }
         }
+        signaling.relay = { payload -> reg?.let { rr -> thread { api.signal(rr.code, rr.agentToken, payload) } } }
         thread {
             try { signaling.connect(r.channel, r.agentToken) }
             catch (e: Throwable) { ui { setStatus("Realtime failed: ${e.message}", "#ef4444") } }
         }
-        // If ws subscribe hasn't completed in ~20s, fall back to polling /status
-        // so join requests still surface and Accept can work over HTTP.
+        // Always-on fallback loop: drains the HTTP signal queue (covers a
+        // peer whose ws is dead) and, while our own ws is unsubscribed,
+        // polls /status so join requests still surface. Requests the host
+        // already answered are never re-shown (respondedAtMs dedupe).
         if (statusPollRunning) return
         statusPollRunning = true
         thread {
-            Thread.sleep(20000)
-            while (reg != null && !signaling.hostSubscribed) {
+            Thread.sleep(15000)
+            while (reg != null) {
                 try {
-                    val s = api.status(r.code, r.agentToken)
-                    if (s?.get("ok")?.asBoolean == true) {
-                        val vj = s.get("viewer_joined_at")?.asString
-                        if (vj != null) {
-                            val age = System.currentTimeMillis() -
-                                java.time.Instant.parse(vj).toEpochMilli()
-                            if (age < 120_000 && reqBox.visibility != View.VISIBLE) {
-                                ui {
-                                    reqName.text = "Someone wants to view this device"
-                                    reqBox.visibility = View.VISIBLE
-                                    setStatus("Connection request…", "#f59e0b")
+                    api.drainSignals(r.code, r.agentToken).forEach { p -> if (sigNew(p)) handleHostSignal(p) }
+                    if (!signaling.hostSubscribed) {
+                        val s = api.status(r.code, r.agentToken)
+                        if (s?.get("ok")?.asBoolean == true) {
+                            val vj = s.get("viewer_joined_at")?.asString
+                            if (vj != null) {
+                                val joinMs = java.time.Instant.parse(vj).toEpochMilli()
+                                if (joinMs > respondedAtMs && System.currentTimeMillis() - joinMs < 120_000
+                                    && reqBox.visibility != View.VISIBLE) {
+                                    ui {
+                                        reqName.text = "Someone wants to view this device"
+                                        reqBox.visibility = View.VISIBLE
+                                        setStatus("Connection request…", "#f59e0b")
+                                    }
                                 }
                             }
                         }
                     }
                 } catch (e: Exception) {}
-                Thread.sleep(4000)
+                Thread.sleep(3000)
             }
         }
     }
@@ -413,6 +434,7 @@ class MainActivity : Activity() {
     // ── Accept flow: projection permission → service → capture ─────
     private fun acceptRequest() {
         reqBox.visibility = View.GONE
+        respondedAtMs = System.currentTimeMillis()
         pendingProjection = true
         setStatus("Requesting screen capture permission…", "#f59e0b")
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -451,10 +473,12 @@ class MainActivity : Activity() {
         setStatus("Streaming…", "#22c55e")
     }
 
-    /** accept/reject over ws when subscribed, else the HTTP fallback endpoint */
+    /** accept/reject: ws whisper for speed AND HTTP POST (server broadcasts +
+     *  queues it) — lands no matter whose socket is alive. */
     private fun respondTo(action: String) {
-        if (signaling.hostSubscribed) signaling.send("join-$action", JsonObject())
-        else reg?.let { thread { api.respond(it.code, it.agentToken, action) } }
+        respondedAtMs = System.currentTimeMillis()
+        runCatching { signaling.send("join-$action", JsonObject()) }
+        reg?.let { r -> thread { api.respond(r.code, r.agentToken, action) } }
     }
 
     private fun rejectRequest() {
@@ -474,6 +498,38 @@ class MainActivity : Activity() {
 
     // ── Remote Desk (viewer): join another device's session ────────
     private var vJoin: AgentApi.JoinResult? = null
+    @Volatile private var viewerPollRunning = false
+
+    private fun handleViewerSignal(j: AgentApi.JoinResult, p: JsonObject) {
+        when (p.get("kind")?.asString) {
+            "accept" -> ui { viewerStatus.text = "Accepted — starting stream…"; startViewerPeer(j) }
+            "reject" -> { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
+            "end" -> { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
+            else -> remoteViewer?.onSignal(p)
+        }
+    }
+
+    // HTTP fallback for the viewer: drains the queued signals + status so a
+    // dead viewer ws still completes accept → offer → answer → stream.
+    private fun startViewerPoll(j: AgentApi.JoinResult, code: String) {
+        if (viewerPollRunning) return
+        viewerPollRunning = true
+        thread {
+            while (vJoin != null) {
+                try {
+                    api.drainSignals(code, j.viewerToken).forEach { p -> if (sigNew(p)) handleViewerSignal(j, p) }
+                    if (remoteViewer == null) {
+                        val st = api.status(code, j.viewerToken)
+                        val stv = st?.get("status")?.asString
+                        if (stv == "rejected") { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
+                        else if (stv == "ended") { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
+                    }
+                } catch (e: Exception) {}
+                Thread.sleep(2000)
+            }
+            viewerPollRunning = false
+        }
+    }
 
     private fun connectRemote() {
         val code = remoteCodeInput.text.toString().trim().uppercase()
@@ -491,9 +547,11 @@ class MainActivity : Activity() {
             try {
                 val j = api.join(code)
                 vJoin = j
+                signaling.viewerRelay = { payload -> thread { api.signal(code, j.viewerToken, payload) } }
+                startViewerPoll(j, code)
                 signaling.connectViewer(j.channel, j.viewerToken, object : SignalingClient.Listener {
                     override fun onConnected() {}
-                    override fun onDisconnected() { ui { viewerStatus.text = "Signaling lost — retry" } }
+                    override fun onDisconnected() { ui { viewerStatus.text = "Signaling lost — relay mode active" } }
                     override fun onJoinRequest(name: String) {}
                     override fun onSubscribed() {
                         signaling.sendViewer("join-request", JsonObject().apply {
@@ -501,15 +559,9 @@ class MainActivity : Activity() {
                         })
                         ui { viewerStatus.text = "Waiting for host approval…" }
                     }
-                    override fun onJoinAccept() {
-                        ui { viewerStatus.text = "Accepted — starting stream…" }
-                        startViewerPeer(j)
-                    }
-                    override fun onJoinReject() {
-                        ui { viewerStatus.text = "Host declined"; }
-                        thread { Thread.sleep(1500); ui { exitViewer() } }
-                    }
-                    override fun onSignal(p: JsonObject) { remoteViewer?.onSignal(p) }
+                    override fun onJoinAccept() { ui { viewerStatus.text = "Accepted — starting stream…"; startViewerPeer(j) } }
+                    override fun onJoinReject() { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
+                    override fun onSignal(p: JsonObject) { if (sigNew(p)) handleViewerSignal(j, p) }
                     override fun onEnd() { ui { viewerStatus.text = "Host ended session"; thread { Thread.sleep(1200); ui { exitViewer() } } } }
                 })
             } catch (e: Exception) {
@@ -520,6 +572,7 @@ class MainActivity : Activity() {
     }
 
     private fun startViewerPeer(j: AgentApi.JoinResult) {
+        if (remoteViewer != null) return // accept may arrive via ws + queue both
         remoteViewer = RemoteViewer(this).apply {
             listener = object : RemoteViewer.Listener {
                 override fun sendSignal(payload: JsonObject) = signaling.sendViewer("signal", payload)
@@ -573,6 +626,7 @@ class MainActivity : Activity() {
 
     private fun exitViewer() {
         runCatching { signaling.sendViewer("end", JsonObject()) }
+        vJoin = null // stops the viewer poll loop
         remoteViewer?.stop(); remoteViewer = null
         signaling.disconnectViewer()
         runCatching { remoteSurface?.release() }

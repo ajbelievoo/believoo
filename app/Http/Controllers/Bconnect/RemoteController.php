@@ -142,7 +142,7 @@ class RemoteController extends Controller {
         }
         $member = $r->input('bconnect_member');
         if ($session->viewer_member_id === null) {
-            $session->update(['viewer_member_id' => $member->id, 'status' => 'connecting']);
+            $session->update(['viewer_member_id' => $member->id, 'status' => 'connecting', 'viewer_joined_at' => now()]);
         } elseif ($session->viewer_member_id !== $member->id && $session->requested_by !== $member->id) {
             return redirect()->route('bconnect.remote.connect')->with('error', 'This session already has a connected viewer.');
         }
@@ -195,6 +195,89 @@ class RemoteController extends Controller {
         $memberId = $r->input('bconnect_member')->id;
         if (!in_array($memberId, [$session->requested_by, $session->viewer_member_id])) abort(403);
         $session->update(['status' => 'ended', 'ended_at' => now()]);
+        $payload = ['n' => (string) Str::random(10), 'kind' => 'end'];
+        \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+            ->broadcast(['private-remote-agent.' . $session->session_code], 'client-end', $payload);
+        $this->queueRelay($session->session_code, $memberId == $session->requested_by ? 'v' : 'h', $payload);
         return response()->json(['ok' => true]);
+    }
+
+    // ── HTTP signaling relay (mirrors the agent API) ────────────────
+    // Browser rooms POST signals here: the server broadcasts to ws peers
+    // AND queues for the peer's poll, so a dead ws on either side still
+    // completes the session. Nonces dedupe double delivery.
+
+    // POST /remote/code/{code}/signal — offer/answer/ice/end relay
+    public function signalByCode(Request $r, string $code) {
+        [$session, $role] = $this->codeParticipant($r, $code);
+        $kind = (string) $r->input('kind', '');
+        if (!in_array($kind, ['offer', 'answer', 'ice', 'end'], true)) abort(422);
+        $payload = [
+            'n' => (string) ($r->input('n') ?: Str::random(10)),
+            'kind' => $kind,
+            'sdp' => $r->input('sdp'),
+            'candidate' => $r->input('candidate'),
+        ];
+        \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+            ->broadcast(['private-remote-agent.' . $session->session_code],
+                $kind === 'end' ? 'client-end' : 'client-signal', $payload);
+        $this->queueRelay($session->session_code, $role === 'host' ? 'v' : 'h', $payload);
+        if ($kind === 'end') $session->update(['status' => 'ended', 'ended_at' => now()]);
+        return response()->json(['ok' => true]);
+    }
+
+    // GET /remote/code/{code}/signals — drain queued signals for the caller
+    public function signalsByCode(Request $r, string $code) {
+        [$session, $role] = $this->codeParticipant($r, $code);
+        $key = $this->relayKey($session->session_code, $role === 'host' ? 'h' : 'v');
+        return response()->json(['ok' => true, 'signals' => \Illuminate\Support\Facades\Cache::pull($key, []) ?: []]);
+    }
+
+    // POST /remote/code/{code}/respond — host accept/reject over HTTP;
+    // broadcasts + queues for the viewer's poll + updates status.
+    public function respondByCode(Request $r, string $code) {
+        [$session, $role] = $this->codeParticipant($r, $code);
+        if ($role !== 'host') abort(403);
+        $accept = $r->input('action') === 'accept';
+        $payload = ['n' => (string) Str::random(10), 'at' => now()->toIso8601String()];
+        \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+            ->broadcast(['private-remote-agent.' . $session->session_code],
+                $accept ? 'client-join-accept' : 'client-join-reject', $payload);
+        $this->queueRelay($session->session_code, 'v', ['kind' => $accept ? 'accept' : 'reject'] + $payload);
+        $session->update(['status' => $accept ? 'active' : 'rejected']);
+        return response()->json(['ok' => true]);
+    }
+
+    // GET /remote/code/{code}/session-status — accept/reject + join-request poll
+    public function statusByCode(Request $r, string $code) {
+        [$session] = $this->codeParticipant($r, $code);
+        return response()->json([
+            'ok' => true,
+            'status' => $session->status,
+            'viewer' => $session->viewer?->user?->name,
+            'viewer_joined_at' => $session->viewer_joined_at?->toIso8601String(),
+        ]);
+    }
+
+    /** Resolves the session + caller's role (host/viewer) for code routes. */
+    protected function codeParticipant(Request $r, string $code): array {
+        $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $code));
+        $session = RemoteSession::where('session_code', $code)->firstOrFail();
+        $memberId = $r->input('bconnect_member')->id;
+        if ($memberId == $session->requested_by) return [$session, 'host'];
+        if ($memberId == $session->viewer_member_id) return [$session, 'viewer'];
+        abort(403);
+    }
+
+    protected function relayKey(string $code, string $role): string {
+        return 'rsig.' . $code . '.' . $role;
+    }
+
+    protected function queueRelay(string $code, string $toRole, array $payload): void {
+        $key = $this->relayKey($code, $toRole);
+        $list = \Illuminate\Support\Facades\Cache::get($key, []);
+        $list[] = $payload;
+        if (count($list) > 200) $list = array_slice($list, -200);
+        \Illuminate\Support\Facades\Cache::put($key, $list, now()->addMinutes(90));
     }
 }

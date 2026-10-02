@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -112,6 +112,33 @@ function getPusher() {
 }
 
 let chRetryTimer = null, subAttempts = 0, statusPoller = null;
+let respondedAt = 0; // ms — polled join-requests older than this aren't re-shown
+let vChanName = null, vChanToken = null;        // live viewer channel survives reconnects
+
+// ── Signal transport ────────────────────────────────────────────────────
+// Every signal is POSTed to /signal: the server broadcasts it to ws peers
+// AND queues it for the other side's HTTP poll. A shared nonce dedupes the
+// double delivery, so it works no matter whose socket is alive.
+const seenSig = new Set();
+function sigNew(m) {
+    const n = m && m.n;
+    if (!n) return true; // ws whisper without nonce — always process
+    if (seenSig.has(n)) return false;
+    seenSig.add(n);
+    if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
+    return true;
+}
+const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+function postSignal(code, token, msg) {
+    msg.n = nonce();
+    fetch(`${API}/${code}/signal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(msg),
+    }).catch(() => {});
+}
+const hostSignal = (m) => session && postSignal(session.session_code, session.agent_token, m);
+const viewerSignal = (m) => vJoinedCode && postSignal(vJoinedCode, vChanToken, m);
 
 // ws signaling is the primary path; if it keeps failing we still surface join
 // requests by polling /status — accept then rides the ws once it recovers.
@@ -126,14 +153,21 @@ function startStatusPoll() {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
             });
             const d = await r.json();
-            if (d.ok && d.viewer_joined_at && (Date.now() - Date.parse(d.viewer_joined_at) < 120000)
+            const joinMs = d.ok && d.viewer_joined_at ? Date.parse(d.viewer_joined_at) : 0;
+            if (joinMs && joinMs > respondedAt && (Date.now() - joinMs < 120000)
                 && $('reqBox').classList.contains('hidden') && !pc) {
                 $('reqName').textContent = d.viewer || 'Someone';
                 $('reqBox').classList.remove('hidden');
                 setStatus('Connection request…', 'wait');
             }
+            // drain queued signals — this is the full ws-free signaling path
+            const sr = await fetch(`${API}/${session.session_code}/signals`, {
+                headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+            });
+            const sd = await sr.json();
+            (sd.signals || []).forEach((m) => { if (sigNew(m)) dispatchHostSignal(m); });
         } catch (e) {}
-    }, 4000);
+    }, 3000);
 }
 
 function connectChannel() {
@@ -146,23 +180,38 @@ function connectChannel() {
     ch = getPusher().subscribe(session.channel);
     hdbg('subscribing ' + session.channel.split('.').pop());
 
-    // watchdog — if subscribe doesn't complete, tear the channel down and retry
+    // watchdog — if subscribe doesn't complete, rebuild the whole connection.
+    // (pusher-js reinstates a cancelled pending channel WITHOUT resending the
+    //  subscribe frame — unsub+resub on the same instance is a no-op, so we
+    //  must drop the socket entirely.)
     if (chRetryTimer) clearTimeout(chRetryTimer);
     chRetryTimer = setTimeout(() => {
         if (!ch.subscribed) {
             subAttempts++;
-            hdbg('sub timeout — retry ' + subAttempts);
-            try { getPusher().unsubscribe(session.channel); } catch (e) {}
+            hdbg('sub timeout — fresh reconnect ' + subAttempts);
+            try { pusher.disconnect(); } catch (e) {}
+            pusher = null; ch = null;
             if (subAttempts >= 2) startStatusPoll();
             connectChannel();
         }
     }, 15000);
 
-    ch.bind('pusher:subscription_succeeded', () => { clearTimeout(chRetryTimer); subAttempts = 0; hdbg('subscribed'); setStatus('Ready — share your code', 'on'); });
+    ch.bind('pusher:subscription_succeeded', () => {
+        clearTimeout(chRetryTimer); subAttempts = 0;
+        hdbg('subscribed'); setStatus('Ready — share your code', 'on');
+        // fresh socket — restore a live viewer session if one was open
+        if (vChanName && vChanToken && !vCh?.subscribed) {
+            channelTokens[vChanName] = vChanToken;
+            const nc = pusher.subscribe(vChanName);
+            bindViewerChannel(nc);
+        }
+    });
     ch.bind('pusher:subscription_error', (e) => {
         clearTimeout(chRetryTimer); subAttempts++;
-        hdbg('sub err — retry ' + subAttempts);
+        hdbg('sub err — fresh reconnect ' + subAttempts);
         setStatus('Channel auth failed — retrying…', 'off');
+        try { pusher.disconnect(); } catch (err) {}
+        pusher = null; ch = null;
         if (subAttempts >= 2) startStatusPoll();
         setTimeout(connectChannel, 5000);
     });
@@ -174,15 +223,18 @@ function connectChannel() {
         try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play().catch(()=>{}); } catch(e){}
     });
 
-    ch.bind('client-signal', async (m) => {
-        if (m.kind === 'offer') await handleOffer(m);
-        else if (m.kind === 'ice' && m.candidate) {
-            if (pc && pc.remoteDescription) await pc.addIceCandidate(m.candidate).catch(() => {});
-            else iceQueue.push(m.candidate);
-        }
-    });
+    ch.bind('client-signal', (m) => { if (sigNew(m)) dispatchHostSignal(m); });
+    ch.bind('client-end', (m) => { if (sigNew(m)) teardown('Viewer disconnected'); });
+}
 
-    ch.bind('client-end', () => teardown('Viewer disconnected'));
+// one dispatcher for host signals — same handling whether they arrive by
+// ws broadcast or the HTTP fallback queue.
+function dispatchHostSignal(m) {
+    if (m.kind === 'offer') handleOffer(m);
+    else if (m.kind === 'ice' && m.candidate) {
+        if (pc && pc.remoteDescription) pc.addIceCandidate(m.candidate).catch(() => {});
+        else iceQueue.push(m.candidate);
+    } else if (m.kind === 'end') teardown('Viewer disconnected');
 }
 
 async function pickScreen() {
@@ -218,14 +270,17 @@ async function captureScreen(sourceId) {
     stream.getVideoTracks()[0].contentHint = 'detail';
 }
 
+let offering = false;
 async function handleOffer(m) {
+    if (pc || offering) return; // dup offer (ws + queue) — ignore
+    offering = true;
     try {
         const sourceId = await pickScreen();
-        if (!sourceId) { ch.trigger('client-end', {}); return; }
+        if (!sourceId) { hostSignal({ kind: 'end' }); offering = false; return; }
         await captureScreen(sourceId);
 
         pc = new RTCPeerConnection(pcConfig);
-        pc.onicecandidate = (e) => { if (e.candidate) ch.trigger('client-signal', { kind: 'ice', candidate: e.candidate }); };
+        pc.onicecandidate = (e) => { if (e.candidate) hostSignal({ kind: 'ice', candidate: e.candidate }); };
         pc.onconnectionstatechange = () => {
             if (pc.connectionState === 'connected') setStatus('Viewer connected — streaming', 'on');
             if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) setStatus('Viewer lost', 'wait');
@@ -245,7 +300,8 @@ async function handleOffer(m) {
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        ch.trigger('client-signal', { kind: 'answer', sdp: pc.localDescription.sdp });
+        hostSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
+        hdbg('answer sent');
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
         iceQueue = [];
         $('endBtn').classList.remove('hidden');
@@ -253,8 +309,9 @@ async function handleOffer(m) {
     } catch (e) {
         console.error(e);
         setStatus('Could not capture screen', 'off');
-        ch.trigger('client-end', {});
+        hostSignal({ kind: 'end' });
     }
+    offering = false;
 }
 
 function teardown(msg) {
@@ -266,28 +323,26 @@ function teardown(msg) {
 }
 
 function respond(action) {
-    const event = 'client-join-' + action;
-    let sent = false;
-    if (ch && ch.subscribed) { try { ch.trigger(event, {}); sent = true; } catch (e) {} }
-    if (!sent && session) {
-        fetch(`${API}/${session.session_code}/respond`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
-            body: JSON.stringify({ action }),
-        }).catch(() => {});
-    }
+    // Always POST — the server broadcasts to ws peers AND queues it for the
+    // viewer's HTTP poll, so it lands no matter whose socket is alive.
+    if (!session) return;
+    fetch(`${API}/${session.session_code}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+        body: JSON.stringify({ action }),
+    }).catch(() => {});
 }
-$('acceptBtn').onclick = () => { $('reqBox').classList.add('hidden'); respond('accept'); setStatus('Accepted — waiting for stream…', 'on'); };
-$('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); respond('reject'); setStatus('Request rejected', 'wait'); };
+$('acceptBtn').onclick = () => { $('reqBox').classList.add('hidden'); respondedAt = Date.now(); respond('accept'); setStatus('Accepted — waiting for stream…', 'on'); };
+$('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); respondedAt = Date.now(); respond('reject'); setStatus('Request rejected', 'wait'); };
 $('endBtn').onclick = async () => {
-    try { ch.trigger('client-end', {}); } catch (e) {}
+    hostSignal({ kind: 'end' });
     try { await fetch(API + '/' + session.session_code + '/end', { method: 'POST', headers: { 'Authorization': 'Bearer ' + session.agent_token } }); } catch (e) {}
     teardown('Session ended');
 };
 
 window.addEventListener('beforeunload', () => {
-    try { ch?.trigger('client-end', {}); } catch (e) {}
-    try { vCh?.trigger('client-end', {}); } catch (e) {}
+    try { if (session) hostSignal({ kind: 'end' }); } catch (e) {}
+    try { if (vJoinedCode) viewerSignal({ kind: 'end' }); } catch (e) {}
     try { if (session) navigator.sendBeacon(API + '/' + session.session_code + '/end', new Blob([JSON.stringify({agent_token: session.agent_token})], {type:'application/json'})); } catch (e) {}
 });
 
@@ -321,37 +376,21 @@ async function connectToPartner() {
 
         // Reuse the single ws connection — a second socket can hang on
         // restrictive networks/proxies; multiplexing avoids that entirely.
-        channelTokens['private-remote-agent.' + code] = vToken;
+        vChanName = 'private-remote-agent.' + code;
+        vChanToken = vToken;
+        channelTokens[vChanName] = vToken;
         const vp = getPusher();
-        vCh = vp.subscribe('private-remote-agent.' + code);
+        vCh = vp.subscribe(vChanName);
 
         vStatus('Subscribing…');
         vDbgReset(); vDbg('subscribing');
         vp.connection.bind('state_change', (s) => vDbg('ws:' + s.current));
-        vp.connection.bind('error', (e) => vDbg('wserr:' + (e?.error?.data?.code || e?.type || 'net')));
         const subTimeout = setTimeout(() => {
-            vStatus('Subscribe timeout — ws:' + (vp.connection?.state || '?') + ' ch:' + vCh.subscribed);
-            vDbg('timeout — retry');
-            exitViewer(4000);
+            vStatus('Relay mode — waiting for host approval…');
+            vDbg('ws timeout — http fallback');
+            startViewerPoll();
         }, 20000);
-        vCh.bind('pusher:subscription_succeeded', () => {
-            clearTimeout(subTimeout);
-            vDbg('subscribed');
-            vStatus('Waiting for host approval…');
-            vCh.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)' });
-            vDbg('join-request sent');
-        });
-        vCh.bind('pusher:subscription_error', (e) => { clearTimeout(subTimeout); vDbg('sub err'); vStatus('Channel auth failed'); exitViewer(3000); });
-        vCh.bind('client-join-accept', () => { vDbg('host accepted'); startViewerPeer(); });
-        vCh.bind('client-join-reject', () => { vStatus('Host declined the request'); exitViewer(2500); });
-        vCh.bind('client-signal', async (m) => {
-            if (!vPc) return;
-            try {
-                if (m.kind === 'answer') { vDbg('answer received'); await vPc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); }
-                else if (m.kind === 'ice' && m.candidate) await vPc.addIceCandidate(m.candidate).catch(() => {});
-            } catch (e) { console.error(e); }
-        });
-        vCh.bind('client-end', () => { vStatus('Session ended by host'); exitViewer(2000); });
+        bindViewerChannel(vCh, subTimeout);
     } catch (e) {
         vStatus('Join failed: ' + (e.message || e));
         exitViewer(3000);
@@ -360,7 +399,58 @@ async function connectToPartner() {
     }
 }
 
+let vPoller = null;
+function startViewerPoll() {
+    if (vPoller || !vJoinedCode) return;
+    vDbg('poll on');
+    vPoller = setInterval(async () => {
+        if (!vJoinedCode) return;
+        try {
+            const r = await fetch(`${API}/${vJoinedCode}/signals`, {
+                headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },
+            });
+            const d = await r.json();
+            (d.signals || []).forEach((m) => { if (sigNew(m)) dispatchViewerSignal(m); });
+            // queued accept may be missed mid-flight — status poll is the backup
+            const st = await fetch(`${API}/${vJoinedCode}/status`, {
+                headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },
+            });
+            const sd = await st.json();
+            if (sd.ok && sd.status === 'rejected') { vStatus('Host declined the request'); exitViewer(2500); }
+            else if (sd.ok && sd.status === 'ended') { vStatus('Session ended by host'); exitViewer(2000); }
+        } catch (e) {}
+    }, 2000);
+}
+function stopViewerPoll() { if (vPoller) { clearInterval(vPoller); vPoller = null; } }
+
+function dispatchViewerSignal(m) {
+    if (m.kind === 'accept') { vDbg('host accepted'); startViewerPeer(); }
+    else if (m.kind === 'reject') { vStatus('Host declined the request'); exitViewer(2500); }
+    else if (m.kind === 'end') { vStatus('Session ended by host'); exitViewer(2000); }
+    else if (m.kind === 'answer' && vPc) { vDbg('answer received'); vPc.setRemoteDescription({ type: 'answer', sdp: m.sdp }).catch(() => {}); }
+    else if (m.kind === 'ice' && vPc && m.candidate) vPc.addIceCandidate(m.candidate).catch(() => {});
+}
+
+function bindViewerChannel(vc, subTimeout) {
+    vc.bind('pusher:subscription_succeeded', () => {
+        if (subTimeout) clearTimeout(subTimeout);
+        vDbg('subscribed');
+        vStatus('Waiting for host approval…');
+        vc.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)' });
+        vDbg('join-request sent');
+        // keep the HTTP poll as a safety net even when ws is alive — signals
+        // sent by an HTTP-only host still land via the queue.
+        startViewerPoll();
+    });
+    vc.bind('pusher:subscription_error', () => { if (subTimeout) clearTimeout(subTimeout); vDbg('sub err — http fallback'); vStatus('Connecting over relay…'); startViewerPoll(); });
+    vc.bind('client-join-accept', (m) => { if (sigNew(m)) dispatchViewerSignal({ kind: 'accept' }); });
+    vc.bind('client-join-reject', (m) => { if (sigNew(m)) dispatchViewerSignal({ kind: 'reject' }); });
+    vc.bind('client-signal', (m) => { if (sigNew(m)) dispatchViewerSignal(m); });
+    vc.bind('client-end', (m) => { if (sigNew(m)) dispatchViewerSignal({ kind: 'end' }); });
+}
+
 async function startViewerPeer() {
+    if (vPc) return; // dedupe — accept may arrive via ws + queue both
     vStatus('Accepted — starting stream…');
     vPc = new RTCPeerConnection(pcConfig);
     vDc = vPc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
@@ -370,7 +460,7 @@ async function startViewerPeer() {
         $('viewerOverlay').classList.add('hidden');
         vStatus('Connected — move & click to control');
     };
-    vPc.onicecandidate = (e) => { if (e.candidate) vCh.trigger('client-signal', { kind: 'ice', candidate: e.candidate }); };
+    vPc.onicecandidate = (e) => { if (e.candidate) viewerSignal({ kind: 'ice', candidate: e.candidate }); };
     vPc.onconnectionstatechange = () => {
         vDbg('rtc:' + vPc.connectionState);
         if (vPc.connectionState === 'connected') vStatus('Connected');
@@ -380,7 +470,7 @@ async function startViewerPeer() {
 
     const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await vPc.setLocalDescription(offer);
-    vCh.trigger('client-signal', { kind: 'offer', sdp: vPc.localDescription.sdp });
+    viewerSignal({ kind: 'offer', sdp: vPc.localDescription.sdp });
     vDbg('offer sent');
 }
 
@@ -406,9 +496,10 @@ function bindViewerInput() {
 
 function exitViewer(delay = 0) {
     const doIt = () => {
-        try { vCh?.trigger('client-end', {}); } catch (e) {}
+        try { viewerSignal({ kind: 'end' }); } catch (e) {}
+        stopViewerPoll();
         if (vPc) { try { vPc.close(); } catch (e) {} vPc = null; }
-        vDc = null; vCh = null; vJoinedCode = null;
+        vDc = null; vCh = null; vJoinedCode = null; vChanName = null; vChanToken = null;
         $('viewerPane').classList.add('hidden');
         $('remoteVideo').srcObject = null;
         window.agent.setViewMode(false);

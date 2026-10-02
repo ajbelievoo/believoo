@@ -111,4 +111,27 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
             http.newCall(req).execute().close()
         }
     }
+
+    /** HTTP signaling path — server broadcasts to ws peers AND queues for
+     *  the peer's poll, so signaling works even when one ws is dead. */
+    fun signal(code: String, token: String, payload: JsonObject) {
+        runCatching {
+            val req = Request.Builder().url("$base/$code/signal")
+                .post(gson.toJson(payload).toRequestBody(json))
+                .header("Authorization", "Bearer $token").build()
+            http.newCall(req).execute().close()
+        }
+    }
+
+    /** Drains queued signals for the caller's role (agent or viewer token). */
+    fun drainSignals(code: String, token: String): List<JsonObject> {
+        val req = Request.Builder().url("$base/$code/signals")
+            .header("Authorization", "Bearer $token").build()
+        return runCatching {
+            http.newCall(req).execute().use {
+                val o = gson.fromJson(it.body!!.string(), JsonObject::class.java)
+                o.getAsJsonArray("signals")?.map { e -> e.asJsonObject } ?: emptyList()
+            }
+        }.getOrDefault(emptyList())
+    }
 }

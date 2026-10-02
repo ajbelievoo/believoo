@@ -63,6 +63,10 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::post('/remote/join', [\App\Http\Controllers\Bconnect\RemoteController::class, 'joinByCode'])->name('bconnect.remote.join');
     Route::get('/remote/code/{code}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'codeRoom'])->name('bconnect.remote.code');
     Route::post('/remote/code/{code}/end', [\App\Http\Controllers\Bconnect\RemoteController::class, 'endByCode'])->name('bconnect.remote.code.end');
+    Route::post('/remote/code/{code}/signal', [\App\Http\Controllers\Bconnect\RemoteController::class, 'signalByCode'])->name('bconnect.remote.code.signal');
+    Route::get('/remote/code/{code}/signals', [\App\Http\Controllers\Bconnect\RemoteController::class, 'signalsByCode'])->name('bconnect.remote.code.signals');
+    Route::post('/remote/code/{code}/respond', [\App\Http\Controllers\Bconnect\RemoteController::class, 'respondByCode'])->name('bconnect.remote.code.respond');
+    Route::get('/remote/code/{code}/session-status', [\App\Http\Controllers\Bconnect\RemoteController::class, 'statusByCode'])->name('bconnect.remote.code.status');
     Route::post('/remote/host/start', [\App\Http\Controllers\Bconnect\RemoteController::class, 'hostStart'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote.host.start');
     Route::get('/remote/host/{code}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'hostRoom'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote.host');
     Route::get('/remote/{session}/room', [\App\Http\Controllers\Bconnect\RemoteController::class, 'room'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote.room');

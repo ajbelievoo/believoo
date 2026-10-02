@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
         ->name('api.webhooks.razorpay');
 
     // BMyDesk desktop agent (code-based remote sessions) — public, rate-limited
-    Route::prefix('bmydesk/agent')->middleware('throttle:30,1')->group(function () {
+    Route::prefix('bmydesk/agent')->middleware('throttle:240,1')->group(function () {
         Route::post('/register', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'register']);
         Route::get('/{code}/status', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'status']);
         Route::post('/{code}/end', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'end']);
@@ -59,6 +59,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/login', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'login']);
         Route::post('/{code}/join', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'join']);
         Route::post('/{code}/respond', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'respond']);
+        Route::post('/{code}/signal', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signal']);
+        Route::get('/{code}/signals', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signals']);
     });
 
     // Authenticated routes

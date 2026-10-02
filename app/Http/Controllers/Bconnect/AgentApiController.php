@@ -11,8 +11,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.0.5';
-    const AGENT_LATEST_ANDROID = '1.0.5';
+    const AGENT_LATEST_WINDOWS = '1.0.6';
+    const AGENT_LATEST_ANDROID = '1.0.6';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -154,6 +154,10 @@ class AgentApiController extends Controller
     {
         $session = $this->findByCode($code);
         if (!$session || !$this->checkToken($r, $session)) {
+            // viewers get a limited read — enough for a ws-less accept/reject poll
+            if ($session && $this->checkViewerToken($r, $session)) {
+                return response()->json(['ok' => true, 'status' => $session->status]);
+            }
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
         }
         if ($session->expires_at && $session->expires_at->isPast() && $session->status === 'waiting') {
@@ -170,16 +174,98 @@ class AgentApiController extends Controller
 
     // POST /api/v1/bmydesk/agent/{code}/respond — HTTP fallback for accept/reject
     // when the host ws channel is wedged: server broadcasts the client-event.
+    // Also queues it for the viewer's HTTP fallback poll and updates status so
+    // plain /status polling reflects the decision.
     public function respond(Request $r, string $code)
     {
         $session = $this->findByCode($code);
         if (!$session || !$this->checkToken($r, $session)) {
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
         }
-        $event = $r->input('action') === 'accept' ? 'client-join-accept' : 'client-join-reject';
+        $accept = $r->input('action') === 'accept';
+        $payload = ['n' => (string) Str::random(10), 'at' => now()->toIso8601String()];
         \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
-            ->broadcast(['private-remote-agent.' . $session->session_code], $event, []);
+            ->broadcast(['private-remote-agent.' . $session->session_code],
+                $accept ? 'client-join-accept' : 'client-join-reject', $payload);
+        $this->queueSignal($session->session_code, 'v', ['kind' => $accept ? 'accept' : 'reject'] + $payload);
+        $session->update(['status' => $accept ? 'active' : 'rejected']);
         return response()->json(['ok' => true]);
+    }
+
+    // POST /api/v1/bmydesk/agent/{code}/signal — HTTP fallback for WebRTC
+    // signaling (offer/answer/ice/end). Broadcasts the client-event for
+    // ws-connected peers AND queues it for the other side's HTTP poll, so a
+    // fully wedged ws on either end still lets the session complete.
+    public function signal(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        $isHost = $this->checkToken($r, $session);
+        $isViewer = !$isHost && $this->checkViewerToken($r, $session);
+        if (!$isHost && !$isViewer) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        $kind = (string) $r->input('kind', '');
+        if (!in_array($kind, ['offer', 'answer', 'ice', 'end'], true)) {
+            return response()->json(['ok' => false, 'error' => 'bad kind'], 422);
+        }
+        // client-supplied nonce keeps the ws broadcast and the queued copy
+        // identical so receivers can dedupe double delivery.
+        $payload = [
+            'n' => (string) ($r->input('n') ?: Str::random(10)),
+            'kind' => $kind,
+            'sdp' => $r->input('sdp'),
+            'candidate' => $r->input('candidate'),
+        ];
+        \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+            ->broadcast(['private-remote-agent.' . $session->session_code],
+                $kind === 'end' ? 'client-end' : 'client-signal', $payload);
+        $this->queueSignal($session->session_code, $isHost ? 'v' : 'h', $payload);
+        if ($kind === 'end') {
+            $session->update(['status' => 'ended', 'ended_at' => now()]);
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    // GET /api/v1/bmydesk/agent/{code}/signals — drain queued signals for the
+    // caller's role (host token → signals destined for host, viewer → viewer).
+    public function signals(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        if ($this->checkToken($r, $session)) {
+            $role = 'h';
+        } elseif ($this->checkViewerToken($r, $session)) {
+            $role = 'v';
+        } else {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        return response()->json(['ok' => true, 'signals' => $this->drainSignals($session->session_code, $role)]);
+    }
+
+    protected function signalKey(string $code, string $role): string
+    {
+        return 'rsig.' . $code . '.' . $role;
+    }
+
+    protected function queueSignal(string $code, string $toRole, array $payload): void
+    {
+        $key = $this->signalKey($code, $toRole);
+        $list = \Illuminate\Support\Facades\Cache::get($key, []);
+        $list[] = $payload;
+        if (count($list) > 200) {
+            $list = array_slice($list, -200);
+        }
+        \Illuminate\Support\Facades\Cache::put($key, $list, now()->addMinutes(90));
+    }
+
+    protected function drainSignals(string $code, string $role): array
+    {
+        return \Illuminate\Support\Facades\Cache::pull($this->signalKey($code, $role), []) ?: [];
     }
 
     // POST /api/v1/bmydesk/agent/{code}/end — agent ends its own session
@@ -190,6 +276,11 @@ class AgentApiController extends Controller
             return response()->json(['ok' => false], 403);
         }
         $session->update(['status' => 'ended', 'ended_at' => now()]);
+        // tell the viewer — ws broadcast plus queued copy for pollers
+        $payload = ['n' => (string) Str::random(10), 'kind' => 'end'];
+        \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+            ->broadcast(['private-remote-agent.' . $session->session_code], 'client-end', $payload);
+        $this->queueSignal($session->session_code, 'v', $payload);
         return response()->json(['ok' => true]);
     }
 

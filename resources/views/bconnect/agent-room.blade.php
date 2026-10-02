@@ -57,11 +57,76 @@ function dbg(step) {
 
 const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
 
+const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+const API = '/remote/code/' + CODE;
+
+// ws whisper for speed + HTTP relay (server broadcasts AND queues for a
+// dead-ws peer). Shared nonce dedupes the double delivery.
+const seenSig = new Set();
+function sigNew(m) {
+    const n = m && m.n;
+    if (!n) return true;
+    if (seenSig.has(n)) return false;
+    seenSig.add(n); if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
+    return true;
+}
+const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+function postJson(url, body) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin', headers: {
+        'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+        body: JSON.stringify(body || {}) }).catch(() => {});
+}
 function whisper(evt, data) {
     try { channel.trigger('client-' + evt, data); } catch (e) { console.warn('send failed', e); }
 }
+function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); postJson(API + '/signal', msg); }
+
+function onAccept() {
+    setStatus('Accepted — starting stream…', 'text-green-400');
+    dbg('host accepted');
+    startPeer();
+}
+function onReject(reason) {
+    setStatus('Host rejected the request', 'text-red-400');
+    document.getElementById('waitTitle').textContent = 'Connection declined';
+    document.getElementById('waitSub').textContent = (reason === 'device')
+        ? 'The host device cannot share its screen from a browser. Ask them to use the BMyDesk Agent app.'
+        : 'The host declined your request.';
+}
+function onEnded() {
+    setStatus('Session ended by host', 'text-red-400');
+    cleanup();
+    document.getElementById('waitOverlay').classList.remove('hidden');
+    document.getElementById('waitTitle').textContent = 'Session ended';
+    document.getElementById('waitSub').textContent = 'The host ended this remote session.';
+}
+function dispatchViewerSignal(m) {
+    if (m.kind === 'accept') onAccept();
+    else if (m.kind === 'reject') onReject(m.reason);
+    else if (m.kind === 'end') onEnded();
+    else onSignal(m);
+}
+
+// HTTP fallback — drains queued signals (accept/answer/ice/end) and polls
+// status, so a dead ws still completes the whole session.
+function startViewerPoll() {
+    setInterval(async () => {
+        try {
+            const r = await fetch(API + '/signals', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+            const d = await r.json();
+            (d.signals || []).forEach((m) => { if (sigNew(m)) { dbg('poll sig: ' + (m.kind || '?')); dispatchViewerSignal(m); } });
+            if (!pc) {
+                const s = await fetch(API + '/session-status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+                const sd = await s.json();
+                if (sd.ok && sd.status === 'rejected') onReject();
+                else if (sd.ok && sd.status === 'ended') onEnded();
+            }
+        } catch (e) {}
+    }, 2000);
+}
 
 async function startPeer() {
+    if (pc) return; // accept may arrive via ws + queue both
     pc = new RTCPeerConnection(pcConfig);
 
     pc.ontrack = (e) => {
@@ -76,7 +141,7 @@ async function startPeer() {
     };
 
     pc.onicecandidate = (e) => {
-        if (e.candidate) whisper('signal', { kind: 'ice', candidate: e.candidate });
+        if (e.candidate) sendSignal({ kind: 'ice', candidate: e.candidate });
     };
 
     pc.onconnectionstatechange = () => {
@@ -103,7 +168,7 @@ async function startPeer() {
 
     const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await pc.setLocalDescription(offer);
-    whisper('signal', { kind: 'offer', sdp: pc.localDescription.sdp });
+    sendSignal({ kind: 'offer', sdp: pc.localDescription.sdp });
     dbg('offer sent');
     setStatus('Connecting…', 'text-amber-400');
     if (streamTimeout) clearTimeout(streamTimeout);
@@ -236,26 +301,11 @@ function initChannel() {
         dbg('subscription_error');
     });
 
-    channel.bind('client-join-accept', () => {
-        setStatus('Accepted — starting stream…', 'text-green-400');
-        dbg('host accepted');
-        startPeer();
-    });
-    channel.bind('client-join-reject', (m) => {
-        setStatus('Host rejected the request', 'text-red-400');
-        document.getElementById('waitTitle').textContent = 'Connection declined';
-        document.getElementById('waitSub').textContent = (m && m.reason === 'device')
-            ? 'The host device cannot share its screen from a browser. Ask them to use the BMyDesk Agent app.'
-            : 'The host declined your request.';
-    });
-    channel.bind('client-signal', (m) => onSignal(m));
-    channel.bind('client-end', () => {
-        setStatus('Session ended by host', 'text-red-400');
-        cleanup();
-        document.getElementById('waitOverlay').classList.remove('hidden');
-        document.getElementById('waitTitle').textContent = 'Session ended';
-        document.getElementById('waitSub').textContent = 'The host ended this remote session.';
-    });
+    channel.bind('client-join-accept', (m) => { if (sigNew(m)) onAccept(); });
+    channel.bind('client-join-reject', (m) => { if (sigNew(m)) onReject(m && m.reason); });
+    channel.bind('client-signal', (m) => { if (sigNew(m)) onSignal(m); });
+    channel.bind('client-end', (m) => { if (sigNew(m)) onEnded(); });
+    startViewerPoll();
 }
 
 function cleanup() {
@@ -281,7 +331,11 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
     (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
 });
 
-window.addEventListener('beforeunload', () => { whisper('end', {}); cleanup(); });
+window.addEventListener('beforeunload', () => {
+    whisper('end', {});
+    try { fetch(END_URL, { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF } }); } catch (e) {}
+    cleanup();
+});
 
 initChannel();
 </script>
