@@ -20,6 +20,31 @@ function loadNut() {
 
 let win = null;
 
+// ── bmydesk:// deep links (Google sign-in token handoff, etc.) ────
+function deliverDeepLink(url) {
+    try {
+        const u = new URL(url);
+        if (u.hostname === 'auth') {
+            const token = u.searchParams.get('token');
+            const name = u.searchParams.get('name') || '';
+            if (token && win) win.webContents.send('agent-auth', { token, name });
+        }
+    } catch (e) { /* malformed link — ignore */ }
+}
+
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+    app.quit();
+} else {
+    app.setAsDefaultProtocolClient('bmydesk');
+    app.on('second-instance', (_e, argv) => {
+        const url = argv.find((a) => typeof a === 'string' && a.startsWith('bmydesk://'));
+        if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+        if (url) deliverDeepLink(url);
+    });
+    app.on('open-url', (e, url) => { e.preventDefault(); deliverDeepLink(url); });
+}
+
 function createWindow() {
     win = new BrowserWindow({
         width: 460,
@@ -39,8 +64,14 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    if (!gotLock) return; // another instance owns the protocol — it got the argv
     createWindow();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+    // Cold start via bmydesk:// link — the URL arrives in argv on Windows/Linux.
+    win.webContents.once('did-finish-load', () => {
+        const url = process.argv.find((a) => typeof a === 'string' && a.startsWith('bmydesk://'));
+        if (url) deliverDeepLink(url);
+    });
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

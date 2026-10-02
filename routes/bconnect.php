@@ -58,6 +58,7 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::get('/settings', [\App\Http\Controllers\Bconnect\SettingsController::class, 'index'])->middleware('bconnect.permission:settings.view')->name('bconnect.settings');
     Route::get('/remote', [\App\Http\Controllers\Bconnect\RemoteController::class, 'index'])->middleware('bconnect.permission:remote.use')->name('bconnect.remote');
     Route::get('/remote/agent', [\App\Http\Controllers\Bconnect\AgentController::class, 'index'])->name('bconnect.remote.agent');
+    Route::get('/remote/app-login', [\App\Http\Controllers\Bconnect\AgentController::class, 'appLogin'])->name('bconnect.remote.applogin');
     Route::get('/remote/connect', [\App\Http\Controllers\Bconnect\RemoteController::class, 'connect'])->name('bconnect.remote.connect');
     Route::post('/remote/join', [\App\Http\Controllers\Bconnect\RemoteController::class, 'joinByCode'])->name('bconnect.remote.join');
     Route::get('/remote/code/{code}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'codeRoom'])->name('bconnect.remote.code');

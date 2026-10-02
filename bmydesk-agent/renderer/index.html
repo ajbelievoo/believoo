@@ -105,6 +105,7 @@
     <div id="loginArea">
         <p class="login-link" id="loginToggle">🔑 Sign in with your BMyDesk account</p>
         <div class="login-card hidden" id="loginCard">
+            <button class="btn" id="googleBtn" style="background:#fff;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;">🔵 Sign in with Google</button>
             <input id="loginEmail" type="email" placeholder="Email">
             <input id="loginPass" type="password" placeholder="Password">
             <button class="btn" id="loginBtn">Sign In</button>
@@ -120,14 +121,17 @@
     <!-- Viewer mode: remote screen renders here -->
     <div class="viewer hidden" id="viewerPane">
         <div class="viewer-bar">
-            <span class="st" id="viewerStatus">Connecting…</span>
+            <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
+                <span class="st" id="viewerStatus">Connecting…</span>
+                <span id="viewerDebug" style="font-size:10px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+            </div>
             <button class="end" id="viewerEnd">Disconnect</button>
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
         <div class="viewer-overlay" id="viewerOverlay"><div>Connecting to remote device…</div></div>
     </div>
 
-    <div class="foot">BMyDesk Agent v1.0.3 · <span id="verNote">codes expire after 60 min</span></div>
+    <div class="foot">BMyDesk Agent v1.0.4 · <span id="verNote">codes expire after 60 min</span></div>
 </div>
 <script src="../node_modules/pusher-js/dist/web/pusher.min.js"></script>
 <script>

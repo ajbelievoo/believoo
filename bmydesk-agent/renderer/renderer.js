@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -27,6 +27,7 @@ function setStatus(text, mode = 'wait') {
 }
 
 async function register() {
+    try { if (pusher) { pusher.disconnect(); pusher = null; ch = null; } } catch (e) {}
     try {
         const r = await fetch(API + '/register', {
             method: 'POST',
@@ -212,6 +213,8 @@ window.addEventListener('beforeunload', () => {
 let vCh = null, vPc = null, vDc = null, vJoinedCode = null;
 
 function vStatus(t) { $('viewerStatus').textContent = t; }
+function vDbg(t) { const el = $('viewerDebug'); if (el) { el.textContent = (el.textContent ? el.textContent + ' › ' : '') + t; } }
+function vDbgReset() { const el = $('viewerDebug'); if (el) el.textContent = ''; }
 
 function newPusher(opts = {}) {
     return new Pusher(REVERB_KEY, Object.assign({
@@ -256,17 +259,29 @@ async function connectToPartner() {
         vCh = p2.subscribe('private-remote-agent.' + code);
 
         vStatus('Subscribing…');
+        vDbgReset(); vDbg('subscribing');
+        // surface the real transport state so a stuck connect is diagnosable
+        p2.connection.bind('state_change', (s) => vDbg('ws:' + s.current));
+        p2.connection.bind('error', (e) => vDbg('wserr:' + (e?.error?.data?.code || e?.type || 'net')));
+        const subTimeout = setTimeout(() => {
+            vStatus('Subscribe timeout — ws:' + (p2.connection?.state || '?'));
+            vDbg('timeout — retry');
+            exitViewer(4000);
+        }, 20000);
         vCh.bind('pusher:subscription_succeeded', () => {
+            clearTimeout(subTimeout);
+            vDbg('subscribed');
             vStatus('Waiting for host approval…');
             vCh.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)' });
+            vDbg('join-request sent');
         });
-        vCh.bind('pusher:subscription_error', () => { vStatus('Channel auth failed'); exitViewer(3000); });
-        vCh.bind('client-join-accept', () => startViewerPeer());
+        vCh.bind('pusher:subscription_error', (e) => { clearTimeout(subTimeout); vDbg('sub err'); vStatus('Channel auth failed'); exitViewer(3000); });
+        vCh.bind('client-join-accept', () => { vDbg('host accepted'); startViewerPeer(); });
         vCh.bind('client-join-reject', () => { vStatus('Host declined the request'); exitViewer(2500); });
         vCh.bind('client-signal', async (m) => {
             if (!vPc) return;
             try {
-                if (m.kind === 'answer') await vPc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+                if (m.kind === 'answer') { vDbg('answer received'); await vPc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); }
                 else if (m.kind === 'ice' && m.candidate) await vPc.addIceCandidate(m.candidate).catch(() => {});
             } catch (e) { console.error(e); }
         });
@@ -291,6 +306,7 @@ async function startViewerPeer() {
     };
     vPc.onicecandidate = (e) => { if (e.candidate) vCh.trigger('client-signal', { kind: 'ice', candidate: e.candidate }); };
     vPc.onconnectionstatechange = () => {
+        vDbg('rtc:' + vPc.connectionState);
         if (vPc.connectionState === 'connected') vStatus('Connected');
         if (vPc.connectionState === 'failed') vStatus('Connection failed — retry');
         if (['disconnected', 'closed'].includes(vPc.connectionState)) vStatus('Disconnected');
@@ -299,6 +315,7 @@ async function startViewerPeer() {
     const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await vPc.setLocalDescription(offer);
     vCh.trigger('client-signal', { kind: 'offer', sdp: vPc.localDescription.sdp });
+    vDbg('offer sent');
 }
 
 // Input capture on the remote video → host's DataChannel handler
@@ -376,6 +393,18 @@ $('loginBtn').onclick = async () => {
         $('loginBtn').disabled = false; $('loginBtn').textContent = 'Sign In';
     }
 };
+
+$('googleBtn').onclick = () => window.agent.openExternal('https://bmydesk.believoo.com/auth/google?agent=1');
+
+// OAuth completed in the system browser → token arrives via bmydesk:// deep link
+window.agent.onAuth?.(({ token, name }) => {
+    localStorage.setItem('bmydesk_member_token', token);
+    localStorage.setItem('bmydesk_member_name', name);
+    $('signedAs').textContent = '✓ Signed in as ' + name + ' — click to sign out';
+    $('signedAs').classList.remove('hidden');
+    $('loginCard').classList.add('hidden'); $('loginToggle').classList.add('hidden');
+    register(); // re-register so the active session links to this account
+});
 
 register();
 checkUpdate();

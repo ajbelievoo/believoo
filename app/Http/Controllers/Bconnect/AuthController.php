@@ -62,7 +62,10 @@ class AuthController extends Controller {
         return $redirectUrl;
     }
 
-    public function redirectToGoogle() {
+    public function redirectToGoogle(Request $r) {
+        // ?agent=1 → after OAuth completes, hand the session token to the
+        // desktop/mobile app via the bmydesk:// deep link instead of the dashboard.
+        if ($r->query('agent')) session(['bconnect_agent_auth' => true]);
         $redirectUrl = $this->configureGoogle();
         return Socialite::driver('google')->redirectUrl($redirectUrl)->stateless()->redirect();
     }
@@ -86,6 +89,12 @@ class AuthController extends Controller {
             }
             $member = Member::where('user_id', $user->id)->where('is_active', true)->first();
             Auth::login($user);
+            // Agent-app login: OAuth started from the desktop/mobile app —
+            // return the member token through the bmydesk:// deep link.
+            if ($member && session()->pull('bconnect_agent_auth')) {
+                if (!$member->api_token) { $member->api_token = Str::random(48); $member->save(); }
+                return redirect()->away('bmydesk://auth?token=' . $member->api_token . '&name=' . urlencode($user->name));
+            }
             if ($member) {
                 session(['bconnect_company_id' => $member->company_id, 'bconnect_role' => $member->role]);
                 return redirect()->route('bconnect.dashboard');

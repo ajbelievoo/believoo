@@ -88,8 +88,27 @@ class MainActivity : Activity() {
         }
         super.onCreate(savedInstanceState)
         buildUi()
-        register()
+        if (!handleAuthIntent(intent)) register()
         checkUpdate()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent != null && handleAuthIntent(intent)) return
+    }
+
+    // bmydesk://auth?token=…&name=… — signed-in handoff from the website /
+    // Google OAuth flow. Stores the member token and re-registers linked.
+    private fun handleAuthIntent(i: Intent?): Boolean {
+        val u = i?.data ?: return false
+        if (u.scheme != "bmydesk" || u.host != "auth") return false
+        val token = u.getQueryParameter("token") ?: return false
+        val name = u.getQueryParameter("name") ?: ""
+        getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit()
+            .putString("member_token", token).putString("member_name", name).apply()
+        ui { setStatus("Signed in as $name", "#22c55e") }
+        register()
+        return true
     }
 
     // If a newer build exists on the server, offer to open the download page.
@@ -252,6 +271,13 @@ class MainActivity : Activity() {
                 background = GradientDrawable().apply { setColor(if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")); cornerRadius = 14f }
             }
             val loginBtn = Button(this).apply { text = "Sign in" }
+            val googleBtn = Button(this).apply {
+                text = "Sign in with Google"
+                setOnClickListener {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/auth/google?agent=1")))
+                }
+            }
+            acct.addView(googleBtn)
             acct.addView(emailIn); acct.addView(passIn); acct.addView(loginBtn)
             loginBtn.setOnClickListener {
                 thread {
