@@ -68,6 +68,7 @@ class MainActivity : Activity() {
     }
 
     private val signaling = SignalingClient()
+    @Volatile private var statusPollRunning = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Show the real crash instead of silently dying — screenshot it and share.
@@ -380,6 +381,33 @@ class MainActivity : Activity() {
             try { signaling.connect(r.channel, r.agentToken) }
             catch (e: Throwable) { ui { setStatus("Realtime failed: ${e.message}", "#ef4444") } }
         }
+        // If ws subscribe hasn't completed in ~20s, fall back to polling /status
+        // so join requests still surface and Accept can work over HTTP.
+        if (statusPollRunning) return
+        statusPollRunning = true
+        thread {
+            Thread.sleep(20000)
+            while (reg != null && !signaling.hostSubscribed) {
+                try {
+                    val s = api.status(r.code, r.agentToken)
+                    if (s?.get("ok")?.asBoolean == true) {
+                        val vj = s.get("viewer_joined_at")?.asString
+                        if (vj != null) {
+                            val age = System.currentTimeMillis() -
+                                java.time.Instant.parse(vj).toEpochMilli()
+                            if (age < 120_000 && reqBox.visibility != View.VISIBLE) {
+                                ui {
+                                    reqName.text = "Someone wants to view this device"
+                                    reqBox.visibility = View.VISIBLE
+                                    setStatus("Connection request…", "#f59e0b")
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {}
+                Thread.sleep(4000)
+            }
+        }
     }
 
     // ── Accept flow: projection permission → service → capture ─────
@@ -396,7 +424,7 @@ class MainActivity : Activity() {
         if (requestCode != 1001) return
         if (resultCode != RESULT_OK || data == null) {
             pendingProjection = false
-            signaling.send("join-reject", JsonObject())
+            respondTo("reject")
             setStatus("Capture permission denied", "#ef4444")
             return
         }
@@ -408,7 +436,7 @@ class MainActivity : Activity() {
             .putExtra(ScreenShareService.EXTRA_RESULT_DATA, data)
         startService(svc)
         pendingProjection = false
-        signaling.send("join-accept", JsonObject())
+        respondTo("accept")
         setStatus("Accepted — waiting for stream…", "#22c55e")
         endBtn.visibility = View.VISIBLE
         waitingOfferSdp?.let { sdp -> waitingOfferSdp = null; handleOffer(sdp) }
@@ -423,9 +451,15 @@ class MainActivity : Activity() {
         setStatus("Streaming…", "#22c55e")
     }
 
+    /** accept/reject over ws when subscribed, else the HTTP fallback endpoint */
+    private fun respondTo(action: String) {
+        if (signaling.hostSubscribed) signaling.send("join-$action", JsonObject())
+        else reg?.let { thread { api.respond(it.code, it.agentToken, action) } }
+    }
+
     private fun rejectRequest() {
         reqBox.visibility = View.GONE
-        signaling.send("join-reject", JsonObject())
+        respondTo("reject")
         setStatus("Request rejected", "#f59e0b")
     }
 

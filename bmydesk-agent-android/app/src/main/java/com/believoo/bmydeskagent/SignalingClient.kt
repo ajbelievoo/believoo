@@ -46,6 +46,7 @@ class SignalingClient(
     private var viewerChannel: PrivateChannel? = null
     private val channelTokens = ConcurrentHashMap<String, String>()
     @Volatile var isConnected = false; private set
+    @Volatile var hostSubscribed = false; private set
     var listener: Listener? = null
 
     // Per-channel token authorizer — one ws connection carries both the host
@@ -100,9 +101,10 @@ class SignalingClient(
                     "client-end" -> listener?.onEnd()
                 }
             }
-            override fun onSubscriptionSucceeded(channelName: String?) { listener?.onSubscribed() }
+            override fun onSubscriptionSucceeded(channelName: String?) { hostSubscribed = true; listener?.onSubscribed() }
             override fun onAuthenticationFailure(message: String?, e: Exception?) {
                 isConnected = false
+                hostSubscribed = false
                 listener?.onDisconnected()
             }
         })

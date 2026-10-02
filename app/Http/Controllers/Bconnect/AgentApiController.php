@@ -163,8 +163,23 @@ class AgentApiController extends Controller
             'ok' => true,
             'status' => $session->status,
             'viewer' => $session->viewer?->user?->name,
+            'viewer_joined_at' => $session->viewer_joined_at?->toIso8601String(),
             'expires_at' => $session->expires_at?->toIso8601String(),
         ]);
+    }
+
+    // POST /api/v1/bmydesk/agent/{code}/respond — HTTP fallback for accept/reject
+    // when the host ws channel is wedged: server broadcasts the client-event.
+    public function respond(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session)) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        $event = $r->input('action') === 'accept' ? 'client-join-accept' : 'client-join-reject';
+        \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+            ->broadcast(['private-remote-agent.' . $session->session_code], $event, []);
+        return response()->json(['ok' => true]);
     }
 
     // POST /api/v1/bmydesk/agent/{code}/end — agent ends its own session

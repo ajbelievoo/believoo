@@ -85,6 +85,16 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         }
     }
 
+    /** HTTP fallback accept/reject — server broadcasts the client-event. */
+    fun respond(code: String, token: String, action: String) {
+        runCatching {
+            val req = Request.Builder().url("$base/$code/respond")
+                .post(gson.toJson(mapOf("action" to action)).toRequestBody(json))
+                .header("Authorization", "Bearer $token").build()
+            http.newCall(req).execute().close()
+        }
+    }
+
     fun status(code: String, token: String): JsonObject? {
         val req = Request.Builder().url("$base/$code/status")
             .header("Authorization", "Bearer $token").build()

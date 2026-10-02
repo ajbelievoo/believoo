@@ -58,6 +58,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/version', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'version']);
         Route::post('/login', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'login']);
         Route::post('/{code}/join', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'join']);
+        Route::post('/{code}/respond', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'respond']);
     });
 
     // Authenticated routes

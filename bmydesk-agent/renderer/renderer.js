@@ -111,10 +111,35 @@ function getPusher() {
     return pusher;
 }
 
-let chRetryTimer = null;
+let chRetryTimer = null, subAttempts = 0, statusPoller = null;
+
+// ws signaling is the primary path; if it keeps failing we still surface join
+// requests by polling /status — accept then rides the ws once it recovers.
+function startStatusPoll() {
+    if (statusPoller || !session) return;
+    hdbg('poll fallback on');
+    setStatus('Ready — share your code (slow link)', 'wait');
+    statusPoller = setInterval(async () => {
+        if (!session) return;
+        try {
+            const r = await fetch(`${API}/${session.session_code}/status`, {
+                headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+            });
+            const d = await r.json();
+            if (d.ok && d.viewer_joined_at && (Date.now() - Date.parse(d.viewer_joined_at) < 120000)
+                && $('reqBox').classList.contains('hidden') && !pc) {
+                $('reqName').textContent = d.viewer || 'Someone';
+                $('reqBox').classList.remove('hidden');
+                setStatus('Connection request…', 'wait');
+            }
+        } catch (e) {}
+    }, 4000);
+}
+
 function connectChannel() {
     if (typeof Pusher === 'undefined') {
         setStatus('Realtime lib missing — reinstall the agent', 'off');
+        startStatusPoll();
         return;
     }
     channelTokens[session.channel] = session.agent_token;
@@ -125,14 +150,22 @@ function connectChannel() {
     if (chRetryTimer) clearTimeout(chRetryTimer);
     chRetryTimer = setTimeout(() => {
         if (!ch.subscribed) {
-            hdbg('sub timeout — retrying');
+            subAttempts++;
+            hdbg('sub timeout — retry ' + subAttempts);
             try { getPusher().unsubscribe(session.channel); } catch (e) {}
+            if (subAttempts >= 2) startStatusPoll();
             connectChannel();
         }
     }, 15000);
 
-    ch.bind('pusher:subscription_succeeded', () => { clearTimeout(chRetryTimer); hdbg('subscribed'); setStatus('Ready — share your code', 'on'); });
-    ch.bind('pusher:subscription_error', (e) => { clearTimeout(chRetryTimer); hdbg('sub err'); setStatus('Channel auth failed — retrying…', 'off'); setTimeout(connectChannel, 5000); });
+    ch.bind('pusher:subscription_succeeded', () => { clearTimeout(chRetryTimer); subAttempts = 0; hdbg('subscribed'); setStatus('Ready — share your code', 'on'); });
+    ch.bind('pusher:subscription_error', (e) => {
+        clearTimeout(chRetryTimer); subAttempts++;
+        hdbg('sub err — retry ' + subAttempts);
+        setStatus('Channel auth failed — retrying…', 'off');
+        if (subAttempts >= 2) startStatusPoll();
+        setTimeout(connectChannel, 5000);
+    });
 
     ch.bind('client-join-request', (m) => {
         $('reqName').textContent = m.name || 'Someone';
@@ -232,8 +265,20 @@ function teardown(msg) {
     setStatus(msg || 'Ready — share your code', 'wait');
 }
 
-$('acceptBtn').onclick = () => { $('reqBox').classList.add('hidden'); ch.trigger('client-join-accept', {}); setStatus('Accepted — waiting for stream…', 'on'); };
-$('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); ch.trigger('client-join-reject', {}); setStatus('Request rejected', 'wait'); };
+function respond(action) {
+    const event = 'client-join-' + action;
+    let sent = false;
+    if (ch && ch.subscribed) { try { ch.trigger(event, {}); sent = true; } catch (e) {} }
+    if (!sent && session) {
+        fetch(`${API}/${session.session_code}/respond`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+            body: JSON.stringify({ action }),
+        }).catch(() => {});
+    }
+}
+$('acceptBtn').onclick = () => { $('reqBox').classList.add('hidden'); respond('accept'); setStatus('Accepted — waiting for stream…', 'on'); };
+$('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); respond('reject'); setStatus('Request rejected', 'wait'); };
 $('endBtn').onclick = async () => {
     try { ch.trigger('client-end', {}); } catch (e) {}
     try { await fetch(API + '/' + session.session_code + '/end', { method: 'POST', headers: { 'Authorization': 'Bearer ' + session.agent_token } }); } catch (e) {}
