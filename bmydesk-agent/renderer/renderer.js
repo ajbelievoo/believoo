@@ -70,24 +70,26 @@ function require_os_name() {
     return (window.agent?.platform || 'pc') + '-' + (navigator.userAgent.match(/Windows|Mac|Linux/)?.[0] || 'host');
 }
 
-function connectChannel() {
-    if (typeof Pusher === 'undefined') {
-        setStatus('Realtime lib missing — reinstall the agent', 'off');
-        return;
-    }
+// One ws connection multiplexes all channel subscriptions (host + viewer).
+// channelTokens maps each channel name to the token that authorizes it —
+// host channels use agent_token, joined sessions use their viewer_token.
+const channelTokens = {};
+
+function getPusher() {
+    if (pusher) return pusher;
     pusher = new Pusher(REVERB_KEY, {
         cluster: 'mt1', // pusher-js requires a cluster even when wsHost overrides it
         wsHost: REVERB_HOST,
         wssPort: REVERB_PORT,
         forceTLS: true,
         enabledTransports: ['wss'],
-        // custom authorizer — POSTs socket_id+channel_name to our API with the agent token
+        // custom authorizer — POSTs socket_id+channel_name to our API
         authorizer: (channel) => ({
             authorize: (socketId, callback) => {
                 fetch(API + '/broadcast-auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ socket_id: socketId, channel_name: channel.name, agent_token: session.agent_token }),
+                    body: JSON.stringify({ socket_id: socketId, channel_name: channel.name, agent_token: channelTokens[channel.name] || '' }),
                 })
                     .then(r => r.json())
                     .then(d => d.auth ? callback(null, d) : callback(new Error(d.error || 'auth failed'), null))
@@ -95,8 +97,16 @@ function connectChannel() {
             },
         }),
     });
+    return pusher;
+}
 
-    ch = pusher.subscribe(session.channel);
+function connectChannel() {
+    if (typeof Pusher === 'undefined') {
+        setStatus('Realtime lib missing — reinstall the agent', 'off');
+        return;
+    }
+    channelTokens[session.channel] = session.agent_token;
+    ch = getPusher().subscribe(session.channel);
     ch.bind('pusher:subscription_succeeded', () => setStatus('Ready — share your code', 'on'));
     ch.bind('pusher:subscription_error', (e) => setStatus('Channel auth failed', 'off'));
 
@@ -135,16 +145,19 @@ async function pickScreen() {
 }
 
 async function captureScreen(sourceId) {
-    stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-            mandatory: {
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: sourceId,
-                maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30,
-            },
-        },
-    });
+    try { await window.agent.selectScreenSource(sourceId); } catch (e) {}
+    try {
+        // modern path — setDisplayMediaRequestHandler in main supplies the source
+        stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { frameRate: { ideal: 30, max: 30 } }, audio: false,
+        });
+    } catch (e) {
+        // legacy fallback (older Electron)
+        stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
+        });
+    }
     stream.getVideoTracks()[0].contentHint = 'detail';
 }
 
@@ -216,13 +229,6 @@ function vStatus(t) { $('viewerStatus').textContent = t; }
 function vDbg(t) { const el = $('viewerDebug'); if (el) { el.textContent = (el.textContent ? el.textContent + ' › ' : '') + t; } }
 function vDbgReset() { const el = $('viewerDebug'); if (el) el.textContent = ''; }
 
-function newPusher(opts = {}) {
-    return new Pusher(REVERB_KEY, Object.assign({
-        cluster: 'mt1', wsHost: REVERB_HOST, wssPort: REVERB_PORT,
-        forceTLS: true, enabledTransports: ['wss'],
-    }, opts));
-}
-
 async function connectToPartner() {
     const code = $('remoteCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 6) { $('remoteCode').focus(); return; }
@@ -244,27 +250,18 @@ async function connectToPartner() {
         const vToken = d.viewer_token;
         if (Array.isArray(d.ice_servers) && d.ice_servers.length) pcConfig = { iceServers: d.ice_servers };
 
-        const p2 = newPusher({
-            authorizer: () => ({
-                authorize: (socketId, callback) => {
-                    fetch(API + '/broadcast-auth', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({ socket_id: socketId, channel_name: 'private-remote-agent.' + code, agent_token: vToken }),
-                    }).then(x => x.json()).then(d2 => d2.auth ? callback(null, d2) : callback(new Error(d2.error || 'auth'), null))
-                      .catch(e => callback(e, null));
-                },
-            }),
-        });
-        vCh = p2.subscribe('private-remote-agent.' + code);
+        // Reuse the single ws connection — a second socket can hang on
+        // restrictive networks/proxies; multiplexing avoids that entirely.
+        channelTokens['private-remote-agent.' + code] = vToken;
+        const vp = getPusher();
+        vCh = vp.subscribe('private-remote-agent.' + code);
 
         vStatus('Subscribing…');
         vDbgReset(); vDbg('subscribing');
-        // surface the real transport state so a stuck connect is diagnosable
-        p2.connection.bind('state_change', (s) => vDbg('ws:' + s.current));
-        p2.connection.bind('error', (e) => vDbg('wserr:' + (e?.error?.data?.code || e?.type || 'net')));
+        vp.connection.bind('state_change', (s) => vDbg('ws:' + s.current));
+        vp.connection.bind('error', (e) => vDbg('wserr:' + (e?.error?.data?.code || e?.type || 'net')));
         const subTimeout = setTimeout(() => {
-            vStatus('Subscribe timeout — ws:' + (p2.connection?.state || '?'));
+            vStatus('Subscribe timeout — ws:' + (vp.connection?.state || '?') + ' ch:' + vCh.subscribed);
             vDbg('timeout — retry');
             exitViewer(4000);
         }, 20000);

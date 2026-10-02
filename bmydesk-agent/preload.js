@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('agent', {
     getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
+    selectScreenSource: (id) => ipcRenderer.invoke('select-screen-source', id),
     getDisplaySize: () => ipcRenderer.invoke('get-display-size'),
     sendInput: (msg) => ipcRenderer.send('input-event', msg),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),

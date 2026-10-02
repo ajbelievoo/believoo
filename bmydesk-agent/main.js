@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell, session } = require('electron');
 const path = require('path');
 
 // nut-js is a native module; load lazily so the app still starts even if the
@@ -83,6 +83,25 @@ ipcMain.handle('get-screen-sources', async () => {
         thumbnailSize: { width: 360, height: 220 },
     });
     return sources.map(s => ({ id: s.id, name: s.name, thumbnail: s.thumbnail.toDataURL() }));
+});
+
+// Renderer picks a source id, then getDisplayMedia() triggers this handler —
+// the legacy chromeMediaSourceId getUserMedia path is flaky/black on modern
+// Electron, so capture goes through the native display-media pipeline.
+let pickedSourceId = null;
+ipcMain.handle('select-screen-source', (_e, id) => { pickedSourceId = id; return true; });
+
+app.whenReady().then(() => {
+    session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
+        try {
+            const sources = await desktopCapturer.getSources({ types: ['screen'] });
+            const src = sources.find(s => s.id === pickedSourceId) || sources[0];
+            if (src) callback({ video: src, audio: false });
+            else callback({});
+        } catch (e) {
+            callback({});
+        }
+    });
 });
 
 ipcMain.handle('set-view-mode', (_e, on) => {
