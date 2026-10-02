@@ -35,6 +35,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
 <script>
 const CODE = @json($session->session_code);
 const VIEWER = @json($viewerName);
@@ -57,7 +58,7 @@ function dbg(step) {
 const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
 
 function whisper(evt, data) {
-    try { channel.whisper(evt, data); } catch (e) { console.warn('whisper failed', e); }
+    try { channel.trigger('client-' + evt, data); } catch (e) { console.warn('send failed', e); }
 }
 
 async function startPeer() {
@@ -190,45 +191,70 @@ video.addEventListener('contextmenu', (e) => e.preventDefault());
 video.addEventListener('click', () => { video.focus(); document.getElementById('clickHint').classList.add('hidden'); });
 video.tabIndex = 0;
 
-// ── Signaling channel ────────────────────────────────────────
+// ── Signaling channel — dedicated raw Pusher connection ─────
+// (bypasses the global Echo manager: its 10s polling fallback silently
+//  swallows whispers, which broke join-request delivery)
 function initChannel() {
-    if (!window.Echo || !window.Echo.connector || window.Echo.usePolling) {
-        setStatus('Realtime unavailable — Reverb not connected', 'text-red-400');
+    if (typeof Pusher === 'undefined') {
+        setStatus('Realtime lib missing — reload', 'text-red-400');
         document.getElementById('waitSub').textContent = 'Refresh the page and try again.';
         return;
     }
-    channel = window.Echo.private(channelName);
+    const p = new Pusher(@json(config('broadcasting.connections.reverb.key')), {
+        cluster: 'mt1',
+        wsHost: 'believoo.com',
+        wssPort: 443,
+        forceTLS: true,
+        enabledTransports: ['wss'],
+        authEndpoint: '/broadcasting/auth',
+        auth: { headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+        }},
+    });
+    p.connection.bind('state_change', s => dbg('ws:' + s.current));
+    p.connection.bind('error', () => dbg('ws error'));
+    channel = p.subscribe('private-' + channelName);
 
-    channel.subscribed(() => {
+    const subTimeout = setTimeout(() => {
+        if (!channel.subscribed) {
+            setStatus('Signaling timeout — reload and retry', 'text-red-400');
+            dbg('subscribe timeout, ws:' + p.connection.state);
+        }
+    }, 20000);
+
+    channel.bind('pusher:subscription_succeeded', () => {
+        clearTimeout(subTimeout);
         setStatus('Requesting access…', 'text-amber-400');
         dbg('channel subscribed');
         whisper('join-request', { name: VIEWER });
         dbg('join-request sent');
     });
+    channel.bind('pusher:subscription_error', () => {
+        clearTimeout(subTimeout);
+        setStatus('Channel auth failed — reload', 'text-red-400');
+        dbg('subscription_error');
+    });
 
-    channel.listenForWhisper('join-accept', () => {
+    channel.bind('client-join-accept', () => {
         setStatus('Accepted — starting stream…', 'text-green-400');
         dbg('host accepted');
         startPeer();
     });
-    channel.listenForWhisper('join-reject', (m) => {
+    channel.bind('client-join-reject', (m) => {
         setStatus('Host rejected the request', 'text-red-400');
         document.getElementById('waitTitle').textContent = 'Connection declined';
         document.getElementById('waitSub').textContent = (m && m.reason === 'device')
             ? 'The host device cannot share its screen from a browser. Ask them to use the BMyDesk Agent app.'
             : 'The host declined your request.';
     });
-    channel.listenForWhisper('signal', (m) => onSignal(m));
-    channel.listenForWhisper('end', () => {
+    channel.bind('client-signal', (m) => onSignal(m));
+    channel.bind('client-end', () => {
         setStatus('Session ended by host', 'text-red-400');
         cleanup();
         document.getElementById('waitOverlay').classList.remove('hidden');
         document.getElementById('waitTitle').textContent = 'Session ended';
         document.getElementById('waitSub').textContent = 'The host ended this remote session.';
-    });
-    channel.error((e) => {
-        console.error('channel error', e);
-        setStatus('Channel auth failed', 'text-red-400');
     });
 }
 
@@ -257,11 +283,6 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
 
 window.addEventListener('beforeunload', () => { whisper('end', {}); cleanup(); });
 
-// Echo loads via the app bundle — wait for it
-let tries = 0;
-const waitEcho = setInterval(() => {
-    if (window.Echo) { clearInterval(waitEcho); initChannel(); }
-    else if (++tries > 40) { clearInterval(waitEcho); setStatus('Realtime init failed — reload', 'text-red-400'); }
-}, 250);
+initChannel();
 </script>
 @endsection

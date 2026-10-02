@@ -56,6 +56,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
 <script>
 const CODE = @json($session->session_code);
 const channelName = 'remote-agent.' + CODE;
@@ -74,7 +75,7 @@ function dbg(step) {
     el.textContent = (el.textContent + ' › ' + step).slice(-140);
     console.log('[bmydesk-host]', step);
 }
-function whisper(evt, data) { try { channel.whisper(evt, data); } catch (e) { console.warn(e); } }
+function whisper(evt, data) { try { channel.trigger('client-' + evt, data); } catch (e) { console.warn(e); } }
 
 const CAN_SHARE = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
 
@@ -85,7 +86,7 @@ function showMobileHostNotice() {
         '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
         '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
         '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
-        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-1.0.3.apk" class="text-cyan-400 underline">Download APK</a></p>';
+        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-v1.0.5.apk" class="text-cyan-400 underline">Download APK</a></p>';
     const btn = document.getElementById('shareBtn');
     btn.disabled = true;
     btn.classList.add('opacity-40');
@@ -153,28 +154,55 @@ async function onSignal(m) {
     }
 }
 
+// Dedicated raw Pusher connection — bypasses the global Echo manager whose
+// 10s polling fallback silently drops whispers (join-request never arrived).
 function initChannel() {
-    if (!window.Echo || !window.Echo.connector || window.Echo.usePolling) {
-        setStatus('Realtime unavailable', 'bc-badge-red');
+    if (typeof Pusher === 'undefined') {
+        setStatus('Realtime lib missing — reload', 'bc-badge-red');
         return;
     }
-    channel = window.Echo.private(channelName);
+    const p = new Pusher(@json(config('broadcasting.connections.reverb.key')), {
+        cluster: 'mt1',
+        wsHost: 'believoo.com',
+        wssPort: 443,
+        forceTLS: true,
+        enabledTransports: ['wss'],
+        authEndpoint: '/broadcasting/auth',
+        auth: { headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+        }},
+    });
+    p.connection.bind('state_change', s => dbg('ws:' + s.current));
+    channel = p.subscribe('private-' + channelName);
 
-    channel.subscribed(() => { dbg('channel subscribed'); if (!CAN_SHARE) showMobileHostNotice(); else setStatus('Waiting for viewer…', 'bc-badge-amber'); });
+    const subTimeout = setTimeout(() => {
+        if (!channel.subscribed) { setStatus('Signaling timeout — reload', 'bc-badge-red'); dbg('subscribe timeout'); }
+    }, 20000);
 
-    channel.listenForWhisper('join-request', (m) => {
+    channel.bind('pusher:subscription_succeeded', () => {
+        clearTimeout(subTimeout);
+        dbg('channel subscribed');
+        if (!CAN_SHARE) showMobileHostNotice(); else setStatus('Waiting for viewer…', 'bc-badge-amber');
+    });
+    channel.bind('pusher:subscription_error', () => {
+        clearTimeout(subTimeout);
+        setStatus('Channel auth failed — reload', 'bc-badge-red');
+        dbg('subscription_error');
+    });
+
+    channel.bind('client-join-request', (m) => {
         dbg('join-request received');
         if (!CAN_SHARE) { showMobileHostNotice(); whisper('join-reject', { reason: 'device' }); return; }
         document.getElementById('joinName').textContent = m.name || 'Someone';
         document.getElementById('joinRequest').classList.remove('hidden');
         setStatus('Join request', 'bc-badge-amber');
     });
-    channel.listenForWhisper('signal', (m) => { dbg('signal: ' + (m.kind || '?')); onSignal(m); });
-    channel.listenForWhisper('end', () => {
+    channel.bind('client-signal', (m) => { dbg('signal: ' + (m.kind || '?')); onSignal(m); });
+    channel.bind('client-end', () => {
         setStatus('Viewer disconnected', 'bc-badge-amber');
         if (pc) { pc.close(); pc = null; }
     });
-    channel.error((e) => { console.error(e); setStatus('Channel auth failed', 'bc-badge-red'); });
 }
 
 document.getElementById('acceptBtn').addEventListener('click', () => {
@@ -200,10 +228,6 @@ document.getElementById('endBtn').addEventListener('click', async () => {
 
 window.addEventListener('beforeunload', () => { whisper('end', {}); if (pc) pc.close(); if (stream) stream.getTracks().forEach(t => t.stop()); });
 
-let tries = 0;
-const waitEcho = setInterval(() => {
-    if (window.Echo) { clearInterval(waitEcho); initChannel(); }
-    else if (++tries > 40) { clearInterval(waitEcho); setStatus('Realtime init failed — reload', 'bc-badge-red'); }
-}, 250);
+initChannel();
 </script>
 @endsection

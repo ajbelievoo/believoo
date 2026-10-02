@@ -34,7 +34,7 @@
                         </ul>
                         <div class="flex flex-wrap gap-3">
                             <a href="/downloads/BMyDesk-Agent-Setup-1.0.4.exe" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-windows mr-1"></i>Windows (Beta)</a>
-                            <a href="/downloads/BMyDesk-Agent-1.0.4.apk" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-android mr-1"></i>Android APK (Beta)</a>
+                            <a href="/downloads/BMyDesk-Agent-v1.0.5.apk" download class="bc-btn bc-btn-primary text-sm"><i class="fab fa-android mr-1"></i>Android APK (Beta)</a>
                             <a href="/downloads/BMyDesk-Agent-1.0.4-win.zip" download class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
                             <button class="bc-btn bc-btn-secondary text-sm opacity-60 cursor-not-allowed" title="Coming soon"><i class="fab fa-apple mr-1"></i>iOS (Soon)</button>
                         </div>

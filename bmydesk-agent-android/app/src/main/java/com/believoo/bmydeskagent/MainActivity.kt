@@ -44,7 +44,6 @@ class MainActivity : Activity() {
     private var waitingOfferSdp: String? = null
 
     // Viewer mode (Remote Desk — connect to another code)
-    private val vSignaling = SignalingClient()
     private var remoteViewer: RemoteViewer? = null
     private var remoteSurface: org.webrtc.SurfaceViewRenderer? = null
     private lateinit var remoteCodeInput: android.widget.EditText
@@ -348,7 +347,7 @@ class MainActivity : Activity() {
                     getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_token", null)
                 )
                 reg = r
-                ui { codeView.text = r.code; setStatus("Ready — share your code", "#22c55e"); spinner.visibility = View.GONE }
+                ui { codeView.text = r.code; setStatus("Connecting realtime…", "#f59e0b"); spinner.visibility = View.GONE }
                 connectSignaling(r)
             } catch (e: Exception) {
                 ui { codeView.text = "ERROR"; setStatus("Cannot reach server — retrying…", "#ef4444") }
@@ -359,8 +358,9 @@ class MainActivity : Activity() {
 
     private fun connectSignaling(r: AgentApi.Registration) {
         signaling.listener = object : SignalingClient.Listener {
-            override fun onConnected() {}
-            override fun onDisconnected() {}
+            override fun onConnected() { ui { setStatus("Realtime connected…", "#f59e0b") } }
+            override fun onDisconnected() { ui { setStatus("Realtime lost — reconnecting…", "#ef4444") } }
+            override fun onSubscribed() { ui { setStatus("Ready — share your code", "#22c55e") } }
             override fun onJoinRequest(name: String) {
                 ui { reqName.text = "$name wants to view this device"; reqBox.visibility = View.VISIBLE }
             }
@@ -448,16 +448,21 @@ class MainActivity : Activity() {
             viewerPane.visibility = View.VISIBLE
             viewerStatus.text = "Joining $code…"
         }
+        if (!signaling.isConnected) {
+            ui { viewerStatus.text = "Agent channel not ready yet — wait for \"Ready\" then retry" }
+            thread { Thread.sleep(2500); ui { exitViewer() } }
+            return
+        }
         thread {
             try {
                 val j = api.join(code)
                 vJoin = j
-                vSignaling.listener = object : SignalingClient.Listener {
+                signaling.connectViewer(j.channel, j.viewerToken, object : SignalingClient.Listener {
                     override fun onConnected() {}
-                    override fun onDisconnected() {}
+                    override fun onDisconnected() { ui { viewerStatus.text = "Signaling lost — retry" } }
                     override fun onJoinRequest(name: String) {}
                     override fun onSubscribed() {
-                        vSignaling.send("join-request", JsonObject().apply {
+                        signaling.sendViewer("join-request", JsonObject().apply {
                             addProperty("name", (android.os.Build.MODEL ?: "Android") + " (app)")
                         })
                         ui { viewerStatus.text = "Waiting for host approval…" }
@@ -472,8 +477,7 @@ class MainActivity : Activity() {
                     }
                     override fun onSignal(p: JsonObject) { remoteViewer?.onSignal(p) }
                     override fun onEnd() { ui { viewerStatus.text = "Host ended session"; thread { Thread.sleep(1200); ui { exitViewer() } } } }
-                }
-                vSignaling.connect(j.channel, j.viewerToken)
+                })
             } catch (e: Exception) {
                 ui { viewerStatus.text = "Join failed: ${e.message}"; }
                 thread { Thread.sleep(2500); ui { exitViewer() } }
@@ -484,7 +488,7 @@ class MainActivity : Activity() {
     private fun startViewerPeer(j: AgentApi.JoinResult) {
         remoteViewer = RemoteViewer(this).apply {
             listener = object : RemoteViewer.Listener {
-                override fun sendSignal(payload: JsonObject) = vSignaling.send("signal", payload)
+                override fun sendSignal(payload: JsonObject) = signaling.sendViewer("signal", payload)
                 override fun onPeerConnected() = ui { viewerStatus.text = "Connected — touch to control" }
                 override fun onPeerDisconnected() = ui { viewerStatus.text = "Disconnected" }
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
@@ -534,9 +538,9 @@ class MainActivity : Activity() {
     }
 
     private fun exitViewer() {
-        runCatching { vSignaling.send("end", JsonObject()) }
+        runCatching { signaling.sendViewer("end", JsonObject()) }
         remoteViewer?.stop(); remoteViewer = null
-        vSignaling.disconnect()
+        signaling.disconnectViewer()
         runCatching { remoteSurface?.release() }
         viewerPane.visibility = View.GONE
     }

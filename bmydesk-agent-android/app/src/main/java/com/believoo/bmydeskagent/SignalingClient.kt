@@ -10,7 +10,11 @@ import com.pusher.client.channel.PusherEvent
 import com.pusher.client.connection.ConnectionEventListener
 import com.pusher.client.connection.ConnectionState
 import com.pusher.client.connection.ConnectionStateChange
-import com.pusher.client.util.HttpChannelAuthorizer
+import com.pusher.client.ChannelAuthorizer
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Reverb (Pusher-protocol) signaling for the agent — mirrors the Electron
@@ -38,24 +42,45 @@ class SignalingClient(
     private val gson = Gson()
     private var pusher: Pusher? = null
     private var channel: PrivateChannel? = null
+    // second subscription on the SAME ws connection (viewer channel)
+    private var viewerChannel: PrivateChannel? = null
+    private val channelTokens = ConcurrentHashMap<String, String>()
+    @Volatile var isConnected = false; private set
     var listener: Listener? = null
 
-    fun connect(channelName: String, agentToken: String) {
-        val authorizer = HttpChannelAuthorizer(authEndpoint).apply {
-            setHeaders(mutableMapOf("Authorization" to "Bearer $agentToken"))
+    // Per-channel token authorizer — one ws connection carries both the host
+    // channel (agent_token) and a joined viewer channel (viewer_token).
+    private inner class MapAuthorizer : ChannelAuthorizer {
+        override fun authorize(channelName: String, socketId: String): String {
+            val token = channelTokens[channelName] ?: return "{}"
+            val c = URL(authEndpoint).openConnection() as HttpURLConnection
+            return try {
+                c.requestMethod = "POST"
+                c.setRequestProperty("Content-Type", "application/json")
+                c.setRequestProperty("Accept", "application/json")
+                c.doOutput = true
+                val body = """{"socket_id":"$socketId","channel_name":"$channelName","agent_token":"$token"}"""
+                OutputStreamWriter(c.outputStream).use { it.write(body) }
+                c.inputStream.bufferedReader().readText()
+            } catch (e: Exception) { "{}" } finally { c.disconnect() }
         }
+    }
+
+    fun connect(channelName: String, agentToken: String) {
+        if (pusher != null) { runCatching { pusher?.disconnect() }; pusher = null; channel = null; viewerChannel = null }
+        channelTokens[if (channelName.startsWith("private-")) channelName else "private-$channelName"] = agentToken
         val opts = PusherOptions()
             .setHost(wsHost)
             .setWssPort(wssPort)
             .setEncrypted(true)
-            .setChannelAuthorizer(authorizer)
+            .setChannelAuthorizer(MapAuthorizer())
 
         pusher = Pusher(appKey, opts)
         pusher!!.connect(object : ConnectionEventListener {
             override fun onConnectionStateChange(change: ConnectionStateChange) {
                 when (change.currentState) {
-                    ConnectionState.CONNECTED -> listener?.onConnected()
-                    ConnectionState.DISCONNECTED -> listener?.onDisconnected()
+                    ConnectionState.CONNECTED -> { isConnected = true; listener?.onConnected() }
+                    ConnectionState.DISCONNECTED -> { isConnected = false; listener?.onDisconnected() }
                     else -> {}
                 }
             }
@@ -76,8 +101,46 @@ class SignalingClient(
                 }
             }
             override fun onSubscriptionSucceeded(channelName: String?) { listener?.onSubscribed() }
-            override fun onAuthenticationFailure(message: String?, e: Exception?) {}
+            override fun onAuthenticationFailure(message: String?, e: Exception?) {
+                isConnected = false
+                listener?.onDisconnected()
+            }
         })
+    }
+
+    /**
+     * Subscribe a viewer channel on the SAME ws connection (multiplexed) —
+     * avoids a second socket which some networks/proxies throttle.
+     */
+    fun connectViewer(channelName: String, viewerToken: String, viewerListener: Listener) {
+        val p = pusher ?: run { viewerListener.onDisconnected(); return }
+        val full = if (channelName.startsWith("private-")) channelName else "private-$channelName"
+        channelTokens[full] = viewerToken
+        runCatching { p.unsubscribe(full) }
+        viewerChannel = p.subscribePrivate(full, object : PrivateChannelEventListener {
+            override fun onEvent(event: PusherEvent) {
+                val data = gson.fromJson(event.data ?: "{}", JsonObject::class.java)
+                when (event.eventName) {
+                    "client-join-accept" -> viewerListener.onJoinAccept()
+                    "client-join-reject" -> viewerListener.onJoinReject()
+                    "client-signal" -> viewerListener.onSignal(data)
+                    "client-end" -> viewerListener.onEnd()
+                }
+            }
+            override fun onSubscriptionSucceeded(channelName: String?) { viewerListener.onSubscribed() }
+            override fun onAuthenticationFailure(message: String?, e: Exception?) { viewerListener.onDisconnected() }
+        })
+    }
+
+    fun sendViewer(event: String, payload: JsonObject) {
+        runCatching { viewerChannel?.trigger("client-$event", gson.toJson(payload)) }
+    }
+
+    fun disconnectViewer() {
+        runCatching {
+            viewerChannel?.let { pusher?.unsubscribe(it.name) }
+        }
+        viewerChannel = null
     }
 
     fun send(event: String, payload: JsonObject) {
@@ -85,7 +148,8 @@ class SignalingClient(
     }
 
     fun disconnect() {
+        isConnected = false
         runCatching { pusher?.disconnect() }
-        pusher = null; channel = null
+        pusher = null; channel = null; viewerChannel = null
     }
 }

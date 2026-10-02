@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request as RequestFacade;
+use Illuminate\Support\Str;
 
 class AuditService
 {
@@ -80,7 +81,7 @@ class AuditService
             'auditable_type' => $auditable ? get_class($auditable) : null,
             'auditable_id' => $auditable?->getKey(),
             'route' => $request->route()?->getName(),
-            'url' => $request->fullUrl(),
+            'url' => Str::limit($request->fullUrl(), 255, ''),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'old_values' => self::redact($oldValues),
