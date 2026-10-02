@@ -15,10 +15,20 @@ android {
         versionName "1.0.4"
     }
 
+    signingConfigs {
+        release {
+            storeFile file("bmydesk-release.keystore")
+            storePassword "bmydesk123"
+            keyAlias "bmydesk"
+            keyPassword "bmydesk123"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             shrinkResources false
+            signingConfig signingConfigs.release
         }
         debug {
             applicationIdSuffix ".debug"
