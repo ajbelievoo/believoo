@@ -60,7 +60,11 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <button class="btn" id="joinBtn">Connect</button>
         <div class="err" id="joinErr"></div>
         <div class="dbg" id="joinDbg"></div>
-        <a class="login-link" href="{{ route('bconnect.login') }}">Have a BMyDesk account? Sign in for the full workspace →</a>
+        @auth
+            <a class="login-link" href="{{ route('bconnect.remote.connect') }}" style="color:var(--cyan)">You're signed in — open the workspace Remote Desk →</a>
+        @else
+            <a class="login-link" href="{{ route('bconnect.login') }}">Have a BMyDesk account? Sign in for the full workspace →</a>
+        @endauth
     </div>
 </div>
 

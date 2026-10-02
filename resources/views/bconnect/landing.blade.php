@@ -67,8 +67,12 @@
             </div>
             <div class="flex items-center gap-3">
                 <a href="{{ route('bconnect.remote.guest') }}" class="text-sm font-bold text-brand hover:underline">Remote Access</a>
-                <a href="{{ route('bconnect.login') }}" class="text-sm font-semibold text-slate-700 hover:text-brand">Log in</a>
-                <a href="{{ route('bconnect.register') }}" class="px-5 py-2.5 text-sm font-bold text-white btn-gradient rounded-full transition shadow-lg shadow-rose-500/30">Get Started Free</a>
+                @auth
+                    <a href="{{ route('bconnect.dashboard') }}" class="px-5 py-2.5 text-sm font-bold text-white btn-gradient rounded-full transition shadow-lg shadow-rose-500/30"><i class="fas fa-th-large mr-1"></i>Dashboard</a>
+                @else
+                    <a href="{{ route('bconnect.login') }}" class="text-sm font-semibold text-slate-700 hover:text-brand">Log in</a>
+                    <a href="{{ route('bconnect.register') }}" class="px-5 py-2.5 text-sm font-bold text-white btn-gradient rounded-full transition shadow-lg shadow-rose-500/30">Get Started Free</a>
+                @endauth
             </div>
         </div>
     </div>
@@ -89,8 +93,13 @@
             Bmydesk unifies video conferencing, remote desktop, bug tracking, AI summaries, client billing and real-time team chat — built for IT companies, developers and global clients.
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-4">
-            <a href="{{ route('bconnect.register') }}" class="px-8 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Start Free Workspace</a>
-            <a href="{{ route('bconnect.login') }}" class="px-8 py-4 text-lg font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition">Login to Dashboard</a>
+            @auth
+                <a href="{{ route('bconnect.dashboard') }}" class="px-8 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30"><i class="fas fa-th-large mr-2"></i>Open Dashboard</a>
+                <a href="{{ route('bconnect.remote') }}" class="px-8 py-4 text-lg font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition"><i class="fas fa-desktop mr-2"></i>Remote Desktop</a>
+            @else
+                <a href="{{ route('bconnect.register') }}" class="px-8 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Start Free Workspace</a>
+                <a href="{{ route('bconnect.login') }}" class="px-8 py-4 text-lg font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition">Login to Dashboard</a>
+            @endauth
         </div>
 
         <!-- Remote Desktop Access — public quick connect, no login needed -->
@@ -108,6 +117,14 @@
                         class="flex-1 min-w-0 text-center text-xl font-mono tracking-[0.3em] uppercase bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-cyan-300 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
                     <button type="submit" class="px-6 py-3 font-bold text-white btn-gradient rounded-xl shadow-lg shadow-rose-500/30 whitespace-nowrap">Connect <i class="fas fa-arrow-right ml-1"></i></button>
                 </form>
+                <div class="mt-5 pt-4 border-t border-slate-700/60">
+                    <p class="text-[11px] text-slate-500 mb-3"><i class="fas fa-download mr-1"></i>Hosting a session? Get the agent — shows your permanent code &amp; shares your screen:</p>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="/downloads/BMyDesk-Agent-Setup-1.0.8.exe" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows</a>
+                        <a href="/downloads/BMyDesk-Agent-v1.0.8.apk" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android</a>
+                        <a href="/downloads/BMyDesk-Agent-1.0.8-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -326,7 +343,11 @@
     <div class="max-w-4xl mx-auto px-4 text-center">
         <h2 class="text-3xl lg:text-5xl font-extrabold mb-6">Ready to unify your IT workflow?</h2>
         <p class="text-slate-400 mb-10 text-lg">Join companies already using Bmydesk to ship faster and support clients better.</p>
-        <a href="{{ route('bconnect.register') }}" class="inline-block px-10 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Create Free Workspace</a>
+        @auth
+            <a href="{{ route('bconnect.dashboard') }}" class="inline-block px-10 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Open Dashboard</a>
+        @else
+            <a href="{{ route('bconnect.register') }}" class="inline-block px-10 py-4 text-lg font-bold text-white btn-gradient rounded-full transition shadow-xl shadow-rose-500/30">Create Free Workspace</a>
+        @endauth
     </div>
 </section>
 
@@ -341,8 +362,12 @@
         </div>
         <div class="flex gap-6 text-slate-600">
             <a href="https://believoo.com" class="hover:text-brand">Believoo.com</a>
-            <a href="{{ route('bconnect.login') }}" class="hover:text-brand">Login</a>
-            <a href="{{ route('bconnect.register') }}" class="hover:text-brand">Register</a>
+            @auth
+                <a href="{{ route('bconnect.dashboard') }}" class="hover:text-brand">Dashboard</a>
+            @else
+                <a href="{{ route('bconnect.login') }}" class="hover:text-brand">Login</a>
+                <a href="{{ route('bconnect.register') }}" class="hover:text-brand">Register</a>
+            @endauth
         </div>
     </div>
 </footer>
