@@ -93,14 +93,17 @@ ipcMain.handle('select-screen-source', (_e, id) => { pickedSourceId = id; return
 
 app.whenReady().then(() => {
     session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
-        try {
-            const sources = await desktopCapturer.getSources({ types: ['screen'] });
-            const src = sources.find(s => s.id === pickedSourceId) || sources[0];
-            if (src) callback({ video: src, audio: false });
-            else callback({});
-        } catch (e) {
-            callback({});
+        for (let i = 0; i < 2; i++) {
+            try {
+                const sources = await desktopCapturer.getSources({ types: ['screen'] });
+                const src = sources.find(s => s.id === pickedSourceId) || sources[0];
+                if (src) { callback({ video: src, audio: false }); return; }
+            } catch (e) {
+                console.error('[agent] getSources in displayMedia handler:', e.message);
+            }
+            await new Promise(r => setTimeout(r, 400));
         }
+        callback({});
     });
 });
 

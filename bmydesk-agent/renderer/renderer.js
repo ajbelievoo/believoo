@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.0.9';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -269,18 +269,23 @@ async function pickScreen() {
 
 async function captureScreen(sourceId) {
     try { await window.agent.selectScreenSource(sourceId); } catch (e) {}
-    try {
+    const attempts = [
         // modern path — setDisplayMediaRequestHandler in main supplies the source
-        stream = await navigator.mediaDevices.getDisplayMedia({
-            video: { frameRate: { ideal: 30, max: 30 } }, audio: false,
-        });
-    } catch (e) {
-        // legacy fallback (older Electron)
-        stream = await navigator.mediaDevices.getUserMedia({
+        () => navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: false }),
+        // retry without constraints — some drivers reject frameRate
+        () => navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }),
+        // legacy desktop-capture path (older Electron)
+        () => navigator.mediaDevices.getUserMedia({
             audio: false,
             video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
-        });
+        }),
+    ];
+    let lastErr = null;
+    for (const fn of attempts) {
+        try { stream = await fn(); lastErr = null; break; }
+        catch (e) { lastErr = e; hdbg('capture try: ' + (e.name || '?') + ' ' + (e.message || '').slice(0, 60)); }
     }
+    if (lastErr) throw lastErr;
     stream.getVideoTracks()[0].contentHint = 'detail';
 }
 
@@ -290,7 +295,7 @@ async function handleOffer(m) {
     offering = true;
     try {
         const sourceId = await pickScreen();
-        if (!sourceId) { hostSignal({ kind: 'end' }); offering = false; return; }
+        if (!sourceId) { hdbg('no screen sources found'); setStatus('No screen to share', 'off'); hostSignal({ kind: 'end' }); offering = false; return; }
         await captureScreen(sourceId);
 
         pc = new RTCPeerConnection(pcConfig);
@@ -323,6 +328,7 @@ async function handleOffer(m) {
     } catch (e) {
         console.error(e);
         setStatus('Could not capture screen', 'off');
+        hdbg('CAPTURE FAIL: ' + (e.name || '?') + ' — ' + (e.message || 'unknown'));
         hostSignal({ kind: 'end' });
     }
     offering = false;

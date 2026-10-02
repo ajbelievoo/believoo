@@ -120,9 +120,9 @@
                 <div class="mt-5 pt-4 border-t border-slate-700/60">
                     <p class="text-[11px] text-slate-500 mb-3"><i class="fas fa-download mr-1"></i>Hosting a session? Get the agent — shows your permanent code &amp; shares your screen:</p>
                     <div class="flex flex-wrap gap-2">
-                        <a href="/downloads/BMyDesk-Agent-Setup-1.0.8.exe" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows</a>
-                        <a href="/downloads/BMyDesk-Agent-v1.0.8.apk" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android</a>
-                        <a href="/downloads/BMyDesk-Agent-1.0.8-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                        <a href="/downloads/BMyDesk-Agent-Setup-1.0.9.exe" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows</a>
+                        <a href="/downloads/BMyDesk-Agent-v1.0.9.apk" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android</a>
+                        <a href="/downloads/BMyDesk-Agent-1.0.9-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
                     </div>
                 </div>
             </div>
