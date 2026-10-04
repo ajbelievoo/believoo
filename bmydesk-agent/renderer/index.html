@@ -81,7 +81,11 @@
     <div class="code-card">
         <div class="label">Your Session Code</div>
         <div class="code" id="code">— — —</div>
-        <div style="margin-top:4px;"><a href="#" id="newCodeLink" style="font-size:10px;color:#475569;text-decoration:none;">↻ new code</a></div>
+        <div style="margin-top:4px;">
+            <a href="#" id="newCodeLink" style="font-size:10px;color:#475569;text-decoration:none;">↻ new code</a>
+            <span style="color:#334155;font-size:10px;"> · </span>
+            <a href="#" id="pinLink" style="font-size:10px;color:#475569;text-decoration:none;">🔒 unattended access</a>
+        </div>
         <div class="status"><span class="dot" id="dot"></span><span id="statusText">Registering…</span></div>
         <div id="hostDebug" style="font-size:10px;color:#475569;font-family:monospace;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
 
@@ -102,6 +106,10 @@
             <input class="code-input" id="remoteCode" maxlength="8" placeholder="ABC123XY" autocomplete="off" spellcheck="false">
             <button class="btn-connect" id="connectBtn">Connect</button>
         </div>
+        <div class="row" style="margin-top:8px;">
+            <input class="code-input" id="remotePin" maxlength="12" placeholder="PIN (optional — unattended access)" inputmode="numeric" style="font-size:14px;letter-spacing:2px;text-align:center;padding:8px;">
+        </div>
+        <div id="recentRow" class="hidden" style="margin-top:10px;text-align:left;"></div>
     </div>
 
     <div id="loginArea">
@@ -133,7 +141,7 @@
         <div class="viewer-overlay" id="viewerOverlay"><div>Connecting to remote device…</div></div>
     </div>
 
-    <div class="foot">BMyDesk Agent <span id="verFoot">v1.0.9</span> · <span id="verNote">your code is permanent — tap ↻ for a new one</span></div>
+    <div class="foot">BMyDesk Agent <span id="verFoot">v1.1.0</span> · <span id="verNote">your code is permanent — tap ↻ for a new one</span></div>
 </div>
 <script src="../node_modules/pusher-js/dist/web/pusher.min.js"></script>
 <script>

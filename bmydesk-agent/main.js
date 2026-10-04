@@ -20,6 +20,27 @@ function loadNut() {
 
 let win = null;
 
+// Auto-update (electron-updater, generic feed on /downloads) — latest.yml is
+// published next to the installer; the app checks on launch + every 4 h.
+function wireAutoUpdate() {
+    let autoUpdater;
+    try { autoUpdater = require('electron-updater').autoUpdater; }
+    catch (e) { console.warn('[agent] updater unavailable:', e.message); return; }
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    const send = (evt, data) => { try { win?.webContents.send('agent-update', { evt, ...data }); } catch (e) {} };
+    autoUpdater.on('checking-for-update', () => send('checking'));
+    autoUpdater.on('update-available', (i) => send('available', { version: i.version }));
+    autoUpdater.on('update-not-available', () => send('none'));
+    autoUpdater.on('download-progress', (p) => send('progress', { percent: Math.round(p.percent) }));
+    autoUpdater.on('update-downloaded', (i) => send('downloaded', { version: i.version }));
+    autoUpdater.on('error', (e) => send('error', { message: String(e.message || e) }));
+    ipcMain.on('update-install', () => autoUpdater.quitAndInstall());
+    autoUpdater.checkForUpdates().catch(() => {});
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 3600 * 1000);
+}
+app.whenReady().then(() => { if (gotLock) wireAutoUpdate(); });
+
 // ── bmydesk:// deep links (Google sign-in token handoff, etc.) ────
 function deliverDeepLink(url) {
     try {

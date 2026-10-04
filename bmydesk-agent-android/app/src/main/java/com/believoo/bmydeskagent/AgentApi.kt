@@ -24,6 +24,7 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         val channel: String,
         val expiresAt: String?,
         val iceServers: com.google.gson.JsonArray?,
+        val autoAccepted: Boolean = false,
     )
 
     fun register(hostName: String, os: String = "android", memberToken: String? = null, deviceId: String? = null): Registration {
@@ -69,11 +70,20 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         }
     }
 
-    data class JoinResult(val viewerToken: String, val channel: String, val hostLabel: String?, val iceServers: com.google.gson.JsonArray?)
+    data class JoinResult(
+        val viewerToken: String,
+        val channel: String,
+        val hostLabel: String?,
+        val iceServers: com.google.gson.JsonArray?,
+        val autoAccepted: Boolean = false,
+    )
 
     /** Join another session as a viewer (agent-to-agent remote). Throws on error. */
-    fun join(code: String): JoinResult {
-        val req = Request.Builder().url("$base/$code/join").post("{}".toRequestBody(json)).build()
+    fun join(code: String, pin: String? = null): JoinResult {
+        val body = mutableMapOf<String, String>()
+        pin?.takeIf { it.isNotBlank() }?.let { body["pin"] = it }
+        val req = Request.Builder().url("$base/$code/join")
+            .post(gson.toJson(body).toRequestBody(json)).build()
         http.newCall(req).execute().use { res ->
             val obj = gson.fromJson(res.body!!.string(), JsonObject::class.java)
             if (!obj.get("ok").asBoolean) throw RuntimeException(obj.get("error")?.asString ?: "join failed")
@@ -82,8 +92,21 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
                 channel = obj.get("channel").asString,
                 hostLabel = obj.get("host_label")?.asString,
                 iceServers = obj.getAsJsonArray("ice_servers"),
+                autoAccepted = obj.get("auto_accepted")?.asBoolean == true,
             )
         }
+    }
+
+    /** Set/clear the unattended-access PIN for this device (empty = remove). */
+    fun setPin(code: String, token: String, pin: String): Boolean {
+        val req = Request.Builder().url("$base/$code/set-pin")
+            .post(gson.toJson(mapOf("pin" to pin)).toRequestBody(json))
+            .header("Authorization", "Bearer $token").build()
+        return runCatching {
+            http.newCall(req).execute().use {
+                gson.fromJson(it.body!!.string(), JsonObject::class.java).get("ok").asBoolean
+            }
+        }.getOrDefault(false)
     }
 
     /** HTTP fallback accept/reject — server broadcasts the client-event. */

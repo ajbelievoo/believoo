@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private var remoteViewer: RemoteViewer? = null
     private var remoteSurface: org.webrtc.SurfaceViewRenderer? = null
     private lateinit var remoteCodeInput: android.widget.EditText
+    private lateinit var remotePinInput: android.widget.EditText
     private lateinit var viewerPane: android.widget.FrameLayout
     private lateinit var viewerStatus: TextView
 
@@ -160,6 +161,30 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    // Unattended access — let trusted viewers connect with code+PIN, no
+    // approval needed. Empty entry removes the PIN (approval required again).
+    private fun promptUnattendedPin() {
+        val code = reg?.code ?: return
+        val tok = reg?.agentToken ?: return
+        val input = android.widget.EditText(this).apply {
+            hint = "4-12 digit PIN (empty = remove)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Unattended access")
+            .setMessage("Viewers who know this device's code + PIN can connect without approval.")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val pin = input.text.toString().trim()
+                thread {
+                    val ok = api.setPin(code, tok, pin)
+                    ui { setStatus(if (ok) (if (pin.isBlank()) "Unattended access OFF" else "Unattended access ON") else "PIN update failed", if (ok && pin.isNotBlank()) "#22c55e" else "#f59e0b") }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // ── UI ─────────────────────────────────────────────────────────
@@ -286,6 +311,17 @@ class MainActivity : Activity() {
             setOnClickListener { connectRemote() }
         })
         remoteCard.addView(row)
+        remotePinInput = android.widget.EditText(this).apply {
+            hint = "PIN — only for unattended devices"
+            setTextColor(rose); textSize = 13f; typeface = Typeface.MONOSPACE
+            setHintTextColor(Color.parseColor("#475569"))
+            filters = arrayOf(android.text.InputFilter.LengthFilter(12))
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setPadding(20, 10, 20, 10)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
+            background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
+        }
+        remoteCard.addView(remotePinInput)
         col.addView(remoteCard)
 
         // ── Account: sign in with BMyDesk workspace credentials ──
@@ -337,6 +373,12 @@ class MainActivity : Activity() {
             text = "Viewer enters this code at\nbmydesk.believoo.com → Remote → Connect"
             setTextColor(Color.parseColor("#64748b")); textSize = 12f; gravity = Gravity.CENTER
             setPadding(0, 24, 0, 0)
+        })
+        col.addView(TextView(this).apply {
+            text = "🔒 Set unattended-access PIN"
+            setTextColor(Color.parseColor("#475569")); textSize = 12f; gravity = Gravity.CENTER
+            setPadding(0, 10, 0, 0)
+            setOnClickListener { promptUnattendedPin() }
         })
 
         endBtn = Button(this).apply {
@@ -575,8 +617,9 @@ class MainActivity : Activity() {
         }
         thread {
             try {
-                val j = api.join(code)
+                val j = api.join(code, remotePinInput.text.toString().trim().ifBlank { null })
                 vJoin = j
+                if (j.autoAccepted) { ui { viewerStatus.text = "Unattended access — starting stream…"; startViewerPeer(j) } }
                 signaling.viewerRelay = { payload -> thread { api.signal(code, j.viewerToken, payload) } }
                 startViewerPoll(j, code)
                 signaling.connectViewer(j.channel, j.viewerToken, object : SignalingClient.Listener {

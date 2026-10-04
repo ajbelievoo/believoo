@@ -11,8 +11,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.0.9';
-    const AGENT_LATEST_ANDROID = '1.0.8';
+    const AGENT_LATEST_WINDOWS = '1.1.0';
+    const AGENT_LATEST_ANDROID = '1.1.0';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -139,16 +139,38 @@ class AgentApiController extends Controller
     {
         $platform = strtolower((string) $r->query('platform', 'windows'));
         $latest = $platform === 'android' ? self::AGENT_LATEST_ANDROID : self::AGENT_LATEST_WINDOWS;
-        $base = 'https://bmydesk.believoo.com/downloads/';
-        $file = $platform === 'android'
-            ? 'BMyDesk-Agent-v' . $latest . '.apk'
-            : 'BMyDesk-Agent-Setup-' . $latest . '.exe';
+        // stable /dl/* URLs — proper MIME + never go stale
+        $url = 'https://bmydesk.believoo.com/dl/agent.' . ($platform === 'android' ? 'apk' : 'exe');
 
         return response()->json([
             'ok' => true,
             'latest' => $latest,
-            'url' => $base . $file,
+            'url' => $url,
         ]);
+    }
+
+    // POST /api/v1/bmydesk/agent/{code}/set-pin — set/clear the unattended-
+    // access PIN for this device. Stored keyed by device_id so it survives
+    // session-code regeneration.
+    public function setPin(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session)) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        if (!$session->device_id) {
+            return response()->json(['ok' => false, 'error' => 'no device id'], 422);
+        }
+        $pin = trim((string) $r->input('pin', ''));
+        if ($pin !== '' && !preg_match('/^[0-9]{4,12}$/', $pin)) {
+            return response()->json(['ok' => false, 'error' => 'PIN must be 4-12 digits'], 422);
+        }
+        \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->updateOrInsert(
+            ['device_id' => $session->device_id],
+            ['pin_hash' => $pin === '' ? null : \Illuminate\Support\Facades\Hash::make($pin),
+             'updated_at' => now(), 'created_at' => now()]
+        );
+        return response()->json(['ok' => true, 'pin_set' => $pin !== '']);
     }
 
     // POST /api/v1/bmydesk/agent/{code}/join — an agent app joining ANOTHER
@@ -179,6 +201,20 @@ class AgentApiController extends Controller
                 'viewer_token' => null, 'viewer_joined_at' => null, 'viewer_name' => null]);
         }
 
+        // Unattended access: a correct PIN skips host approval entirely.
+        $autoAccept = false;
+        $pin = (string) $r->input('pin', '');
+        if ($pin !== '' && $session->device_id) {
+            $pinHash = \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')
+                ->where('device_id', $session->device_id)->value('pin_hash');
+            if ($pinHash && \Illuminate\Support\Facades\Hash::check($pin, $pinHash)) {
+                $autoAccept = true;
+            } elseif ($pinHash) {
+                return response()->json(['ok' => false, 'error' => 'wrong PIN'], 403);
+            }
+            // device has no PIN set → fall through to normal approval flow
+        }
+
         // One viewer at a time: refuse if a viewer joined within the last 2 min
         if ($session->viewer_token && $session->viewer_joined_at
             && $session->viewer_joined_at->gt(now()->subMinutes(2))) {
@@ -192,8 +228,17 @@ class AgentApiController extends Controller
             'status' => $session->status === 'waiting' ? 'connecting' : $session->status,
         ]);
 
+        if ($autoAccept) {
+            $session->update(['status' => 'active']);
+            $payload = ['n' => (string) Str::random(10), 'at' => now()->toIso8601String(), 'unattended' => true];
+            \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
+                ->broadcast(['private-remote-agent.' . $session->session_code], 'client-join-accept', $payload);
+            $this->queueSignal($session->session_code, 'v', ['kind' => 'accept'] + $payload);
+        }
+
         return response()->json([
             'ok' => true,
+            'auto_accepted' => $autoAccept,
             'viewer_token' => $session->viewer_token,
             'channel' => 'private-remote-agent.' . $session->session_code,
             'host_label' => $session->host_label,
@@ -225,6 +270,9 @@ class AgentApiController extends Controller
             'ok' => true,
             'status' => $session->status,
             'viewer' => $session->viewer?->user?->name ?: $session->viewer_name,
+            'pin_set' => $session->device_id
+                ? (bool) \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->where('device_id', $session->device_id)->value('pin_hash')
+                : false,
             'viewer_joined_at' => $session->viewer_joined_at?->toIso8601String(),
             'expires_at' => $session->expires_at?->toIso8601String(),
         ]);

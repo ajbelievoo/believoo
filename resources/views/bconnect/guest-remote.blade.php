@@ -56,8 +56,10 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <p class="hint">Enter the code shown on the remote computer or phone running the BMyDesk Agent.</p>
         <input class="name-input" id="nameInput" maxlength="40" placeholder="Your name (optional)" autocomplete="name">
         <input class="code-input" id="codeInput" maxlength="8" placeholder="CODE" autocomplete="off" spellcheck="false" value="{{ $prefillCode ?? '' }}">
+        <input class="name-input" id="pinInput" maxlength="12" inputmode="numeric" placeholder="PIN — only for unattended devices" style="margin-top:10px;font-family:monospace;letter-spacing:3px">
         <br>
         <button class="btn" id="joinBtn">Connect</button>
+        <div id="recentRow" style="margin-top:12px;display:none;text-align:center;"></div>
         <div class="err" id="joinErr"></div>
         <div class="dbg" id="joinDbg"></div>
         @auth
@@ -124,13 +126,15 @@ async function join() {
     dbg('joining ' + code);
     const r = await fetch(API + '/' + code + '/join', { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ name: $('nameInput').value.trim() || 'Guest' }) }).catch(() => null);
+        body: JSON.stringify({ name: $('nameInput').value.trim() || 'Guest', pin: $('pinInput').value.trim() || undefined }) }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     if (!d.ok) {
         $('joinErr').textContent = d.error || 'Could not reach the device.';
         $('joinBtn').disabled = false;
         return;
     }
+    saveRecent(code);
+    if (d.auto_accepted) { setBadge('accepted'); setTimeout(() => startPeer(), 400); }
     CODE = code; VTOKEN = d.viewer_token; channelName = d.channel;
     window.__ice = d.ice_servers || [{ urls: 'stun:stun.l.google.com:19302' }];
     $('hostLabel').textContent = d.host_label || 'Remote device';
@@ -305,6 +309,22 @@ window.addEventListener('beforeunload', () => {
     try { fetch(API + '/' + CODE + '/signal', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'end', agent_token: VTOKEN, n: nonce() }) }); } catch (e) {}
 });
+// Recent codes — saved in this browser, one-tap fill.
+function recentCodes() { try { return JSON.parse(localStorage.getItem('bmydesk_recent') || '[]'); } catch (e) { return []; } }
+function saveRecent(code) {
+    const list = recentCodes().filter(c => c.code !== code);
+    list.unshift({ code, at: Date.now() });
+    localStorage.setItem('bmydesk_recent', JSON.stringify(list.slice(0, 6)));
+}
+function renderRecent() {
+    const list = recentCodes(), box = $('recentRow');
+    if (!list.length) return;
+    box.style.display = 'block';
+    box.innerHTML = '<span style="color:#475569;font-size:11px;">Recent: </span>' + list.map(c =>
+        `<a href="#" data-c="${c.code}" style="color:#22d3ee;font-size:11px;font-family:monospace;margin:0 6px;text-decoration:none;">${c.code}</a>`).join('');
+    box.querySelectorAll('a').forEach(a => a.onclick = e => { e.preventDefault(); $('codeInput').value = a.dataset.c; });
+}
+renderRecent();
 if ($('codeInput').value) dbg('code prefilled — press Connect');
 </script>
 </body>

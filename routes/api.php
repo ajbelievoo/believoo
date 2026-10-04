@@ -59,6 +59,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/login', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'login']);
         Route::post('/{code}/join', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'join']);
         Route::post('/{code}/respond', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'respond']);
+        Route::post('/{code}/set-pin', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'setPin']);
         Route::post('/{code}/signal', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signal']);
         Route::get('/{code}/signals', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signals']);
     });

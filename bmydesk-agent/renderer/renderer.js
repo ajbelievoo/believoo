@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.0.9';
+const APP_VERSION = '1.1.0';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -64,6 +64,26 @@ function checkUpdate() {
             }
         })
         .catch(() => {});
+}
+
+// electron-updater events — silent background download, banner prompts the
+// restart when ready. Falls back to the banner link above if the updater
+// isn't wired (dev builds).
+if (window.agent?.onUpdate) {
+    window.agent.onUpdate((d) => {
+        const b = $('updateBanner');
+        if (d.evt === 'available') {
+            $('updateText').textContent = 'Downloading update v' + d.version + '…';
+            b.classList.remove('hidden'); b.onclick = null;
+        } else if (d.evt === 'progress') {
+            $('updateText').textContent = 'Downloading update… ' + d.percent + '%';
+            b.classList.remove('hidden'); b.onclick = null;
+        } else if (d.evt === 'downloaded') {
+            $('updateText').textContent = 'v' + d.version + ' ready — click to restart & update';
+            b.classList.remove('hidden');
+            b.onclick = () => window.agent.installUpdate();
+        }
+    });
 }
 
 function require_os_name() {
@@ -291,7 +311,19 @@ async function captureScreen(sourceId) {
 
 let offering = false;
 async function handleOffer(m) {
-    if (pc || offering) return; // dup offer (ws + queue) — ignore
+    if (pc) {
+        // ICE restart / renegotiation from a reconnecting viewer — reuse the
+        // existing peer (and stream) instead of starting over.
+        try {
+            await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            hostSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
+            hdbg('re-answer sent');
+        } catch (e) { console.error('re-offer failed', e); }
+        return;
+    }
+    if (offering) return; // dup offer (ws + queue) — ignore
     offering = true;
     try {
         const sourceId = await pickScreen();
@@ -302,7 +334,8 @@ async function handleOffer(m) {
         pc.onicecandidate = (e) => { if (e.candidate) hostSignal({ kind: 'ice', candidate: e.candidate }); };
         pc.onconnectionstatechange = () => {
             if (pc.connectionState === 'connected') setStatus('Viewer connected — streaming', 'on');
-            if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) setStatus('Viewer lost', 'wait');
+            if (pc.connectionState === 'disconnected') setStatus('Viewer connection unstable…', 'wait');
+            if (['failed', 'closed'].includes(pc.connectionState)) { teardown('Viewer lost — ready for new connection'); }
         };
         pc.ondatachannel = (e) => {
             dcIn = e.channel;
@@ -386,10 +419,15 @@ async function connectToPartner() {
     try {
         const r = await fetch(API + '/' + code + '/join', {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: '{}',
+            body: JSON.stringify({
+                name: localStorage.getItem('bmydesk_member_name') || require_os_name(),
+                pin: ($('remotePin') && $('remotePin').value.trim()) || undefined,
+            }),
         });
         const d = await r.json();
         if (!d.ok) throw new Error(d.error || 'join failed');
+        saveRecent(code);
+        if (d.auto_accepted) vAutoAccepted = true;
         vJoinedCode = code;
         const vToken = d.viewer_token;
         if (Array.isArray(d.ice_servers) && d.ice_servers.length) pcConfig = { iceServers: d.ice_servers };
@@ -419,6 +457,7 @@ async function connectToPartner() {
     }
 }
 
+let vAutoAccepted = false;
 let vPoller = null;
 function startViewerPoll() {
     if (vPoller || !vJoinedCode) return;
@@ -438,6 +477,7 @@ function startViewerPoll() {
             const sd = await st.json();
             if (sd.ok && sd.status === 'rejected') { vStatus('Host declined the request'); exitViewer(2500); }
             else if (sd.ok && sd.status === 'ended') { vStatus('Session ended by host'); exitViewer(2000); }
+            else if (sd.ok && sd.status === 'active' && vAutoAccepted && !vPc) { vDbg('auto-accepted'); startViewerPeer(); }
         } catch (e) {}
     }, 2000);
 }
@@ -483,8 +523,11 @@ async function startViewerPeer() {
     vPc.onicecandidate = (e) => { if (e.candidate) viewerSignal({ kind: 'ice', candidate: e.candidate }); };
     vPc.onconnectionstatechange = () => {
         vDbg('rtc:' + vPc.connectionState);
-        if (vPc.connectionState === 'connected') vStatus('Connected');
-        if (vPc.connectionState === 'failed') vStatus('Connection failed — retry');
+        if (vPc.connectionState === 'connected') { vStatus('Connected'); vReconnectTries = 0; }
+        if (vPc.connectionState === 'failed') {
+            if (vReconnectTries++ < 3) { vStatus('Reconnecting…'); viewerReoffer(); }
+            else vStatus('Connection failed — retry');
+        }
         if (['disconnected', 'closed'].includes(vPc.connectionState)) vStatus('Disconnected');
     };
 
@@ -492,6 +535,19 @@ async function startViewerPeer() {
     await vPc.setLocalDescription(offer);
     viewerSignal({ kind: 'offer', sdp: vPc.localDescription.sdp });
     vDbg('offer sent');
+}
+
+// Auto-reconnect: on 'failed' re-offer with ICE restart — the session survives
+// a network hiccup without re-joining or a new host approval.
+let vReconnectTries = 0;
+async function viewerReoffer() {
+    if (!vPc) return;
+    try {
+        const offer = await vPc.createOffer({ iceRestart: true });
+        await vPc.setLocalDescription(offer);
+        viewerSignal({ kind: 'offer', sdp: vPc.localDescription.sdp });
+        vDbg('re-offer sent');
+    } catch (e) { console.error('reoffer', e); }
 }
 
 // Input capture on the remote video → host's DataChannel handler
@@ -537,6 +593,50 @@ const themeBtn = $('themeBtn');
 function applyTheme(t) { document.body.classList.toggle('light', t === 'light'); themeBtn.textContent = t === 'light' ? '☀' : '☾'; }
 themeBtn.onclick = () => { const t = document.body.classList.contains('light') ? 'dark' : 'light'; localStorage.setItem('bmydesk_theme', t); applyTheme(t); };
 applyTheme(localStorage.getItem('bmydesk_theme') || 'dark');
+
+// ── Recent devices — saved locally, one-tap reconnect ──────────
+function recentCodes() {
+    try { return JSON.parse(localStorage.getItem('bmydesk_recent') || '[]'); } catch (e) { return []; }
+}
+function saveRecent(code) {
+    const list = recentCodes().filter(c => c.code !== code);
+    list.unshift({ code, at: Date.now() });
+    localStorage.setItem('bmydesk_recent', JSON.stringify(list.slice(0, 6)));
+    renderRecent();
+}
+function renderRecent() {
+    const box = $('recentRow');
+    const list = recentCodes();
+    if (!list.length) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.innerHTML = '<span style="font-size:10px;color:#475569;">Recent: </span>' + list.map(c =>
+        `<a href="#" data-code="${c.code}" style="font-size:10px;color:#22d3ee;text-decoration:none;margin-right:10px;font-family:monospace;">${c.code}</a>`).join('');
+    box.querySelectorAll('a').forEach(a => a.onclick = (e) => {
+        e.preventDefault();
+        $('remoteCode').value = a.dataset.code;
+    });
+}
+renderRecent();
+
+// Unattended access — set a device PIN; viewers with code+PIN connect
+// without approval. PIN is stored server-side keyed by device_id.
+$('pinLink').onclick = async (e) => {
+    e.preventDefault();
+    if (!session) return;
+    const pin = prompt('Set unattended-access PIN (4-12 digits).\nLeave empty to REMOVE unattended access:', '');
+    if (pin === null) return;
+    if (pin !== '' && !/^[0-9]{4,12}$/.test(pin)) { setStatus('PIN must be 4-12 digits', 'off'); return; }
+    try {
+        const r = await fetch(`${API}/${session.session_code}/set-pin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+            body: JSON.stringify({ pin }),
+        });
+        const d = await r.json();
+        if (d.ok) setStatus(d.pin_set ? 'Unattended access ON' : 'Unattended access OFF', d.pin_set ? 'on' : 'wait');
+        else setStatus(d.error || 'PIN failed', 'off');
+    } catch (err) { setStatus('PIN update failed', 'off'); }
+};
 
 // Manual "new code" — clears the device identity so the next register mints
 // a fresh code. Without this, the code stays permanent (AnyDesk-style).
