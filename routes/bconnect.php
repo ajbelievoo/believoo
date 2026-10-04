@@ -25,6 +25,19 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     // Note: /downloads/* is served directly by nginx (public/downloads/) —
     // BMyDesk-Agent.apk / BMyDesk-Agent-Setup.exe are symlinks to the latest
     // builds so links never need version bumps.
+    // /dl/* routes stream through Laravel — needed for the APK's proper
+    // MIME so Android Chrome hands it to the package installer instead of
+    // failing a bare octet-stream fetch.
+    Route::get('/dl/agent.apk', function () {
+        $f = 'BMyDesk-Agent-v' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_ANDROID . '.apk';
+        return response()->download(public_path('downloads/' . $f), 'BMyDesk-Agent.apk', [
+            'Content-Type' => 'application/vnd.android.package-archive',
+        ]);
+    })->name('bconnect.dl.apk');
+    Route::get('/dl/agent.exe', function () {
+        $f = 'BMyDesk-Agent-Setup-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '.exe';
+        return response()->download(public_path('downloads/' . $f), 'BMyDesk-Agent-Setup.exe');
+    })->name('bconnect.dl.exe');
 });
 
 // Authenticated B-CONNECT workspace
