@@ -21,6 +21,7 @@ class RemoteViewer(context: Context) {
 
     var listener: Listener? = null
     private val gson = Gson()
+    val ctl = CtlChannel(gson)
 
     val egl: EglBase = EglBase.create()
     private val factory: PeerConnectionFactory
@@ -82,6 +83,7 @@ class RemoteViewer(context: Context) {
         val init = DataChannel.Init()
         init.ordered = false; init.maxRetransmits = 0
         dc = peer!!.createDataChannel("input", init)
+        ctl.attach(peer!!.createDataChannel("ctl", DataChannel.Init())) // reliable — chat/clip/file
 
         val constraints = MediaConstraints()
         constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
@@ -129,6 +131,7 @@ class RemoteViewer(context: Context) {
     }
 
     fun stop() {
+        ctl.close()
         runCatching { dc?.close() }
         runCatching { peer?.close() }
         dc = null; peer = null; remoteSet = false; iceQueue.clear()

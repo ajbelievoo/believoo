@@ -21,6 +21,7 @@ class WebRtcHost(context: Context) {
 
     var listener: Listener? = null
     private val gson = Gson()
+    val ctl = CtlChannel(gson)
 
     private val egl = EglBase.create()
     private val factory: PeerConnectionFactory
@@ -84,6 +85,7 @@ class WebRtcHost(context: Context) {
             override fun onAddStream(s: MediaStream?) {}
             override fun onRemoveStream(s: MediaStream?) {}
             override fun onDataChannel(dc: DataChannel) {
+                if (dc.label() == "ctl") { ctl.attach(dc); return }
                 dc.registerObserver(object : DataChannel.Observer {
                     override fun onBufferedAmountChange(p0: Long) {}
                     override fun onStateChange() {}
@@ -132,6 +134,7 @@ class WebRtcHost(context: Context) {
     }
 
     fun stop() {
+        ctl.close()
         runCatching { capturer?.stopCapture() }
         runCatching { peer?.close() }
         capturer = null; peer = null; remoteSet = false; iceQueue.clear()

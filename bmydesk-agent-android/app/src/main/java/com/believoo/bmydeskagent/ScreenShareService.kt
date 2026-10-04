@@ -28,6 +28,10 @@ class ScreenShareService : Service() {
         fun onConnected()      // viewer P2P established
         fun onDisconnected()
         fun onError(msg: String)
+        fun onCtlReady() {}
+        fun onChat(from: String, text: String) {}
+        fun onClip(text: String) {}
+        fun onFile(name: String, data: ByteArray) {}
     }
 
     var events: Events? = null
@@ -52,6 +56,7 @@ class ScreenShareService : Service() {
 
     fun setIce(list: List<PeerConnection.IceServer>) { iceServers = list }
     fun peer(): WebRtcHost? = host
+    fun ctl(): CtlChannel? = host?.ctl
 
     private fun startForegroundNotif() {
         val chanId = "bmydesk_share"
@@ -82,6 +87,12 @@ class ScreenShareService : Service() {
                 override fun onPeerConnected() { events?.onConnected() }
                 override fun onPeerDisconnected() { events?.onDisconnected() }
                 override fun onError(message: String) { events?.onError(message) }
+            }
+            h.ctl.sink = object : CtlChannel.Sink {
+                override fun onCtlOpen() { events?.onCtlReady() }
+                override fun onChat(from: String, text: String) { events?.onChat(from, text) }
+                override fun onClip(text: String) { events?.onClip(text) }
+                override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
             }
             h.startCapture(resultData, m.widthPixels, m.heightPixels, 15)
         }

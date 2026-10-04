@@ -51,14 +51,26 @@ class MainActivity : Activity() {
     private lateinit var viewerPane: android.widget.FrameLayout
     private lateinit var viewerStatus: TextView
 
+    // Session tools (chat + file) — shared by host + viewer modes
+    private lateinit var sessRow: LinearLayout
+    private lateinit var chatPanel: LinearLayout
+    private lateinit var chatLog: TextView
+    private lateinit var chatScroll: ScrollView
+    private lateinit var chatInput: android.widget.EditText
+    private var chatCount = 0
+
     private val conn = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             service = (binder as ScreenShareService.LocalBinder).service
             bound = true
             service?.events = object : ScreenShareService.Events {
-                override fun onConnected() = ui { setStatus("Viewer connected — sharing screen", "#22c55e") }
-                override fun onDisconnected() = ui { setStatus("Viewer disconnected", "#f59e0b") }
+                override fun onConnected() = ui { setStatus("Viewer connected — sharing screen", "#22c55e"); sessRow.visibility = View.VISIBLE }
+                override fun onDisconnected() = ui { setStatus("Viewer disconnected", "#f59e0b"); sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE }
                 override fun onError(msg: String) = ui { setStatus(msg, "#ef4444") }
+                override fun onCtlReady() = ui { sessRow.visibility = View.VISIBLE; startClipSync() }
+                override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
+                override fun onClip(text: String) = clipSet(text)
+                override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
             }
             service?.signaling = signaling
             service?.setIce(iceServersFrom(reg?.iceServers))
@@ -387,6 +399,19 @@ class MainActivity : Activity() {
         }
         col.addView(endBtn)
 
+        // in-session tools: chat + file send (visible while a viewer is connected)
+        sessRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            visibility = View.GONE; setPadding(0, 12, 0, 0)
+        }
+        sessRow.addView(Button(this).apply {
+            text = "💬 Chat"; setOnClickListener { toggleChat() }
+        })
+        sessRow.addView(Button(this).apply {
+            text = "📎 Send file"; setOnClickListener { pickFile() }
+        })
+        col.addView(sessRow)
+
         // ── Fullscreen viewer pane (remote screen + touch control) ──
         viewerPane = android.widget.FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK); visibility = View.GONE
@@ -401,11 +426,39 @@ class MainActivity : Activity() {
         }
         viewerStatus = TextView(this).apply { text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 12f }
         vBar.addView(viewerStatus, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        vSessRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
+        vSessRow.addView(Button(this).apply { text = "💬"; setOnClickListener { toggleChat() } })
+        vSessRow.addView(Button(this).apply { text = "📎"; setOnClickListener { pickFile() } })
+        vBar.addView(vSessRow)
         vBar.addView(Button(this).apply { text = "Disconnect"; setOnClickListener { exitViewer() } })
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP))
         frame.addView(viewerPane)
+
+        // Session chat panel — overlays bottom of whichever screen is up
+        chatPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#f20f172a")); setPadding(16, 10, 16, 10)
+        }
+        chatScroll = ScrollView(this)
+        chatLog = TextView(this).apply { setTextColor(Color.parseColor("#e2e8f0")); textSize = 13f }
+        chatScroll.addView(chatLog)
+        chatPanel.addView(chatScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        val chatRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        chatInput = android.widget.EditText(this).apply {
+            hint = "Message…"; setTextColor(Color.WHITE); textSize = 13f
+            setHintTextColor(Color.parseColor("#64748b")); setPadding(14, 8, 14, 8)
+            background = GradientDrawable().apply { setColor(Color.parseColor("#1e293b")); cornerRadius = 14f }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnEditorActionListener { _, _, _ -> sendChat(); true }
+        }
+        chatRow.addView(chatInput)
+        chatRow.addView(Button(this).apply { text = "Send"; setOnClickListener { sendChat() } })
+        chatPanel.addView(chatRow)
+        val chatH = (150 * resources.displayMetrics.density).toInt()
+        frame.addView(chatPanel, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT, chatH, Gravity.BOTTOM))
 
         col.addView(TextView(this).apply {
             text = "v" + BuildConfig.VERSION_NAME
@@ -415,6 +468,109 @@ class MainActivity : Activity() {
 
         setContentView(frame)
     }
+
+    private lateinit var vSessRow: LinearLayout
+
+    // ── Session tools: chat / file / clipboard (host + viewer share these) ──
+    private fun activeCtl(): CtlChannel? =
+        if (remoteViewer != null) remoteViewer?.ctl else service?.ctl()
+
+    private fun toggleChat() {
+        chatPanel.visibility = if (chatPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        chatCount = 0
+    }
+
+    private fun chatAppend(from: String, text: String, mine: Boolean) {
+        if (text.isBlank()) return
+        chatLog.append((if (mine) "You" else from) + ": " + text + "\n")
+        chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+        if (chatPanel.visibility != View.VISIBLE) {
+            chatCount++
+            if (from != "System") toast("💬 $from: ${text.take(60)}")
+        }
+    }
+
+    private fun sendChat() {
+        val t = chatInput.text.toString().trim(); if (t.isEmpty()) return
+        val me = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_name", null)
+            ?: (android.os.Build.MODEL ?: "Android")
+        activeCtl()?.sendChat(me, t)
+        chatAppend("You", t, true)
+        chatInput.setText("")
+    }
+
+    private fun pickFile() {
+        if (activeCtl()?.open() != true) { toast("No session — connect first"); return }
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+        }, 1002)
+    }
+
+    // Received file → Downloads (MediaStore, no permission needed on API 29+;
+    // app external dir on older). Viewer is also told via chat line.
+    private fun saveIncoming(name: String, data: ByteArray) {
+        thread { saveIncomingBg(name, data) }
+    }
+
+    private fun saveIncomingBg(name: String, data: ByteArray) {
+        val safe = name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "bmydesk-file" }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val v = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safe)
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v)
+                contentResolver.openOutputStream(uri!!)!!.use { it.write(data) }
+                v.clear(); v.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                contentResolver.update(uri, v, null, null)
+            } else {
+                val dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)!!
+                java.io.File(dir, safe).writeBytes(data)
+            }
+            ui { chatAppend("System", "Received: $safe (${data.size / 1024} KB) → Downloads", false) }
+        } catch (e: Exception) { ui { chatAppend("System", "File save failed: ${e.message}", false) } }
+        ui { toast("📎 Received $safe") }
+    }
+
+    // Clipboard: incoming clip → write local. Outgoing poll (foreground only —
+    // Android blocks background reads) → send on change.
+    private fun clipSet(text: String) {
+        if (text.isBlank()) return
+        ui {
+            runCatching {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("bmydesk", text))
+                lastClip = text
+            }
+            toast("📋 Clipboard synced")
+        }
+    }
+
+    private var lastClip = ""
+    private val clipHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val clipTick = object : Runnable {
+        override fun run() {
+            if (activeCtl()?.open() == true) {
+                runCatching {
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val t = cm.primaryClip?.getItemAt(0)?.text?.toString()
+                    if (!t.isNullOrEmpty() && t != lastClip && t.length < 100_000) {
+                        lastClip = t
+                        activeCtl()?.sendClip(t)
+                    }
+                }
+                clipHandler.postDelayed(this, 2500)
+            }
+        }
+    }
+    private fun startClipSync() {
+        clipHandler.removeCallbacks(clipTick)
+        lastClip = ""
+        clipHandler.postDelayed(clipTick, 2500)
+    }
+
+    private fun toast(t: String) = android.widget.Toast.makeText(this, t, android.widget.Toast.LENGTH_SHORT).show()
 
     private fun ui(block: () -> Unit) = runOnUiThread(block)
     private fun setStatus(t: String, color: String = "#94a3b8") {
@@ -515,6 +671,25 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1002) { // file picked → send over ctl channel
+            val uri = data?.data ?: return
+            thread {
+                try {
+                    val name = runCatching {
+                        contentResolver.query(uri, null, null, null, null)?.use { c ->
+                            val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (c.moveToFirst() && i >= 0) c.getString(i) else null
+                        }
+                    }.getOrNull() ?: "file"
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@thread
+                    if (bytes.size > 100 * 1024 * 1024) { ui { chatAppend("System", "File too large (max 100 MB)", false) }; return@thread }
+                    ui { chatAppend("System", "Sending $name (${bytes.size / 1024} KB)…", false) }
+                    activeCtl()?.sendFile(name, bytes)
+                    ui { chatAppend("System", "Sent: $name", false) }
+                } catch (e: Exception) { ui { chatAppend("System", "File send failed: ${e.message}", false) } }
+            }
+            return
+        }
         if (requestCode != 1001) return
         if (resultCode != RESULT_OK || data == null) {
             pendingProjection = false
@@ -565,6 +740,7 @@ class MainActivity : Activity() {
         runCatching { startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_STOP)) }
         runCatching { if (bound) unbindService(conn); bound = false }
         endBtn.visibility = View.GONE
+        sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
         setStatus("Session ended", "#f59e0b")
     }
 
@@ -660,6 +836,12 @@ class MainActivity : Activity() {
                 }
                 override fun onError(message: String) = ui { viewerStatus.text = message }
             }
+            ctl.sink = object : CtlChannel.Sink {
+                override fun onCtlOpen() = ui { vSessRow.visibility = View.VISIBLE; startClipSync() }
+                override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
+                override fun onClip(text: String) = clipSet(text)
+                override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
+            }
         }
         remoteViewer!!.start(iceServersFrom(j.iceServers))
     }
@@ -704,6 +886,7 @@ class MainActivity : Activity() {
         signaling.disconnectViewer()
         runCatching { remoteSurface?.release() }
         viewerPane.visibility = View.GONE
+        vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
     }
 
     override fun onDestroy() {
