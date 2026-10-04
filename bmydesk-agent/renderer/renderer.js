@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -338,6 +338,7 @@ async function handleOffer(m) {
             if (['failed', 'closed'].includes(pc.connectionState)) { teardown('Viewer lost — ready for new connection'); }
         };
         pc.ondatachannel = (e) => {
+            if (e.channel.label === 'ctl') { wireCtl(e.channel); return; }
             dcIn = e.channel;
             dcIn.onmessage = (ev) => {
                 try {
@@ -358,6 +359,7 @@ async function handleOffer(m) {
         iceQueue = [];
         $('endBtn').classList.remove('hidden');
         setStatus('Streaming screen…', 'on');
+        startClipSync();
     } catch (e) {
         console.error(e);
         setStatus('Could not capture screen', 'off');
@@ -367,7 +369,117 @@ async function handleOffer(m) {
     offering = false;
 }
 
+// ══ ctl channel — reliable/ordered: chat, clipboard, file transfer ══
+let ctl = null, rxFile = null, ctlPeer = 'peer';
+const FILE_CHUNK = 16384;
+
+function wireCtl(ch) {
+    ctl = ch;
+    ctl.onmessage = onCtlMessage;
+    ctl.onopen = () => $('sessBar')?.classList.remove('hidden');
+    ctl.onclose = () => { $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden'); };
+}
+function ctlSend(o) { if (ctl && ctl.readyState === 'open') { try { ctl.send(JSON.stringify(o)); } catch (e) {} } }
+
+async function onCtlMessage(e) {
+    try {
+        if (typeof e.data === 'string') {
+            const m = JSON.parse(e.data);
+            if (m.t === 'chat') { addChat(m.from || ctlPeer, m.text, false); }
+            else if (m.t === 'clip') { try { window.agent?.clipboardSet(m.text); } catch (x) {} }
+            else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
+        } else if (rxFile) {
+            rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
+            if (rxFile.got % (256 * 1024) < FILE_CHUNK) hdbg('rx ' + Math.round(rxFile.got / 1024) + 'K');
+            if (rxFile.got >= rxFile.size) await finishRxFile();
+        }
+    } catch (err) { console.warn('ctl msg', err); }
+}
+async function finishRxFile() {
+    const f = rxFile; rxFile = null;
+    const b64 = await blobToB64(new Blob(f.chunks));
+    if (window.agent?.saveFile) {
+        const p = await window.agent.saveFile(f.name, b64);
+        hdbg(p ? 'saved ' + f.name : 'save cancelled');
+        addChat('System', p ? 'File saved: ' + f.name : 'File receive cancelled', false);
+    }
+}
+function blobToB64(blob) {
+    return new Promise((res) => {
+        const rd = new FileReader();
+        rd.onload = () => res(String(rd.result).split(',')[1]);
+        rd.readAsDataURL(blob);
+    });
+}
+async function sendFile(buf, name) {
+    if (!ctl || ctl.readyState !== 'open') { setStatus('No session — connect first', 'wait'); return; }
+    ctlSend({ t: 'file-meta', name, size: buf.byteLength });
+    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
+        ctl.send(buf.slice(off, off + FILE_CHUNK));
+        if (off % (512 * 1024) < FILE_CHUNK) { hdbg('tx ' + Math.round(off / 1024) + 'K'); await new Promise(r => setTimeout(r, 0)); }
+    }
+    hdbg('sent ' + name);
+    addChat('System', 'Sent file: ' + name, false);
+}
+
+// ── Chat UI ──
+function addChat(from, text, mine) {
+    const box = $('chatMsgs');
+    if (!box) return;
+    const d = document.createElement('div');
+    d.style.cssText = 'margin:2px 0;padding:3px 0;';
+    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span></span>`;
+    d.children[1].textContent = text;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+    $('chatPanel').classList.remove('hidden');
+}
+$('chatSend').onclick = sendChat;
+$('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+function sendChat() {
+    const t = $('chatInput').value.trim();
+    if (!t) return;
+    ctlSend({ t: 'chat', from: (localStorage.getItem('bmydesk_member_name') || 'Me'), text: t });
+    addChat('Me', t, true);
+    $('chatInput').value = '';
+}
+$('chatToggle').onclick = () => $('chatPanel').classList.toggle('hidden');
+$('fileBtn').onclick = async () => {
+    if (window.agent?.pickFile) {
+        // host in-app send — main reads the file, we stream it
+        const f = await window.agent.pickFile().catch(() => null);
+        if (f) sendFile(b64ToBuf(f.data), f.name);
+    } else {
+        $('fileInput').click();
+    }
+};
+$('fileInput').onchange = async (e) => {
+    const f = e.target.files[0];
+    if (f) sendFile(await f.arrayBuffer(), f.name);
+    e.target.value = '';
+};
+function b64ToBuf(b64) {
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8.buffer;
+}
+
+// ── Clipboard sync ──
+let lastClip = '', clipTimer = null;
+function startClipSync() {
+    if (clipTimer || !window.agent?.clipboardGet) return;
+    clipTimer = setInterval(async () => {
+        try {
+            const t = await window.agent.clipboardGet();
+            if (t && t !== lastClip) { lastClip = t; ctlSend({ t: 'clip', text: t }); }
+        } catch (e) {}
+    }, 2000);
+}
+function stopClipSync() { if (clipTimer) { clearInterval(clipTimer); clipTimer = null; } }
+
 function teardown(msg) {
+    stopClipSync();
+    ctl = null; rxFile = null;
+    $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     $('reqBox').classList.add('hidden');
@@ -514,6 +626,7 @@ async function startViewerPeer() {
     vStatus('Accepted — starting stream…');
     vPc = new RTCPeerConnection(pcConfig);
     vDc = vPc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
+    wireCtl(vPc.createDataChannel('ctl')); // reliable — chat/clipboard/file
 
     vPc.ontrack = (e) => {
         $('remoteVideo').srcObject = e.streams[0];
@@ -576,12 +689,21 @@ function exitViewer(delay = 0) {
         stopViewerPoll();
         if (vPc) { try { vPc.close(); } catch (e) {} vPc = null; }
         vDc = null; vCh = null; vJoinedCode = null; vChanName = null; vChanToken = null;
+        ctl = null; rxFile = null; $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
         $('viewerPane').classList.add('hidden');
         $('remoteVideo').srcObject = null;
         window.agent.setViewMode(false);
     };
     delay ? setTimeout(doIt, delay) : doIt();
 }
+
+// Ctrl+C while viewing → send clipboard text to host (clipboard sync)
+document.addEventListener('keydown', async (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && ctl && ctl.readyState === 'open'
+        && window.agent?.clipboardGet && !$('viewerPane').classList.contains('hidden')) {
+        try { const t = await window.agent.clipboardGet(); if (t) ctlSend({ t: 'clip', text: t }); } catch (x) {}
+    }
+});
 
 $('connectBtn').addEventListener('click', connectToPartner);
 $('remoteCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') connectToPartner(); });

@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell, session } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell, session, dialog, clipboard } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 // nut-js is a native module; load lazily so the app still starts even if the
@@ -139,6 +140,24 @@ ipcMain.handle('open-external', async (_e, url) => {
         await shell.openExternal(url);
     }
 });
+
+// ── File transfer + clipboard (ctl channel) ─────────────────
+ipcMain.handle('pick-file', async () => {
+    const r = await dialog.showOpenDialog(win, { properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const p = r.filePaths[0];
+    const buf = fs.readFileSync(p);
+    if (buf.length > 30 * 1024 * 1024) throw new Error('file too large (30 MB max)');
+    return { name: path.basename(p), data: buf.toString('base64'), size: buf.length };
+});
+ipcMain.handle('save-file', async (_e, name, b64) => {
+    const r = await dialog.showSaveDialog(win, { defaultPath: name });
+    if (r.canceled || !r.filePath) return null;
+    fs.writeFileSync(r.filePath, Buffer.from(String(b64), 'base64'));
+    return r.filePath;
+});
+ipcMain.handle('clipboard-get', () => clipboard.readText());
+ipcMain.on('clipboard-set', (_e, t) => clipboard.writeText(String(t || '')));
 
 ipcMain.handle('get-display-size', async () => {
     const d = screen.getPrimaryDisplay();

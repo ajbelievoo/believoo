@@ -15,7 +15,10 @@
         <div class="flex gap-2 flex-wrap">
             <span id="inputBadge" class="bc-badge bc-badge-amber hidden"><i class="fas fa-keyboard mr-1"></i>Control enabled</span>
             @if(!$canControl)<span class="bc-badge bc-badge-cyan" title="Upgrade to Pro/Enterprise for mouse & keyboard control"><i class="fas fa-eye mr-1"></i>View only · upgrade for control</span>@endif
+            <button id="fileBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Send file"><i class="fas fa-paperclip mr-1"></i>File</button>
+            <button id="chatBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Chat"><i class="fas fa-comment mr-1"></i>Chat</button>
             <button id="fullscreenBtn" class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-expand mr-1"></i>Fullscreen</button>
+            <input type="file" id="fileInput" class="hidden">
             <button id="endSessionBtn" class="bc-btn bc-btn-danger text-sm"><i class="fas fa-phone-slash mr-1"></i>End</button>
         </div>
     </div>
@@ -27,6 +30,13 @@
                 <div class="w-14 h-14 mx-auto mb-4 rounded-full border-4 border-[var(--bc-border)] animate-spin" style="border-top-color:var(--bc-cyan);"></div>
                 <p class="font-bold mb-1" id="waitTitle">Waiting for host approval…</p>
                 <p class="text-xs text-slate-500" id="waitSub">The host will see your request and accept it.</p>
+            </div>
+        </div>
+        <div id="chatPanel" class="absolute right-0 top-0 bottom-0 w-72 bg-[var(--bc-card,#0f172a)]/95 border-l border-[var(--bc-border)] z-20 hidden flex-col">
+            <div id="chatMsgs" class="flex-1 overflow-y-auto p-3 text-sm"></div>
+            <div class="flex gap-2 p-2 border-t border-[var(--bc-border)]">
+                <input id="chatInput" placeholder="Message…" class="flex-1 bg-slate-800 border border-[var(--bc-border)] text-slate-200 px-3 py-2 rounded-lg text-sm outline-none">
+                <button id="chatSend" class="bc-btn bc-btn-primary text-sm">Send</button>
             </div>
         </div>
         <div id="clickHint" class="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/70 text-xs text-slate-300 hidden z-20">
@@ -158,6 +168,10 @@ async function startPeer() {
     };
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
+    dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
+    dc2.onopen = () => { $('fileBtn').classList.remove('hidden'); $('chatBtn').classList.remove('hidden'); };
+    dc2.onclose = () => { $('fileBtn').classList.add('hidden'); $('chatBtn').classList.add('hidden'); $('chatPanel').classList.add('hidden'); };
+    dc2.onmessage = onCtlMessage;
     dc.onopen = () => { if (CAN_CONTROL) document.getElementById('inputBadge').classList.remove('hidden'); };
     dc.onclose = () => document.getElementById('inputBadge').classList.add('hidden');
     dc.onmessage = (e) => {
@@ -207,6 +221,64 @@ async function onSignal(m) {
         }
     } catch (e) { console.error('signal error', e); }
 }
+
+// ══ ctl channel — reliable: chat, clipboard sync, file transfer ══
+let dc2 = null, rxFile = null;
+const FILE_CHUNK = 16384;
+function ctlSend(o) { if (dc2 && dc2.readyState === 'open') { try { dc2.send(JSON.stringify(o)); } catch (e) {} } }
+async function onCtlMessage(e) {
+    try {
+        if (typeof e.data === 'string') {
+            const m = JSON.parse(e.data);
+            if (m.t === 'chat') addChat(m.from || 'Remote', m.text, false);
+            else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
+            else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
+        } else if (rxFile) {
+            rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
+            if (rxFile.got >= rxFile.size) {
+                const f = rxFile; rxFile = null;
+                const url = URL.createObjectURL(new Blob(f.chunks));
+                const a = document.createElement('a'); a.href = url; a.download = f.name; a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                addChat('System', 'Saved ' + f.name, false);
+            }
+        }
+    } catch (err) {}
+}
+function addChat(from, text, mine) {
+    const box = $('chatMsgs'); if (!box) return;
+    const d = document.createElement('div');
+    d.style.cssText = 'margin:4px 0;';
+    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span style="color:#cbd5e1;"></span>`;
+    d.children[1].textContent = text;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+const $ = id => document.getElementById(id);
+$('chatSend').onclick = () => {
+    const t = $('chatInput').value.trim(); if (!t) return;
+    ctlSend({ t: 'chat', from: VIEWER, text: t });
+    addChat('Me', t, true); $('chatInput').value = '';
+};
+$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
+$('chatBtn').onclick = () => { $('chatPanel').classList.toggle('hidden'); $('chatPanel').classList.toggle('flex'); };
+$('fileBtn').onclick = () => $('fileInput').click();
+$('fileInput').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f || !dc2 || dc2.readyState !== 'open') return;
+    if (f.size > 30 * 1024 * 1024) { addChat('System', 'File too large (30 MB max)', false); return; }
+    const buf = await f.arrayBuffer();
+    ctlSend({ t: 'file-meta', name: f.name, size: buf.byteLength });
+    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
+        dc2.send(buf.slice(off, off + FILE_CHUNK));
+        if (off % (512 * 1024) < FILE_CHUNK) await new Promise(r => setTimeout(r, 0));
+    }
+    addChat('System', 'Sent ' + f.name, false);
+};
+document.addEventListener('keydown', async e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && dc2 && dc2.readyState === 'open') {
+        try { const t = await navigator.clipboard.readText(); if (t) ctlSend({ t: 'clip', text: t }); } catch (x) {}
+    }
+});
 
 // ── Input capture → DataChannel (Pro/Enterprise only) ─────────
 function sendInput(obj) {

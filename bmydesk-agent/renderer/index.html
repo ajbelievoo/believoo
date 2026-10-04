@@ -112,6 +112,19 @@
         <div id="recentRow" class="hidden" style="margin-top:10px;text-align:left;"></div>
     </div>
 
+    <div id="sessBar" class="hidden" style="position:fixed;top:10px;right:10px;z-index:60;display:flex;gap:6px;">
+        <button id="fileBtn" title="Send a file" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">📎</button>
+        <button id="chatToggle" title="Session chat" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">💬</button>
+    </div>
+    <div id="chatPanel" class="hidden" style="position:fixed;bottom:0;left:0;right:0;background:#0f172a;border-top:1px solid #1e293b;padding:8px;z-index:50;">
+        <div id="chatMsgs" style="max-height:110px;overflow-y:auto;font-size:12px;margin-bottom:6px;color:#e2e8f0;"></div>
+        <div style="display:flex;gap:6px;">
+            <input id="chatInput" placeholder="Message…" style="flex:1;background:#131c2e;border:1px solid #1e293b;color:#e2e8f0;padding:7px 10px;border-radius:8px;font-size:12px;outline:none;">
+            <button id="chatSend" style="background:#f43f5e;border:0;color:#fff;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">Send</button>
+        </div>
+    </div>
+    <input type="file" id="fileInput" class="hidden">
+
     <div id="loginArea">
         <p class="login-link" id="loginToggle">🔑 Sign in with your BMyDesk account</p>
         <div class="login-card hidden" id="loginCard">
@@ -141,7 +154,7 @@
         <div class="viewer-overlay" id="viewerOverlay"><div>Connecting to remote device…</div></div>
     </div>
 
-    <div class="foot">BMyDesk Agent <span id="verFoot">v1.1.0</span> · <span id="verNote">your code is permanent — tap ↻ for a new one</span></div>
+    <div class="foot">BMyDesk Agent <span id="verFoot">v1.2.0</span> · <span id="verNote">your code is permanent — tap ↻ for a new one</span></div>
 </div>
 <script src="../node_modules/pusher-js/dist/web/pusher.min.js"></script>
 <script>

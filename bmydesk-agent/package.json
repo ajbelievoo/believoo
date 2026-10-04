@@ -1,7 +1,7 @@
 {
     "name": "bmydesk-agent",
     "productName": "BMyDesk Agent",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "BMyDesk remote desktop agent \u2014 share your screen with a session code and allow remote control.",
     "main": "main.js",
     "scripts": {

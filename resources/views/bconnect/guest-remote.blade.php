@@ -76,7 +76,10 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <div style="display:flex;gap:8px;align-items:center;">
             <span class="badge" id="connBadge">connecting</span>
             <span class="badge" id="latBadge" style="display:none"><span id="latVal">—</span> ms</span>
+            <button class="endbtn" id="fileBtn" title="Send file" style="background:#1e293b;color:#e2e8f0;display:none;">📎</button>
+            <button class="endbtn" id="chatBtn" title="Chat" style="background:#1e293b;color:#e2e8f0;display:none;">💬</button>
             <button class="endbtn" id="endBtn">End session</button>
+            <input type="file" id="fileInput" style="display:none">
         </div>
     </div>
     <div class="stage-video">
@@ -89,6 +92,13 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             </div>
         </div>
         <div id="clickHint" style="display:none">Click the screen once to enable keyboard &amp; mouse — Esc to release.</div>
+        <div id="chatPanel" style="display:none;position:absolute;right:0;top:0;bottom:0;width:280px;background:rgba(15,23,42,.96);border-left:1px solid var(--border);z-index:8;flex-direction:column;">
+            <div id="chatMsgs" style="flex:1;overflow-y:auto;padding:12px;font-size:13px;"></div>
+            <div style="display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);">
+                <input id="chatInput" placeholder="Message…" style="flex:1;background:#0b1424;border:1px solid var(--border);color:var(--txt);padding:8px 10px;border-radius:8px;font-size:13px;outline:none;">
+                <button id="chatSend" style="background:var(--rose);border:0;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;">Send</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -233,6 +243,10 @@ async function startPeer() {
         if (['disconnected', 'closed'].includes(pc.connectionState)) setBadge('lost');
     };
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
+    dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
+    dc2.onopen = () => { $('fileBtn').style.display = 'inline-block'; $('chatBtn').style.display = 'inline-block'; };
+    dc2.onclose = () => { $('fileBtn').style.display = 'none'; $('chatBtn').style.display = 'none'; $('chatPanel').style.display = 'none'; };
+    dc2.onmessage = onCtlMessage;
     dc.onmessage = e => {
         try { const m = JSON.parse(e.data); if (m.t === 'pong') { $('latBadge').style.display = 'inline-block'; $('latVal').textContent = Math.round(performance.now() - m.ts); } } catch (x) {}
     };
@@ -263,6 +277,65 @@ async function onSignal(m) {
         }
     } catch (e) { console.error(e); }
 }
+
+// ══ ctl channel — reliable: chat, clipboard sync, file transfer ══
+let dc2 = null, rxFile = null;
+const FILE_CHUNK = 16384;
+function ctlSend(o) { if (dc2 && dc2.readyState === 'open') { try { dc2.send(JSON.stringify(o)); } catch (e) {} } }
+
+async function onCtlMessage(e) {
+    try {
+        if (typeof e.data === 'string') {
+            const m = JSON.parse(e.data);
+            if (m.t === 'chat') addChat(m.from || 'Remote', m.text, false);
+            else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
+            else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
+        } else if (rxFile) {
+            rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
+            if (rxFile.got >= rxFile.size) {
+                const f = rxFile; rxFile = null;
+                const url = URL.createObjectURL(new Blob(f.chunks));
+                const a = document.createElement('a'); a.href = url; a.download = f.name; a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                addChat('System', 'Saved ' + f.name, false);
+            }
+        }
+    } catch (err) {}
+}
+function addChat(from, text, mine) {
+    const box = $('chatMsgs');
+    const d = document.createElement('div');
+    d.style.cssText = 'margin:4px 0;';
+    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span style="color:#cbd5e1;"></span>`;
+    d.children[1].textContent = text;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+$('chatSend').onclick = () => {
+    const t = $('chatInput').value.trim(); if (!t) return;
+    ctlSend({ t: 'chat', from: $('nameInput').value.trim() || 'Guest', text: t });
+    addChat('Me', t, true); $('chatInput').value = '';
+};
+$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
+$('chatBtn').onclick = () => { const p = $('chatPanel'); p.style.display = p.style.display === 'none' ? 'flex' : 'none'; };
+$('fileBtn').onclick = () => $('fileInput').click();
+$('fileInput').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f || !dc2 || dc2.readyState !== 'open') return;
+    if (f.size > 30 * 1024 * 1024) { addChat('System', 'File too large (30 MB max)', false); return; }
+    const buf = await f.arrayBuffer();
+    ctlSend({ t: 'file-meta', name: f.name, size: buf.byteLength });
+    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
+        dc2.send(buf.slice(off, off + FILE_CHUNK));
+        if (off % (512 * 1024) < FILE_CHUNK) await new Promise(r => setTimeout(r, 0));
+    }
+    addChat('System', 'Sent ' + f.name, false);
+};
+// Ctrl+C on this page → clipboard text goes to the host
+document.addEventListener('keydown', async e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && dc2 && dc2.readyState === 'open') {
+        try { const t = await navigator.clipboard.readText(); if (t) ctlSend({ t: 'clip', text: t }); } catch (x) {}
+    }
+});
 
 function sendInput(o) { if (dc && dc.readyState === 'open') { try { dc.send(JSON.stringify(o)); } catch (e) {} } }
 const video = $('remoteVideo');
