@@ -106,16 +106,29 @@ class RemoteViewer(context: Context) {
 
     fun onSignal(m: JsonObject) {
         when (m.get("kind")?.asString) {
-            "answer" -> peer?.setRemoteDescription(object : WebRtcHost.SdpAdapter() {
-                override fun onSetSuccess() {
-                    remoteSet = true
-                    iceQueue.forEach { peer?.addIceCandidate(it) }
-                    iceQueue.clear()
-                }
-                override fun onSetFailure(err: String?) { listener?.onError("answer: $err") }
-            }, SessionDescription(SessionDescription.Type.ANSWER, m.get("sdp").asString))
+            "answer" -> applyAnswer(m.get("sdp").asString)
             "ice" -> m.getAsJsonObject("candidate")?.let { addIce(it) }
         }
+    }
+
+    // Retry once with exotic attribute lines dropped — same defense as host.
+    private fun applyAnswer(sdp: String, retried: Boolean = false) {
+        peer?.setRemoteDescription(object : WebRtcHost.SdpAdapter() {
+            override fun onSetSuccess() {
+                remoteSet = true
+                iceQueue.forEach { peer?.addIceCandidate(it) }
+                iceQueue.clear()
+            }
+            override fun onSetFailure(err: String?) {
+                if (!retried) {
+                    val cleaned = sdp.replace("\r\n", "\n").split("\n")
+                        .filter { it.isNotBlank() && !it.startsWith("a=max-message-size") }
+                        .joinToString("\r\n")
+                    if (cleaned != sdp) { applyAnswer(cleaned, true); return }
+                }
+                listener?.onError("answer: $err")
+            }
+        }, SessionDescription(SessionDescription.Type.ANSWER, sdp))
     }
 
     fun addIce(c: JsonObject) {

@@ -105,27 +105,43 @@ class WebRtcHost(context: Context) {
         }) ?: run { listener?.onError("peer create failed"); return }
 
         localTrack?.let { peer!!.addTrack(it, listOf("screen")) }
+        applyOffer(offerSdp, constraints)
+    }
 
+    // Some peers emit SDP attributes this libwebrtc build can't parse
+    // (a=max-message-size outside m=application, LF endings). Retry once
+    // with exotic attribute lines dropped before giving up.
+    private fun applyOffer(offerSdp: String, constraints: MediaConstraints, retried: Boolean = false) {
         peer!!.setRemoteDescription(object : SdpAdapter() {
-            override fun onSetSuccess() {
-                remoteSet = true
-                iceQueue.forEach { peer!!.addIceCandidate(it) }
-                iceQueue.clear()
-                peer!!.createAnswer(object : SdpAdapter() {
-                    override fun onCreateSuccess(answer: SessionDescription?) {
-                        peer!!.setLocalDescription(object : SdpAdapter() {
-                            override fun onSetSuccess() {
-                                val o = JsonObject()
-                                o.addProperty("kind", "answer")
-                                o.addProperty("sdp", peer!!.localDescription.description)
-                                listener?.sendSignal(o)
-                            }
-                        })
-                    }
-                }, constraints)
+            override fun onSetSuccess() = onOfferApplied(constraints)
+            override fun onSetFailure(err: String?) {
+                if (!retried) {
+                    val cleaned = offerSdp.replace("\r\n", "\n").split("\n")
+                        .filter { it.isNotBlank() && !it.startsWith("a=max-message-size") }
+                        .joinToString("\r\n")
+                    if (cleaned != offerSdp) { applyOffer(cleaned, constraints, true); return }
+                }
+                listener?.onError("setRemote: $err")
             }
-            override fun onSetFailure(err: String?) { listener?.onError("setRemote: $err") }
         }, SessionDescription(SessionDescription.Type.OFFER, offerSdp))
+    }
+
+    private fun onOfferApplied(constraints: MediaConstraints) {
+        remoteSet = true
+        iceQueue.forEach { peer!!.addIceCandidate(it) }
+        iceQueue.clear()
+        peer!!.createAnswer(object : SdpAdapter() {
+            override fun onCreateSuccess(answer: SessionDescription?) {
+                peer!!.setLocalDescription(object : SdpAdapter() {
+                    override fun onSetSuccess() {
+                        val o = JsonObject()
+                        o.addProperty("kind", "answer")
+                        o.addProperty("sdp", peer!!.localDescription.description)
+                        listener?.sendSignal(o)
+                    }
+                })
+            }
+        }, constraints)
     }
 
     fun addIce(c: JsonObject) {

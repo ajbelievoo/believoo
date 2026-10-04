@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -310,12 +310,28 @@ async function captureScreen(sourceId) {
 }
 
 let offering = false;
+
+// Some peers emit SDP attributes this libwebrtc build won't parse
+// (a=max-message-size outside m=application, LF endings, …). Try raw,
+// then retry with CRLF normalization + exotic attribute lines dropped.
+async function setRemoteSdp(pc, type, sdp) {
+    const raw = String(sdp || '');
+    try { await pc.setRemoteDescription({ type, sdp: raw }); return; }
+    catch (e1) {
+        const cleaned = raw.replace(/\r?\n/g, '\r\n').split('\r\n')
+            .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
+        if (cleaned === raw) throw e1;
+        hdbg('sdp retry — dropped exotic attrs');
+        await pc.setRemoteDescription({ type, sdp: cleaned });
+    }
+}
+
 async function handleOffer(m) {
     if (pc) {
         // ICE restart / renegotiation from a reconnecting viewer — reuse the
         // existing peer (and stream) instead of starting over.
         try {
-            await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+            await setRemoteSdp(pc, 'offer', m.sdp);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             hostSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
@@ -349,7 +365,7 @@ async function handleOffer(m) {
             };
         };
 
-        await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+        await setRemoteSdp(pc, 'offer', m.sdp);
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -599,7 +615,7 @@ function dispatchViewerSignal(m) {
     if (m.kind === 'accept') { vDbg('host accepted'); startViewerPeer(); }
     else if (m.kind === 'reject') { vStatus('Host declined the request'); exitViewer(2500); }
     else if (m.kind === 'end') { vStatus('Session ended by host'); exitViewer(2000); }
-    else if (m.kind === 'answer' && vPc) { vDbg('answer received'); vPc.setRemoteDescription({ type: 'answer', sdp: m.sdp }).catch(() => {}); }
+    else if (m.kind === 'answer' && vPc) { vDbg('answer received'); setRemoteSdp(vPc, 'answer', m.sdp).catch(() => {}); }
     else if (m.kind === 'ice' && vPc && m.candidate) vPc.addIceCandidate(m.candidate).catch(() => {});
 }
 
