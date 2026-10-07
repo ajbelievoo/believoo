@@ -204,3 +204,22 @@ Examples:
   with legacy app). Full notes in `/www/wwwroot/playgame-app/AGENTS.md`.
 - `playgame.hitune.in` = legacy PHP admin+API kept alive for the old Android app (`/api/*.php`);
   its `/` 301s to the new domain. Legacy logins patched to bcrypt+fallback.
+
+## GitHub auto-sync (added 2026-10-07)
+
+- `believoo` site repo → `github.com/ajbelievoo/believoo` (branch `main`). `.git` lives in
+  `/www/wwwroot/believoo` — was originally cloned from `laravel/laravel` (upstream history kept;
+  `composer` remote still points at laravel).
+- `ghc.believoo.com` codebase → `github.com/ajbelievoo/ghc` (branch `main`). Repo root
+  `/www/wwwroot/ghc` covers `backend/`, `frontend/`, `python-backend/`. `frontend/` had an inner
+  Next.js scaffold repo — its `.git` was moved to `ops/git-autopush/ghc-frontend-inner-git-backup`.
+- **Auto-push**: `/www/wwwroot/ops/git-autopush/git-autopush.sh` every 10 min + `@reboot` via
+  `/etc/cron.d/believoo-ecosystem`, running as `www`. It `add -A`s, commits "Auto-sync …" and
+  pushes when ahead of origin. SSH via `ops/git-autopush/github_key` (copy of ubuntu's
+  GitHub-authorized `id_ed25519`, account `ajbelievoo`) — log at `autopush.log`.
+- `.env` files, `vendor/`, `node_modules/`, `.venv/`, build output (`dist*/`, `.next/`,
+  `web-build/`), `/public/downloads`, and local dev DBs are gitignored — never pushed.
+- believoo history was rewritten once (filter-branch) to drop 126MB `apk/app-release.apk` —
+  GitHub rejects blobs >100MB. Never commit APKs; use `public/downloads/` (gitignored).
+- NOTE: `/www/wwwroot/.git` is a SEPARATE parent repo (`ajbelievoo/hitune_music_backend`) that
+  only tracks `music/`, `hitunesite/`, `web/` — believoo/ghc are nested independent repos.
