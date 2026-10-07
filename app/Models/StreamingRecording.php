@@ -60,9 +60,9 @@ class StreamingRecording extends Model
             }
             
             // Delete thumbnail
-            $thumbPath = storage_path('app/public/recordings/' . $recording->id . '/thumbnail.jpg');
-            if (file_exists($thumbPath)) {
-                unlink($thumbPath);
+            $thumbPath = 'recordings/' . $recording->id . '/thumbnail.jpg';
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($thumbPath)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($thumbPath);
             }
         });
     }

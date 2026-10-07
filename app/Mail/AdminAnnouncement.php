@@ -63,13 +63,16 @@ class AdminAnnouncement extends Mailable
             return [];
         }
 
-        $path = storage_path('app/public/' . $this->announcement->attachment);
-        if (! file_exists($path)) {
+        $path = $this->announcement->attachment;
+        if (! \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
             return [];
         }
 
         return [
-            Attachment::fromPath($path),
+            Attachment::fromData(
+                fn () => \Illuminate\Support\Facades\Storage::disk('public')->get($path),
+                basename($path)
+            ),
         ];
     }
 

@@ -1,6 +1,6 @@
 <x-layouts.believoo
     title="VPS Cloud Hosting in India - Believoo"
-    description="High-performance VPS hosting in India with NVMe SSD storage, DDoS protection, 99.9% uptime and 24/7 support. Buy cheap cloud VPS plans at Believoo."
+    description="High-performance VPS hosting in India with NVMe SSD storage, DDoS protection, 99.9% uptime and expert support. Buy cheap cloud VPS plans at Believoo."
     keywords="VPS hosting India, cloud VPS, cheap VPS, NVMe VPS, DDoS protection, Believoo">
 
     

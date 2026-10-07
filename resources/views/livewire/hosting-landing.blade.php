@@ -299,12 +299,12 @@
                     <!-- Description -->
                     <p class="text-lg mb-8 max-w-xl leading-relaxed"
                        :class="$store.darkMode.on ? 'text-gray-400' : 'text-slate-600'">
-                        Enterprise-grade hosting powered by GHC Cloud. Free SSL, daily backups, 99.9% uptime, and 24/7 expert support included.
+                        Enterprise-grade hosting powered by GHC Cloud. Free SSL, daily backups, 99.9% uptime, and expert support included.
                     </p>
 
                     <!-- Feature Pills -->
                     <div class="flex flex-wrap gap-3 mb-8">
-                        @foreach(['Free SSL Certificate', 'Free Domain', 'Free CloudFlare CDN', '24/7 Expert Support', '30-Day Money Back', 'Free Migration'] as $feature)
+                        @foreach(['Free SSL Certificate', 'Free Domain', 'Free CloudFlare CDN', 'Expert Support', '30-Day Money Back', 'Free Migration'] as $feature)
                             <div class="flex items-center gap-2 px-4 py-2 rounded-full text-sm"
                                  :class="$store.darkMode.on ? 'bg-white/5 border border-white/10 text-gray-300' : 'bg-white border border-slate-200 text-slate-600 shadow-sm'">
                                 <i class="fas fa-check-circle check-animated" :class="$store.darkMode.on ? 'text-emerald-400' : 'text-emerald-500'"></i>
@@ -498,7 +498,7 @@
                                     '{{ $plan->disk_gb }} GB {{ strtoupper($plan->disk_type ?? "SSD") }}',
                                     '{{ $plan->bandwidth_tb ?? "2" }} TB Bandwidth',
                                     '{{ $plan->uplink_mbps ?? "1000" }} Mbps Uplink',
-                                    '24/7 Support'
+                                    'Expert Support'
                                     @if($plan->has_ddos_protection ?? false)
                                     , 'DDoS Protection'
                                     @endif
@@ -576,7 +576,7 @@
                     ['fa-bolt', 'Lightning Fast', 'NVMe SSD with LiteSpeed'],
                     ['fa-shield-alt', 'Secure by Default', 'Free SSL, DDoS protection'],
                     ['fa-globe', 'Global Network', '15+ data centers'],
-                    ['fa-headset', '24/7 Support', 'Expert help anytime'],
+                    ['fa-headset', 'Expert Support', 'Help when you need it'],
                     ['fa-rocket', 'Instant Deploy', 'Ready in 60 seconds'],
                     ['fa-sync-alt', 'Auto Backups', 'Daily automated'],
                     ['fa-chart-line', '99.9% Uptime', 'Enterprise SLA'],

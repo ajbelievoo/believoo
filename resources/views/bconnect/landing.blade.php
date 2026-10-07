@@ -260,7 +260,7 @@
             <div><div class="text-4xl lg:text-5xl font-extrabold text-brand">10k+</div><p class="text-slate-400 mt-2">Teams supported</p></div>
             <div><div class="text-4xl lg:text-5xl font-extrabold text-brand">99.9%</div><p class="text-slate-400 mt-2">Uptime</p></div>
             <div><div class="text-4xl lg:text-5xl font-extrabold text-brand">50+</div><p class="text-slate-400 mt-2">Countries</p></div>
-            <div><div class="text-4xl lg:text-5xl font-extrabold text-brand">24/7</div><p class="text-slate-400 mt-2">Support</p></div>
+            <div><div class="text-4xl lg:text-5xl font-extrabold text-brand">100%</div><p class="text-slate-400 mt-2">Reliable</p></div>
         </div>
     </div>
 </section>

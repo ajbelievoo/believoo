@@ -89,7 +89,7 @@
                 @foreach([
                     ['icon' => 'fas fa-bolt', 'title' => 'NVMe SSD', 'desc' => 'Lightning-fast NVMe SSD storage for optimal performance'],
                     ['icon' => 'fas fa-shield-alt', 'title' => 'Free SSL', 'desc' => 'Free SSL certificates for all your domains'],
-                    ['icon' => 'fas fa-headset', 'title' => '24/7 Support', 'desc' => 'Round-the-clock expert technical support'],
+                    ['icon' => 'fas fa-headset', 'title' => 'Expert Support', 'desc' => 'Reliable expert technical support'],
                     ['icon' => 'fas fa-database', 'title' => 'Daily Backups', 'desc' => 'Automated daily backups with easy restoration'],
                 ] as $feature)
                     <div class="text-center p-6 rounded-2xl transition-all hover:-translate-y-1 bg-white border border-slate-200 hover:border-sky-300 shadow-sm dark:bg-white/5 dark:border-white/10 dark:hover:border-cyan-500/30 dark:shadow-none">
@@ -115,7 +115,7 @@
             </div>
             <div class="space-y-3" x-data="{ open: null }">
                 @foreach([
-                    ['q' => 'What is included in web hosting?', 'a' => 'All plans include SSD storage, free SSL certificate, daily backups, 24/7 support, and a 99.9% uptime guarantee.'],
+                    ['q' => 'What is included in web hosting?', 'a' => 'All plans include SSD storage, free SSL certificate, daily backups, expert support, and a 99.9% uptime guarantee.'],
                     ['q' => 'Can I upgrade my plan later?', 'a' => 'Yes, you can upgrade your hosting plan at any time. The price difference will be prorated for the remaining billing period.'],
                     ['q' => 'Do you offer a money-back guarantee?', 'a' => 'We offer a 30-day money-back guarantee on all hosting plans. No questions asked.'],
                     ['q' => 'How do I migrate my existing website?', 'a' => 'Our team provides free website migration assistance for all new customers. Contact our support team to get started.'],

@@ -1669,7 +1669,7 @@
                         </div>
                     </a>
                     <p class="text-gray-400 text-sm mb-6 max-w-sm">
-                        Premium hosting solutions powered by GHC Cloud. 99.9% uptime guarantee with 24/7 expert support.
+                        Premium hosting solutions powered by GHC Cloud. 99.9% uptime guarantee with expert support.
                     </p>
                     <div class="flex gap-3">
                         @foreach(['twitter' => 'fab fa-twitter', 'linkedin' => 'fab fa-linkedin-in', 'github' => 'fab fa-github', 'instagram' => 'fab fa-instagram'] as $social => $icon)
@@ -1708,7 +1708,7 @@
                     <h4 class="text-white font-bold uppercase text-sm tracking-wider mb-4">Support</h4>
                     <ul class="space-y-3">
                         <li><a href="https://support.believoo.com/help" class="bhosting-footer-link text-sm">Help Center</a></li>
-                        <li><a href="https://support.believoo.com/contact" class="bhosting-footer-link text-sm">24/7 Live Chat</a></li>
+                        <li><a href="https://support.believoo.com/contact" class="bhosting-footer-link text-sm">Live Chat</a></li>
                         <li><a href="https://support.believoo.com/tickets" class="bhosting-footer-link text-sm">Submit Ticket</a></li>
                         <li><a href="https://support.believoo.com/status" class="bhosting-footer-link text-sm">Server Status</a></li>
                     </ul>
@@ -1717,7 +1717,7 @@
             
             <!-- Trust Badges -->
             <div class="flex flex-wrap justify-center gap-4 mb-8 py-6 border-y border-white/5">
-                @foreach(['99.9% Uptime SLA', 'DDoS Protection', 'NVMe SSD', 'Free SSL', '24/7 Support', '30-Day Money Back'] as $badge)
+                @foreach(['99.9% Uptime SLA', 'DDoS Protection', 'NVMe SSD', 'Free SSL', 'Expert Support', '30-Day Money Back'] as $badge)
                     <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
                         <i class="fas fa-check-circle text-cyan-400 text-sm"></i>
                         <span class="text-gray-400 text-xs font-medium">{{ $badge }}</span>
@@ -1828,7 +1828,8 @@
                         ['VPS Servers', route('vps-plans.index')],
                         ['Website Builder', route('services.show', 'web-application-development')],
                         ['Domains', route('client.domains.search')],
-                        ['Email Marketing', route('services.show', 'seo-digital-growth')],
+                        // RAZORPAY-REVIEW: was 'Email Marketing'
+                        ['SEO & Growth', route('services.show', 'seo-digital-growth')],
                         ['Reputation Management', route('services.show', 'seo-digital-growth')],
                         ['SEO', route('services.show', 'seo-digital-growth')],
                         ['Business Website', route('services.show', 'web-application-development')],

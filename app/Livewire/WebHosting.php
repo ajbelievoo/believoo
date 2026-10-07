@@ -36,7 +36,7 @@ class WebHosting extends Component
                 'description' => 'Perfect for personal websites',
                 'price' => 3,
                 'pricing_tiers' => [
-                    ['name' => 'Starter', 'price' => 3, 'features' => ['1 Website', '10 GB SSD Storage', 'Unmetered Bandwidth', 'Free SSL Certificate', 'cPanel Control Panel', '24/7 Support']]
+                    ['name' => 'Starter', 'price' => 3, 'features' => ['1 Website', '10 GB SSD Storage', 'Unmetered Bandwidth', 'Free SSL Certificate', 'cPanel Control Panel', 'Expert Support']]
                 ],
                 'billing_cycles' => [
                     ['months' => 1, 'label' => 'Monthly', 'discount_percent' => 0, 'recommended' => false],
@@ -50,7 +50,7 @@ class WebHosting extends Component
                     ['feature' => 'Unmetered Bandwidth'],
                     ['feature' => 'Free SSL Certificate'],
                     ['feature' => 'cPanel Control Panel'],
-                    ['feature' => '24/7 Support'],
+                    ['feature' => 'Expert Support'],
                 ],
             ],
             [
@@ -120,7 +120,7 @@ class WebHosting extends Component
                 'description' => 'Perfect for personal websites',
                 'price' => 3,
                 'pricing_tiers' => [
-                    ['name' => 'Starter', 'price' => 3, 'features' => ['1 Website', '10 GB SSD Storage', 'Unmetered Bandwidth', 'Free SSL Certificate', 'cPanel Control Panel', '24/7 Support']]
+                    ['name' => 'Starter', 'price' => 3, 'features' => ['1 Website', '10 GB SSD Storage', 'Unmetered Bandwidth', 'Free SSL Certificate', 'cPanel Control Panel', 'Expert Support']]
                 ],
                 'features' => [
                     ['feature' => '1 Website'],
@@ -128,7 +128,7 @@ class WebHosting extends Component
                     ['feature' => 'Unmetered Bandwidth'],
                     ['feature' => 'Free SSL Certificate'],
                     ['feature' => 'cPanel Control Panel'],
-                    ['feature' => '24/7 Support'],
+                    ['feature' => 'Expert Support'],
                 ],
                 'is_active' => true,
             ],

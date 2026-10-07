@@ -1557,8 +1557,8 @@ Team Believoo",
         // About Believoo
         if (str_contains($q, 'about believoo') || str_contains($q, 'what is believoo') || str_contains($q, 'who is believoo') || str_contains($q, 'tell me about') || str_contains($q, 'company') || str_contains($q, 'kya hai believoo') || str_contains($q, 'believoo kya hai')) {
             return $h
-                ? 'Believoo ek IT services company hai jo web hosting, VPS, domains, website development, mobile apps, SEO, digital marketing, streaming, AI automation, cloud, DevOps, UI/UX, API development, cybersecurity aur maintenance services provide karti hai.'
-                : 'Believoo is an IT services company offering web hosting, VPS, domains, website development, mobile apps, SEO, digital marketing, streaming, AI automation, cloud, DevOps, UI/UX, API development, cybersecurity, and maintenance services.';
+                ? 'Believoo ek IT services company hai jo web hosting, VPS, domains, website development, mobile apps, SEO, digital marketing, streaming, AI automation, cloud, DevOps, UI/UX, API development aur cybersecurity services provide karti hai.'
+                : 'Believoo is an IT services company offering web hosting, VPS, domains, website development, mobile apps, SEO, digital marketing, streaming, AI automation, cloud, DevOps, UI/UX, API development, and cybersecurity services.';
         }
 
         // Domain
@@ -1578,8 +1578,8 @@ Team Believoo",
         // Website / App development
         if (str_contains($q, 'website') || str_contains($q, 'web design') || str_contains($q, 'app development') || str_contains($q, 'mobile app') || str_contains($q, 'web application') || str_contains($q, 'android app') || str_contains($q, 'ios app')) {
             return $h
-                ? 'Believoo custom websites, web apps, Android/iOS mobile apps, UI/UX design, API integration aur maintenance services banata hai. Apni requirement bataein ya ticket banaein.'
-                : 'Believoo builds custom websites, web apps, Android/iOS mobile apps, UI/UX design, API integration, and maintenance services. Share your requirements or create a support ticket.';
+                ? 'Believoo custom websites, web apps, Android/iOS mobile apps, UI/UX design aur API integration banata hai. Apni requirement bataein ya ticket banaein.'
+                : 'Believoo builds custom websites, web apps, Android/iOS mobile apps, UI/UX design, and API integration. Share your requirements or create a support ticket.';
         }
 
         // Pricing
@@ -1641,8 +1641,8 @@ Team Believoo",
         // Competitor comparison
         if (str_contains($q, 'vs') || str_contains($q, 'compare') || str_contains($q, 'better') || str_contains($q, 'hostinger') || str_contains($q, 'godaddy') || str_contains($q, 'aws') || str_contains($q, 'digitalocean')) {
             return $h
-                ? 'Believoo vs competitors — hamare VPS plans mein NVMe SSD, 99.9% uptime, DDoS protection, aur 24/7 support hai. Pricing bhi competitive hai. Kya aap koi specific plan compare karna chahenge?'
-                : 'Believoo vs competitors — our VPS plans include NVMe SSD, 99.9% uptime, DDoS protection, and 24/7 support. Our pricing is very competitive. Would you like to compare a specific plan?';
+                ? 'Believoo vs competitors — hamare VPS plans mein NVMe SSD, 99.9% uptime, DDoS protection, aur expert support hai. Pricing bhi competitive hai. Kya aap koi specific plan compare karna chahenge?'
+                : 'Believoo vs competitors — our VPS plans include NVMe SSD, 99.9% uptime, DDoS protection, and expert support. Our pricing is very competitive. Would you like to compare a specific plan?';
         }
 
         // Cross-sell: if they asked about VPS, suggest related services

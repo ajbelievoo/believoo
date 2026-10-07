@@ -6,7 +6,7 @@
     <div class="max-w-4xl mx-auto">
         <div class="text-center mb-12">
             <h1 class="text-4xl font-black text-slate-900 tracking-tight mb-2">Contact Support</h1>
-            <p class="text-slate-500 text-sm">Our team is available 24/7. Reach out anytime.</p>
+            <p class="text-slate-500 text-sm">Our team is here to help. Reach out anytime.</p>
         </div>
 
         <div class="grid md:grid-cols-2 gap-6 mb-12">

@@ -30,13 +30,11 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     // failing a bare octet-stream fetch.
     Route::get('/dl/agent.apk', function () {
         $f = 'BMyDesk-Agent-v' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_ANDROID . '.apk';
-        return response()->download(public_path('downloads/' . $f), 'BMyDesk-Agent.apk', [
-            'Content-Type' => 'application/vnd.android.package-archive',
-        ]);
+        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
     })->name('bconnect.dl.apk');
     Route::get('/dl/agent.exe', function () {
         $f = 'BMyDesk-Agent-Setup-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '.exe';
-        return response()->download(public_path('downloads/' . $f), 'BMyDesk-Agent-Setup.exe');
+        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
     })->name('bconnect.dl.exe');
 });
 

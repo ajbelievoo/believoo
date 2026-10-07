@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'Clytrix') }} - Web Hosting, Domains & Cloud Services</title>
-    <meta name="description" content="Premium web hosting, domain registration, and cloud solutions. 24/7 support, 99.9% uptime, and free migration.">
+    <meta name="description" content="Premium web hosting, domain registration, and cloud solutions. Expert support, 99.9% uptime, and free migration.">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />

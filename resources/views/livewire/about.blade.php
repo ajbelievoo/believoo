@@ -37,7 +37,7 @@
                     ['stat' => '99.9%', 'label' => 'Uptime SLA'],
                     ['stat' => '500+', 'label' => 'Projects Delivered'],
                     ['stat' => '15min', 'label' => 'Response Time'],
-                    ['stat' => '24/7', 'label' => 'Elite Support']
+                    ['stat' => '100%', 'label' => 'Client Focus']
                 ] as $item)
                 <div class="bg-white dark:bg-slate-900 rounded-2xl p-8 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
                     <div class="text-4xl font-bold text-amber-600 mb-2">{{ $item['stat'] }}</div>

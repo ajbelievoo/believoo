@@ -153,7 +153,7 @@
                     ['icon' => 'fas fa-bolt', 'title' => '99.99% Uptime', 'desc' => 'Guaranteed availability with SLA'],
                     ['icon' => 'fas fa-shield-alt', 'title' => 'DDoS Protection', 'desc' => 'Advanced security included'],
                     ['icon' => 'fas fa-hdd', 'title' => 'NVMe SSD', 'desc' => 'Ultra-fast storage'],
-                    ['icon' => 'fas fa-headset', 'title' => '24/7 Support', 'desc' => 'Expert assistance always'],
+                    ['icon' => 'fas fa-headset', 'title' => 'Expert Support', 'desc' => 'Assistance when you need it'],
                 ] as $feature)
                     <div class="text-center p-6 rounded-2xl transition-all hover:-translate-y-1 bg-white border border-slate-200 hover:border-sky-300 shadow-sm dark:bg-white/5 dark:border-white/10 dark:hover:border-cyan-500/30 dark:shadow-none">
                         <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-sky-100 dark:bg-cyan-500/10">
@@ -181,7 +181,7 @@
                     ['q' => 'What is a VPS?', 'a' => 'A Virtual Private Server (VPS) is a virtualized server that mimics a dedicated server within a shared hosting environment. You get dedicated resources and full root access.'],
                     ['q' => 'Can I install custom software?', 'a' => 'Yes, you have full root access to your VPS and can install any software compatible with your chosen operating system.'],
                     ['q' => 'What operating systems are available?', 'a' => 'We support Ubuntu, Debian, CentOS, and Windows Server. You can reinstall your OS at any time from the control panel.'],
-                    ['q' => 'Is managed support available?', 'a' => 'Yes, we offer managed VPS plans where our team handles server maintenance, security updates, and monitoring for you.'],
+                    ['q' => 'Is managed support available?', 'a' => 'Yes, we offer managed VPS plans where our team handles server updates, security patches, and monitoring for you.'],
                 ] as $index => $faq)
                     <div class="rounded-2xl overflow-hidden border bg-white border-slate-200 dark:bg-white/5 dark:border-white/10">
                         <button @click="open = open === {{ $index }} ? null : {{ $index }}"

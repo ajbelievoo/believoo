@@ -2,7 +2,7 @@
 
 @section('title', $categoryInfo['name'] . ' VPS Hosting in India | Believoo Cloud')
 
-@section('meta_description', 'Explore ' . $categoryInfo['name'] . ' VPS plans in India. ' . $categoryInfo['description'] . ' High-performance cloud VPS with 24/7 support from Believoo.')
+@section('meta_description', 'Explore ' . $categoryInfo['name'] . ' VPS plans in India. ' . $categoryInfo['description'] . ' High-performance cloud VPS with expert support from Believoo.')
 
 @section('meta_keywords', $categoryInfo['name'] . ' VPS, India VPS, cloud VPS, ' . strtolower($category) . ' vps hosting, Believoo')
 

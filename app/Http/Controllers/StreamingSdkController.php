@@ -13,20 +13,15 @@ class StreamingSdkController extends Controller
     public function downloadAndroidSdk()
     {
         // SDK file path
-        $sdkPath = storage_path('app/public/sdk/believoo-live-sdk-2.0.0.aar');
-        
+        $sdkPath = 'sdk/believoo-live-sdk-2.0.0.aar';
+
         // Check if file exists, if not create a placeholder
-        if (!file_exists($sdkPath)) {
-            // Create directory if not exists
-            if (!is_dir(dirname($sdkPath))) {
-                mkdir(dirname($sdkPath), 0755, true);
-            }
-            
+        if (!Storage::disk('public')->exists($sdkPath)) {
             // For demo purposes, we'll stream a generated SDK package
             return $this->generateSdkDownload('believoo-live-sdk-2.0.0.aar');
         }
-        
-        return response()->download($sdkPath, 'believoo-live-sdk-2.0.0.aar', [
+
+        return Storage::disk('public')->download($sdkPath, 'believoo-live-sdk-2.0.0.aar', [
             'Content-Type' => 'application/java-archive',
         ]);
     }

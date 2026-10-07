@@ -196,3 +196,11 @@ Examples:
 - Version sources of truth: `AgentApiController::AGENT_LATEST_WINDOWS/ANDROID` (update-check API), `bmydesk-agent/package.json`, `renderer.js` APP_VERSION, Android `build.gradle` versionCode/versionName.
 - Bump the version on every publish — Cloudflare caches `/downloads/*` aggressively (immutable-ish), and stale-file bugs have bitten twice already.
 - Disk on this box is ~97GB and nearly full — delete old-version artifacts after publishing.
+
+## PlayGame site (added 2026-10-07)
+
+- `playgame.believoo.com` = new Laravel+React gaming site. Backend `/www/wwwroot/playgame-app`,
+  frontend SPA `/www/wwwroot/playgame-web` (`deploy.sh` rebuilds). DB: `hitune_gamepro` (shared
+  with legacy app). Full notes in `/www/wwwroot/playgame-app/AGENTS.md`.
+- `playgame.hitune.in` = legacy PHP admin+API kept alive for the old Android app (`/api/*.php`);
+  its `/` 301s to the new domain. Legacy logins patched to bcrypt+fallback.

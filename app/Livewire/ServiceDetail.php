@@ -21,6 +21,10 @@ class ServiceDetail extends Component
         if (in_array($service->slug, $this->hostingSlugs, true)) {
             return redirect('https://ghc.believoo.com');
         }
+        // RAZORPAY-REVIEW: hide deactivated services from public
+        if (!is_null($service->is_active) && !$service->is_active) {
+            abort(404);
+        }
         $this->service = $service;
     }
 

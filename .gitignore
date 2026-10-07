@@ -25,3 +25,6 @@ yarn-error.log
 /.next
 storage/backups/
 /public/downloads
+/vendor_new
+.settings/
+.env.*

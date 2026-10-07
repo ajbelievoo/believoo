@@ -104,7 +104,7 @@
                                 <i class="fas fa-check-circle" style="color: #22c55e;"></i> {{ $datacenter }}
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px; color: #d1d5db; font-size: 0.85rem;">
-                                <i class="fas fa-check-circle" style="color: #22c55e;"></i> 24/7 Support
+                                <i class="fas fa-check-circle" style="color: #22c55e;"></i> Expert Support
                             </div>
                         </div>
                     </div>
@@ -243,7 +243,7 @@
                                 <i class="fas fa-bolt" style="color: #f59e0b;"></i> Automatic Setup
                             </span>
                             <span style="font-size: 0.7rem; color: #6b7280; display: flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-headset" style="color: #00b7ff;"></i> 24/7 Support
+                                <i class="fas fa-headset" style="color: #00b7ff;"></i> Expert Support
                             </span>
                         </div>
                     </div>

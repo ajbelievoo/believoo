@@ -50,8 +50,9 @@
                         </div>
                         <div class="w-px h-10 bg-slate-300"></div>
                         <div class="text-center">
-                            <div class="text-2xl font-bold text-slate-900" data-bel-count="24" data-bel-suffix="/7">24/7</div>
-                            <div class="text-sm text-slate-500">Support</div>
+                            {{-- RAZORPAY-REVIEW: was 24/7 Support --}}
+                            <div class="text-2xl font-bold text-slate-900" data-bel-count="15" data-bel-suffix="min">15min</div>
+                            <div class="text-sm text-slate-500">Avg. Response</div>
                         </div>
                     </div>
                     @if($settings['company_cin'] ?? false)
@@ -112,7 +113,7 @@
                     <span class="inline-flex items-center gap-2"><i class="fas fa-credit-card text-amber-500"></i> {{ $gwName }}</span>
                 @endforeach
                 <span class="inline-flex items-center gap-2"><i class="fas fa-shield-halved text-cyan-500"></i> 99.9% Uptime SLA</span>
-                <span class="inline-flex items-center gap-2"><i class="fas fa-headset text-violet-500"></i> 24/7 Support</span>
+                <span class="inline-flex items-center gap-2"><i class="fas fa-headset text-violet-500"></i> Expert Support</span>
                 <span class="inline-flex items-center gap-2"><i class="fas fa-bolt text-amber-500"></i> Instant Setup</span>
             </div>
         </div>
@@ -314,7 +315,7 @@
                                 <i class="fas fa-headset text-lg"></i>
                             </div>
                             <div>
-                                <h4 class="font-bold text-slate-900 mb-1">24/7 Elite Support</h4>
+                                <h4 class="font-bold text-slate-900 mb-1">Elite Support</h4>
                                 <p class="text-slate-500 text-sm">Direct access to engineers who solve problems, not just log them.</p>
                             </div>
                         </div>
