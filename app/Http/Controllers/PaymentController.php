@@ -440,18 +440,21 @@ class PaymentController extends Controller
 
         $config = $this->getCashfreeConfig();
 
-        // Verify webhook signature (works for both test and live)
+        // Verify webhook signature — required, otherwise anyone could forge paid events
         $timestamp = $request->header('x-webhook-timestamp');
         $signature = $request->header('x-webhook-signature');
-        
-        if ($timestamp && $signature && !empty($config['client_secret'])) {
-            $signedPayload = $timestamp . $rawBody;
-            $expectedSignature = base64_encode(hash_hmac('sha256', $signedPayload, $config['client_secret'], true));
-            
-            if (!hash_equals($expectedSignature, $signature)) {
-                Log::warning('Cashfree webhook: invalid signature');
-                return response()->json(['status' => 'invalid_signature'], 401);
-            }
+
+        if (empty($config['client_secret']) || !$timestamp || !$signature) {
+            Log::warning('Cashfree webhook: missing signature or unconfigured secret');
+            return response()->json(['status' => 'unauthorized'], 401);
+        }
+
+        $signedPayload = $timestamp . $rawBody;
+        $expectedSignature = base64_encode(hash_hmac('sha256', $signedPayload, $config['client_secret'], true));
+
+        if (!hash_equals($expectedSignature, $signature)) {
+            Log::warning('Cashfree webhook: invalid signature');
+            return response()->json(['status' => 'invalid_signature'], 401);
         }
 
         // Handle new Cashfree webhook format (v2023-08-01)
@@ -642,9 +645,25 @@ class PaymentController extends Controller
 
     public function razorpayWebhook(Request $request)
     {
-        $payload = $request->all();
+        $rawBody = $request->getContent();
+        $payload = json_decode($rawBody, true) ?? [];
 
-        Log::info('Razorpay webhook received', $payload);
+        // Verify the webhook signature — without it anyone could forge payment.captured events
+        $webhookSecret = Setting::where('key', 'razorpay_webhook_secret')->value('value') ?? '';
+        $signature = $request->header('X-Razorpay-Signature');
+
+        if (empty($webhookSecret) || empty($signature)) {
+            Log::warning('Razorpay webhook rejected: signature not configured or missing');
+            return response()->json(['status' => 'unauthorized'], 401);
+        }
+
+        $expected = hash_hmac('sha256', $rawBody, $webhookSecret);
+        if (!hash_equals($expected, $signature)) {
+            Log::warning('Razorpay webhook: invalid signature');
+            return response()->json(['status' => 'invalid_signature'], 401);
+        }
+
+        Log::info('Razorpay webhook received', ['event' => $payload['event'] ?? null]);
 
         if (isset($payload['event']) && $payload['event'] === 'payment.captured') {
             $notes = $payload['payload']['payment']['entity']['notes'] ?? [];
@@ -863,7 +882,6 @@ class PaymentController extends Controller
         // Handle payment completed events
         $isPaid = in_array($eventType, [
             'PAYMENT.CAPTURE.COMPLETED',
-            'CHECKOUT.ORDER.APPROVED',
             'PAYMENT.SALE.COMPLETED',
         ]);
 
@@ -899,13 +917,55 @@ class PaymentController extends Controller
             return response()->json(['status' => 'already_processed']);
         }
 
+        // Verify with PayPal API directly — a forged webhook can't fake a real COMPLETED order
         $captureId = $payload['resource']['id'] ?? $paypalOrderId;
+        if (!$this->paypalOrderIsPaid($paypalOrderId ?: $captureId)) {
+            Log::warning('PayPal webhook: order not confirmed paid by PayPal API', [
+                'paypal_order_id' => $paypalOrderId,
+                'order_id' => $order->id,
+            ]);
+            return response()->json(['status' => 'unverified'], 401);
+        }
 
         $order->markAsPaid('paypal', $captureId, $paypalOrderId, $payload);
 
         Log::info('PayPal webhook: order marked paid', ['order_id' => $order->id, 'order_number' => $order->order_number]);
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * Confirm a PayPal order/capture is actually COMPLETED by calling the PayPal API.
+     */
+    private function paypalOrderIsPaid(?string $paypalOrderId): bool
+    {
+        if (!$paypalOrderId) {
+            return false;
+        }
+        try {
+            $config = $this->getPaypalConfig();
+            if (empty($config['client_id']) || empty($config['client_secret'])) {
+                return false;
+            }
+            $tokenResponse = Http::withBasicAuth($config['client_id'], $config['client_secret'])
+                ->asForm()
+                ->post($config['base_url'] . '/v1/oauth2/token', ['grant_type' => 'client_credentials']);
+            $accessToken = $tokenResponse->json('access_token');
+            if (!$accessToken) {
+                return false;
+            }
+            foreach (["/v2/checkout/orders/{$paypalOrderId}", "/v2/payments/captures/{$paypalOrderId}"] as $path) {
+                $res = Http::withToken($accessToken)->get($config['base_url'] . $path);
+                if ($res->successful()) {
+                    $status = $res->json('status');
+                    return in_array($status, ['COMPLETED', 'CAPTURED'], true);
+                }
+            }
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('PayPal webhook verification failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     // PayU Methods

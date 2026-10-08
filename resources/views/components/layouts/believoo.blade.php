@@ -1741,6 +1741,8 @@
                     <a href="{{ route('policy') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Privacy Policy</a>
                     <a href="{{ route('terms') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Terms of Service</a>
                     <a href="{{ route('refund') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Refund Policy</a>
+                    <a href="{{ route('acceptable-use') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">Acceptable Use</a>
+                    <a href="{{ route('sla') }}" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">SLA</a>
                     <a href="#" class="text-gray-500 hover:text-cyan-400 text-sm transition-colors">SLA</a>
                 </div>
             </div>
@@ -1866,6 +1868,8 @@
                         <a href="{{ route('policy') }}" class="hover:text-amber-500 transition-colors">Privacy Policy</a>
                         <a href="{{ route('terms') }}" class="hover:text-amber-500 transition-colors">Terms of Service</a>
                         <a href="{{ route('refund') }}" class="hover:text-amber-500 transition-colors">Refund Policy</a>
+                        <a href="{{ route('acceptable-use') }}" class="hover:text-amber-500 transition-colors">Acceptable Use</a>
+                        <a href="{{ route('sla') }}" class="hover:text-amber-500 transition-colors">SLA</a>
                     </div>
                 </div>
                 <div class="flex gap-4">

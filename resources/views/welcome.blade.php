@@ -540,7 +540,7 @@
                         <p class="text-lg md:text-xl text-slate-700 leading-relaxed mb-8">&ldquo;{{ $t->content }}&rdquo;</p>
                         <div class="flex items-center justify-center gap-4">
                             @if($t->image)
-                                <img src="{{ asset('storage/' . $t->image) }}" alt="{{ $t->name }}" class="w-14 h-14 rounded-full object-cover border-2 border-amber-200">
+                                <img src="{{ asset('storage/' . $t->image) }}" alt="{{ $t->name }}" class="w-14 h-14 rounded-full object-cover border-2 border-amber-200" loading="lazy" width="56" height="56">
                             @else
                                 <div class="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-bold text-xl">{{ strtoupper(substr($t->name, 0, 1)) }}</div>
                             @endif

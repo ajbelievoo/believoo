@@ -121,6 +121,17 @@ Route::get('/privacy', function () {
     return redirect()->route('policy', [], 301);
 })->name('privacy');
 
+Route::get('/acceptable-use', function() {
+    $settings = App\Models\Setting::pluck('value', 'key');
+    return view('acceptable-use', compact('settings'));
+})->name('acceptable-use');
+Route::redirect('/aup', '/acceptable-use', 301);
+
+Route::get('/sla', function() {
+    $settings = App\Models\Setting::pluck('value', 'key');
+    return view('sla', compact('settings'));
+})->name('sla');
+
 Route::get('/refund', function() {
     $settings = App\Models\Setting::pluck('value', 'key');
     return view('refund', compact('settings'));
@@ -271,26 +282,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/client/hosting/{hosting}/activate-streaming', [StreamingPlansController::class, 'activateVpsAddon'])->name('client.streaming.activate')->middleware('check.phone');
 
     // Payment Routes - Razorpay
-    Route::post('/payment/razorpay/create', [PaymentController::class, 'createRazorpayOrder'])->name('payment.razorpay.create')->middleware('check.phone');
+    Route::post('/payment/razorpay/create', [PaymentController::class, 'createRazorpayOrder'])->name('payment.razorpay.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::post('/payment/razorpay/callback', [PaymentController::class, 'razorpayCallback'])->name('payment.razorpay.callback')->middleware('check.phone');
 
     // Payment Routes - Cashfree
-    Route::post('/payment/cashfree/create', [PaymentController::class, 'createCashfreeOrder'])->name('payment.cashfree.create')->middleware('check.phone');
+    Route::post('/payment/cashfree/create', [PaymentController::class, 'createCashfreeOrder'])->name('payment.cashfree.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::get('/payment/cashfree/callback', [PaymentController::class, 'cashfreeCallback'])->name('payment.cashfree.callback')->middleware('check.phone');
 
     // Payment Routes - PayPal
-    Route::post('/payment/paypal/create', [PaymentController::class, 'createPaypalOrder'])->name('payment.paypal.create')->middleware('check.phone');
+    Route::post('/payment/paypal/create', [PaymentController::class, 'createPaypalOrder'])->name('payment.paypal.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::get('/payment/paypal/callback', [PaymentController::class, 'paypalCallback'])->name('payment.paypal.callback')->middleware('check.phone');
-    Route::post('/payment/payu/create', [PaymentController::class, 'createPayuOrder'])->name('payment.payu.create')->middleware('check.phone');
+    Route::post('/payment/payu/create', [PaymentController::class, 'createPayuOrder'])->name('payment.payu.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::post('/payment/payu/callback', [PaymentController::class, 'payuCallback'])->name('payment.payu.callback')->middleware('check.phone');
     Route::get('/wallet/top-up', [WalletController::class, 'topup'])->name('wallet.topup')->middleware('check.phone');
-    Route::post('/wallet/top-up/create', [WalletController::class, 'createTopup'])->name('wallet.topup.create')->middleware('check.phone');
+    Route::post('/wallet/top-up/create', [WalletController::class, 'createTopup'])->name('wallet.topup.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::post('/wallet/top-up/callback', [WalletController::class, 'topupCallback'])->name('wallet.topup.callback')->middleware('check.phone');
-    Route::post('/wallet/top-up/cashfree/create', [WalletController::class, 'createCashfreeTopup'])->name('wallet.topup.cashfree.create')->middleware('check.phone');
+    Route::post('/wallet/top-up/cashfree/create', [WalletController::class, 'createCashfreeTopup'])->name('wallet.topup.cashfree.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::get('/wallet/top-up/cashfree/callback', [WalletController::class, 'cashfreeTopupCallback'])->name('wallet.topup.cashfree.callback')->middleware('check.phone');
-    Route::post('/wallet/top-up/paypal/create', [WalletController::class, 'createPaypalTopup'])->name('wallet.topup.paypal.create')->middleware('check.phone');
+    Route::post('/wallet/top-up/paypal/create', [WalletController::class, 'createPaypalTopup'])->name('wallet.topup.paypal.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::get('/wallet/top-up/paypal/callback', [WalletController::class, 'paypalTopupCallback'])->name('wallet.topup.paypal.callback')->middleware('check.phone');
-    Route::post('/payment/wallet/pay', [WalletController::class, 'pay'])->name('payment.wallet.pay')->middleware('check.phone');
+    Route::post('/payment/wallet/pay', [WalletController::class, 'pay'])->name('payment.wallet.pay')->middleware(['check.phone', 'throttle:20,1']);
 
     // Team Management Routes
     Route::resource('teams', TeamController::class)->middleware('check.phone');

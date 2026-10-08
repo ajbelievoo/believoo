@@ -1,4 +1,4 @@
-@php($co = \App\Models\Setting::whereIn('key', ['company_legal_name','company_cin','company_pan','company_registered_office','company_address'])->pluck('value','key'))
+@php($co = \App\Models\Setting::whereIn('key', ['company_legal_name','company_cin','company_pan','company_gstin','company_registered_office','company_address'])->pluck('value','key'))
 <!DOCTYPE html>
 <html>
 <head>
@@ -120,7 +120,7 @@
         <div class="company-name">{{ $co['company_legal_name'] ?? 'BELIEVOO' }}</div>
         <div style="color: #6b7280; margin-top: 5px;">Software Development Agency</div>
         @if($co['company_cin'] ?? false)
-            <div style="color: #6b7280; margin-top: 5px; font-size: 12px;">CIN: {{ $co['company_cin'] }}@if($co['company_pan'] ?? false) &nbsp;|&nbsp; PAN: {{ $co['company_pan'] }}@endif</div>
+            <div style="color: #6b7280; margin-top: 5px; font-size: 12px;">CIN: {{ $co['company_cin'] }}@if($co['company_pan'] ?? false) &nbsp;|&nbsp; PAN: {{ $co['company_pan'] }}@endif@if($co['company_gstin'] ?? false) &nbsp;|&nbsp; GSTIN: {{ $co['company_gstin'] }}@endif</div>
         @endif
         @if(($co['company_registered_office'] ?? $co['company_address'] ?? false))
             <div style="color: #6b7280; margin-top: 5px; font-size: 12px;">{{ $co['company_registered_office'] ?? $co['company_address'] }}</div>

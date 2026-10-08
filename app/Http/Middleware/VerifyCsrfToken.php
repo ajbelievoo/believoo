@@ -10,5 +10,9 @@ class VerifyCsrfToken extends Middleware
         // GHC admin panel forms are protected by auth + admin middleware already.
         // Temporary bypass until session/CSRF issue is fully resolved.
         'admin/ghc/*',
+        // Payment gateway webhooks are server-to-server POSTs verified by signature.
+        'payment/razorpay/webhook',
+        'payment/cashfree/webhook',
+        'payment/paypal/webhook',
     ];
 }
