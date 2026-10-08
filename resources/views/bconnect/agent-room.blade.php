@@ -17,6 +17,11 @@
             @if(!$canControl)<span class="bc-badge bc-badge-cyan" title="Upgrade to Pro/Enterprise for mouse & keyboard control"><i class="fas fa-eye mr-1"></i>View only · upgrade for control</span>@endif
             <button id="fileBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Send file"><i class="fas fa-paperclip mr-1"></i>File</button>
             <button id="chatBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Chat"><i class="fas fa-comment mr-1"></i>Chat</button>
+            <button id="shotBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Screenshot"><i class="fas fa-camera mr-1"></i></button>
+            <button id="recBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Record session"><i class="fas fa-circle mr-1"></i></button>
+            <select id="qualitySel" title="Quality" class="bc-btn bc-btn-secondary text-sm hidden" style="padding:4px 8px;">
+                <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
+            </select>
             <button id="fullscreenBtn" class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-expand mr-1"></i>Fullscreen</button>
             <input type="file" id="fileInput" class="hidden">
             <button id="endSessionBtn" class="bc-btn bc-btn-danger text-sm"><i class="fas fa-phone-slash mr-1"></i>End</button>
@@ -25,6 +30,7 @@
 
     <div id="remoteContainer" class="flex-1 bg-black rounded-2xl border border-[var(--bc-border)] relative overflow-hidden flex items-center justify-center select-none">
         <video id="remoteVideo" autoplay playsinline class="max-w-full max-h-full w-full h-full object-contain" style="cursor:crosshair;"></video>
+        <div id="statOverlay" class="absolute top-2 left-2 text-[10px] text-slate-200 bg-slate-900/60 px-2 py-0.5 rounded hidden pointer-events-none"></div>
         <div id="waitOverlay" class="absolute inset-0 flex items-center justify-center bg-[var(--bc-bg)]/90 text-center z-10">
             <div>
                 <div class="w-14 h-14 mx-auto mb-4 rounded-full border-4 border-[var(--bc-border)] animate-spin" style="border-top-color:var(--bc-cyan);"></div>
@@ -169,8 +175,8 @@ async function startPeer() {
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { $('fileBtn').classList.remove('hidden'); $('chatBtn').classList.remove('hidden'); };
-    dc2.onclose = () => { $('fileBtn').classList.add('hidden'); $('chatBtn').classList.add('hidden'); $('chatPanel').classList.add('hidden'); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel'].forEach(i => $(i).classList.remove('hidden')); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','chatPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onopen = () => { if (CAN_CONTROL) document.getElementById('inputBadge').classList.remove('hidden'); };
     dc.onclose = () => document.getElementById('inputBadge').classList.add('hidden');
@@ -260,6 +266,62 @@ $('chatSend').onclick = () => {
     addChat('Me', t, true); $('chatInput').value = '';
 };
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
+$('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
+
+let stTimer = null, stBytes = 0, stAt = 0;
+function startStats() {
+    stopStats();
+    stTimer = setInterval(async () => {
+        if (!pc) return;
+        try {
+            let fps = 0, rtt = 0, bytesNow = 0;
+            (await pc.getStats()).forEach(r => {
+                if (r.type === 'inbound-rtp' && r.kind === 'video') { fps = r.framesPerSecond || 0; bytesNow = r.bytesReceived || 0; }
+                if (r.type === 'candidate-pair' && r.nominated) rtt = Math.round((r.currentRoundTripTime || 0) * 1000);
+            });
+            const now = Date.now();
+            const kbps = stAt ? Math.round((bytesNow - stBytes) * 8 / (now - stAt)) : 0;
+            stBytes = bytesNow; stAt = now;
+            const el = $('statOverlay'); if (el) el.textContent = rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+        } catch (e) {}
+    }, 2000);
+}
+function stopStats() { if (stTimer) clearInterval(stTimer); stTimer = null; stBytes = 0; stAt = 0; }
+
+$('shotBtn').onclick = () => {
+    const v = $('remoteVideo');
+    if (!v.videoWidth) return;
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png'); a.download = 'bmydesk-' + Date.now() + '.png'; a.click();
+};
+
+let rec = null, recChunks = [];
+$('recBtn').onclick = () => {
+    if (rec && rec.state !== 'inactive') { stopRec(); return; }
+    const stream = $('remoteVideo').srcObject;
+    if (!stream) return;
+    try { rec = new MediaRecorder(stream, { mimeType: 'video/webm' }); }
+    catch (e) { try { rec = new MediaRecorder(stream); } catch (x) { return; } }
+    recChunks = [];
+    rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(recChunks, { type: 'video/webm' }));
+        a.download = 'bmydesk-session-' + Date.now() + '.webm'; a.click();
+        rec = null;
+    };
+    rec.start(1000);
+    $('recBtn').innerHTML = '<i class="fas fa-stop mr-1"></i>';
+    $('recBtn').style.color = '#f43f5e';
+};
+function stopRec() {
+    if (rec && rec.state !== 'inactive') rec.stop();
+    const b = $('recBtn'); if (b) { b.innerHTML = '<i class="fas fa-circle mr-1"></i>'; b.style.color = ''; }
+}
+
 $('chatBtn').onclick = () => { $('chatPanel').classList.toggle('hidden'); $('chatPanel').classList.toggle('flex'); };
 $('fileBtn').onclick = () => $('fileInput').click();
 $('fileInput').onchange = async e => {

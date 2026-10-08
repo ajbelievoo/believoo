@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Bconnect\RemoteSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AgentApiController extends Controller
 {
@@ -173,11 +174,71 @@ class AgentApiController extends Controller
         return response()->json(['ok' => true, 'pin_set' => $pin !== '']);
     }
 
+    // ── Address book: saved devices (owner = this agent's device_id) ──
+    // GET /{code}/devices
+    public function savedDevices(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session) || !$session->device_id) {
+            return response()->json(['ok' => false], 403);
+        }
+        $rows = \Illuminate\Support\Facades\DB::table('bconnect_saved_devices')
+            ->where('owner_key', 'dev:' . $session->device_id)
+            ->orderByDesc('last_used_at')->orderByDesc('id')->limit(50)->get();
+        $out = [];
+        foreach ($rows as $row) {
+            $target = \Illuminate\Support\Facades\DB::table('bconnect_remote_sessions')
+                ->where('session_code', $row->code)->first();
+            $out[] = [
+                'id' => $row->id, 'code' => $row->code, 'label' => $row->label,
+                // device counts as online when its host heartbeat is <3 min fresh
+                'online' => $target && $target->updated_at
+                    && \Illuminate\Support\Carbon::parse($target->updated_at)->gt(now()->subMinutes(3)),
+            ];
+        }
+        return response()->json(['ok' => true, 'devices' => $out]);
+    }
+
+    // POST /{code}/devices  {target_code, label}
+    public function saveDevice(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session) || !$session->device_id) {
+            return response()->json(['ok' => false], 403);
+        }
+        $data = $r->validate(['target_code' => 'required|string|min:6|max:12', 'label' => 'nullable|string|max:120']);
+        \Illuminate\Support\Facades\DB::table('bconnect_saved_devices')->updateOrInsert(
+            ['owner_key' => 'dev:' . $session->device_id, 'code' => strtoupper($data['target_code'])],
+            ['label' => $data['label'] ?? null, 'last_used_at' => now(), 'updated_at' => now(), 'created_at' => now()]
+        );
+        return response()->json(['ok' => true]);
+    }
+
+    // DELETE /{code}/devices/{id}
+    public function forgetDevice(Request $r, string $code, int $id)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session) || !$session->device_id) {
+            return response()->json(['ok' => false], 403);
+        }
+        \Illuminate\Support\Facades\DB::table('bconnect_saved_devices')
+            ->where('owner_key', 'dev:' . $session->device_id)->where('id', $id)->delete();
+        return response()->json(['ok' => true]);
+    }
+
     // POST /api/v1/bmydesk/agent/{code}/join — an agent app joining ANOTHER
     // session as viewer (AnyDesk "remote desk" box). Issues a short-lived
     // viewer token; the host still has to accept the join-request.
     public function join(Request $r, string $code)
     {
+        // Brute-force guard: 20 join attempts / min / IP (covers code guessing)
+        // and 5 wrong PINs / 10 min / code+IP (covers PIN grinding).
+        $joinKey = 'bmd-join:' . $r->ip();
+        if (RateLimiter::tooManyAttempts($joinKey, 20)) {
+            return response()->json(['ok' => false, 'error' => 'too many attempts — wait a minute'], 429);
+        }
+        RateLimiter::hit($joinKey, 60);
+
         $session = $this->findByCode($code);
         if (!$session) {
             return response()->json(['ok' => false, 'error' => 'invalid or expired code'], 404);
@@ -207,9 +268,15 @@ class AgentApiController extends Controller
         if ($pin !== '' && $session->device_id) {
             $pinHash = \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')
                 ->where('device_id', $session->device_id)->value('pin_hash');
+            $pinKey = 'bmd-pin:' . $session->session_code . ':' . $r->ip();
+            if (RateLimiter::tooManyAttempts($pinKey, 5)) {
+                return response()->json(['ok' => false, 'error' => 'too many wrong PINs — wait 10 minutes'], 429);
+            }
             if ($pinHash && \Illuminate\Support\Facades\Hash::check($pin, $pinHash)) {
+                RateLimiter::clear($pinKey);
                 $autoAccept = true;
             } elseif ($pinHash) {
+                RateLimiter::hit($pinKey, 600);
                 return response()->json(['ok' => false, 'error' => 'wrong PIN'], 403);
             }
             // device has no PIN set → fall through to normal approval flow

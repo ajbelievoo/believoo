@@ -62,6 +62,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/{code}/set-pin', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'setPin']);
         Route::post('/{code}/signal', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signal']);
         Route::get('/{code}/signals', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signals']);
+        Route::get('/{code}/devices', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'savedDevices']);
+        Route::post('/{code}/devices', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'saveDevice']);
+        Route::delete('/{code}/devices/{id}', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'forgetDevice']);
     });
 
     // Authenticated routes

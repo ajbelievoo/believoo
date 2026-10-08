@@ -78,12 +78,18 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             <span class="badge" id="latBadge" style="display:none"><span id="latVal">—</span> ms</span>
             <button class="endbtn" id="fileBtn" title="Send file" style="background:#1e293b;color:#e2e8f0;display:none;">📎</button>
             <button class="endbtn" id="chatBtn" title="Chat" style="background:#1e293b;color:#e2e8f0;display:none;">💬</button>
+            <button class="endbtn" id="shotBtn" title="Screenshot" style="background:#1e293b;color:#e2e8f0;display:none;">📸</button>
+            <button class="endbtn" id="recBtn" title="Record session" style="background:#1e293b;color:#e2e8f0;display:none;">⏺</button>
+            <select id="qualitySel" title="Quality" style="background:#1e293b;border:0;color:#94a3b8;font-size:11px;padding:5px;border-radius:6px;display:none;">
+                <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
+            </select>
             <button class="endbtn" id="endBtn">End session</button>
             <input type="file" id="fileInput" style="display:none">
         </div>
     </div>
     <div class="stage-video">
         <video id="remoteVideo" autoplay playsinline tabindex="0"></video>
+        <div id="statOverlay" style="position:absolute;top:52px;left:10px;font-size:10px;color:rgba(226,232,240,.85);background:rgba(15,23,42,.65);padding:2px 8px;border-radius:6px;display:none;pointer-events:none;"></div>
         <div class="overlay" id="waitOverlay">
             <div>
                 <div class="spin"></div>
@@ -229,6 +235,8 @@ async function startPeer() {
     pc.ontrack = e => {
         dbg('video');
         $('remoteVideo').srcObject = e.streams[0];
+        $('statOverlay').style.display = 'block';
+        startStats();
         $('waitOverlay').classList.add('hidden');
         $('clickHint').style.display = 'block';
         setBadge('connected', true); connected = true;
@@ -244,8 +252,8 @@ async function startPeer() {
     };
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { $('fileBtn').style.display = 'inline-block'; $('chatBtn').style.display = 'inline-block'; };
-    dc2.onclose = () => { $('fileBtn').style.display = 'none'; $('chatBtn').style.display = 'none'; $('chatPanel').style.display = 'none'; };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel'].forEach(i => $(i).style.display = 'inline-block'); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','chatPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onmessage = e => {
         try { const m = JSON.parse(e.data); if (m.t === 'pong') { $('latBadge').style.display = 'inline-block'; $('latVal').textContent = Math.round(performance.now() - m.ts); } } catch (x) {}
@@ -316,6 +324,64 @@ $('chatSend').onclick = () => {
     addChat('Me', t, true); $('chatInput').value = '';
 };
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
+$('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
+
+// ── Stats overlay (rtt/fps/bitrate) ──
+let stTimer = null, stBytes = 0, stAt = 0;
+function startStats() {
+    stopStats();
+    stTimer = setInterval(async () => {
+        if (!pc) return;
+        try {
+            let fps = 0, rtt = 0, bytesNow = 0;
+            (await pc.getStats()).forEach(r => {
+                if (r.type === 'inbound-rtp' && r.kind === 'video') { fps = r.framesPerSecond || 0; bytesNow = r.bytesReceived || 0; }
+                if (r.type === 'candidate-pair' && r.nominated) rtt = Math.round((r.currentRoundTripTime || 0) * 1000);
+            });
+            const now = Date.now();
+            const kbps = stAt ? Math.round((bytesNow - stBytes) * 8 / (now - stAt)) : 0;
+            stBytes = bytesNow; stAt = now;
+            $('statOverlay').textContent = rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+        } catch (e) {}
+    }, 2000);
+}
+function stopStats() { if (stTimer) clearInterval(stTimer); stTimer = null; stBytes = 0; stAt = 0; }
+
+// ── Screenshot + session recording ──
+$('shotBtn').onclick = () => {
+    const v = $('remoteVideo');
+    if (!v.videoWidth) return;
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png'); a.download = 'bmydesk-' + Date.now() + '.png'; a.click();
+};
+
+let rec = null, recChunks = [];
+$('recBtn').onclick = () => {
+    if (rec && rec.state !== 'inactive') { stopRec(); return; }
+    const stream = $('remoteVideo').srcObject;
+    if (!stream) return;
+    try { rec = new MediaRecorder(stream, { mimeType: 'video/webm' }); }
+    catch (e) { try { rec = new MediaRecorder(stream); } catch (x) { return; } }
+    recChunks = [];
+    rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(recChunks, { type: 'video/webm' }));
+        a.download = 'bmydesk-session-' + Date.now() + '.webm'; a.click();
+        rec = null;
+    };
+    rec.start(1000);
+    $('recBtn').style.color = '#f43f5e';
+    $('recBtn').textContent = '⏹';
+};
+function stopRec() {
+    if (rec && rec.state !== 'inactive') rec.stop();
+    $('recBtn').style.color = ''; $('recBtn').textContent = '⏺';
+}
+
 $('chatBtn').onclick = () => { const p = $('chatPanel'); p.style.display = p.style.display === 'none' ? 'flex' : 'none'; };
 $('fileBtn').onclick = () => $('fileInput').click();
 $('fileInput').onchange = async e => {
@@ -382,20 +448,30 @@ window.addEventListener('beforeunload', () => {
     try { fetch(API + '/' + CODE + '/signal', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'end', agent_token: VTOKEN, n: nonce() }) }); } catch (e) {}
 });
-// Recent codes — saved in this browser, one-tap fill.
+// Saved devices (guest address book) — labels + one-tap connect, browser-local.
 function recentCodes() { try { return JSON.parse(localStorage.getItem('bmydesk_recent') || '[]'); } catch (e) { return []; } }
-function saveRecent(code) {
+function saveRecent(code, label) {
     const list = recentCodes().filter(c => c.code !== code);
-    list.unshift({ code, at: Date.now() });
-    localStorage.setItem('bmydesk_recent', JSON.stringify(list.slice(0, 6)));
+    list.unshift({ code, label: label || (recentCodes().find(c => c.code === code) || {}).label || '', at: Date.now() });
+    localStorage.setItem('bmydesk_recent', JSON.stringify(list.slice(0, 10)));
 }
 function renderRecent() {
     const list = recentCodes(), box = $('recentRow');
-    if (!list.length) return;
+    if (!list.length) { box.style.display = 'none'; return; }
     box.style.display = 'block';
-    box.innerHTML = '<span style="color:#475569;font-size:11px;">Recent: </span>' + list.map(c =>
-        `<a href="#" data-c="${c.code}" style="color:#22d3ee;font-size:11px;font-family:monospace;margin:0 6px;text-decoration:none;">${c.code}</a>`).join('');
-    box.querySelectorAll('a').forEach(a => a.onclick = e => { e.preventDefault(); $('codeInput').value = a.dataset.c; });
+    box.innerHTML = '<span style="color:#475569;font-size:11px;">Devices: </span>' + list.map(c =>
+        `<a href="#" data-c="${c.code}" style="color:#22d3ee;font-size:11px;font-family:monospace;margin:0 5px;text-decoration:none;">${c.label ? c.label + ' · ' : ''}${c.code}</a>`).join('')
+        + ` <a href="#" id="saveDevLink" style="color:#475569;font-size:11px;text-decoration:none;margin-left:4px;">☆ name &amp; save</a>`;
+    box.querySelectorAll('a[data-c]').forEach(a => a.onclick = e => { e.preventDefault(); $('codeInput').value = a.dataset.c; });
+    const sl = $('saveDevLink');
+    if (sl) sl.onclick = e => {
+        e.preventDefault();
+        const code = $('codeInput').value.trim().toUpperCase();
+        if (code.length < 6) { $('codeInput').focus(); return; }
+        const label = prompt('Name this device:', '') || '';
+        saveRecent(code, label);
+        renderRecent();
+    };
 }
 renderRecent();
 if ($('codeInput').value) dbg('code prefilled — press Connect');

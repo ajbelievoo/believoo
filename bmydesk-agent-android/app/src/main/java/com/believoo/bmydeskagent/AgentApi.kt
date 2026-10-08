@@ -158,4 +158,39 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
             }
         }.getOrDefault(emptyList())
     }
+
+    // ── Address book (saved devices under this device's owner key) ──
+    data class SavedDevice(val id: Int, val code: String, val label: String?, val online: Boolean)
+
+    fun savedDevices(code: String, token: String): List<SavedDevice> {
+        val req = Request.Builder().url("$base/$code/devices")
+            .header("Authorization", "Bearer $token").build()
+        return runCatching {
+            http.newCall(req).execute().use {
+                val arr = gson.fromJson(it.body!!.string(), JsonObject::class.java)
+                    .getAsJsonArray("devices") ?: return@use emptyList()
+                arr.map { d -> d.asJsonObject.let { o ->
+                    SavedDevice(o.get("id").asInt, o.get("code").asString,
+                        o.get("label")?.let { l -> if (l.isJsonNull) null else l.asString },
+                        o.get("online")?.asBoolean == true) } }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    fun saveDevice(code: String, token: String, targetCode: String, label: String) {
+        runCatching {
+            val req = Request.Builder().url("$base/$code/devices")
+                .post(gson.toJson(mapOf("target_code" to targetCode, "label" to label)).toRequestBody(json))
+                .header("Authorization", "Bearer $token").build()
+            http.newCall(req).execute().close()
+        }
+    }
+
+    fun forgetDevice(code: String, token: String, id: Int) {
+        runCatching {
+            val req = Request.Builder().url("$base/$code/devices/$id").delete()
+                .header("Authorization", "Bearer $token").build()
+            http.newCall(req).execute().close()
+        }
+    }
 }

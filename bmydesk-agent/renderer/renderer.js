@@ -37,6 +37,7 @@ async function register() {
         const data = await r.json();
         if (!data.ok) throw new Error(data.error || 'register failed');
         session = data;
+        loadSavedDevices();
         if (Array.isArray(data.ice_servers) && data.ice_servers.length) {
             pcConfig = { iceServers: data.ice_servers };
         }
@@ -403,6 +404,7 @@ async function onCtlMessage(e) {
             const m = JSON.parse(e.data);
             if (m.t === 'chat') { addChat(m.from || ctlPeer, m.text, false); }
             else if (m.t === 'clip') { try { window.agent?.clipboardSet(m.text); } catch (x) {} }
+            else if (m.t === 'quality') { applyQuality(m.mode); }
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
@@ -436,6 +438,19 @@ async function sendFile(buf, name) {
     }
     hdbg('sent ' + name);
     addChat('System', 'Sent file: ' + name, false);
+}
+
+// Viewer picks quality → we retune the outbound video sender live.
+function applyQuality(mode) {
+    const sender = pc?.getSenders().find(s => s.track?.kind === 'video');
+    if (!sender) return;
+    const p = sender.getParameters(); p.encodings = p.encodings || [{}];
+    const e = p.encodings[0];
+    if (mode === 'sd') { e.maxBitrate = 1200000; e.scaleResolutionDownBy = 2; e.maxFramerate = 20; }
+    else if (mode === 'hd') { e.maxBitrate = 9000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    else { e.maxBitrate = 4000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    sender.setParameters(p).catch(() => {});
+    hdbg('quality: ' + mode);
 }
 
 // ── Chat UI ──
@@ -646,6 +661,8 @@ async function startViewerPeer() {
 
     vPc.ontrack = (e) => {
         $('remoteVideo').srcObject = e.streams[0];
+        $('statOverlay').style.display = 'block';
+        startStats();
         $('viewerOverlay').classList.add('hidden');
         vStatus('Connected — move & click to control');
     };
@@ -722,6 +739,27 @@ document.addEventListener('keydown', async (e) => {
 });
 
 $('connectBtn').addEventListener('click', connectToPartner);
+$('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
+
+let vStatsTimer = null, lastBytes = 0, lastStatAt = 0;
+function startStats() {
+    stopStats();
+    vStatsTimer = setInterval(async () => {
+        if (!vPc) return;
+        try {
+            let fps = 0, rtt = 0, bytesNow = 0;
+            (await vPc.getStats()).forEach(r => {
+                if (r.type === 'inbound-rtp' && r.kind === 'video') { fps = r.framesPerSecond || 0; bytesNow = r.bytesReceived || 0; }
+                if (r.type === 'candidate-pair' && r.nominated) rtt = Math.round((r.currentRoundTripTime || 0) * 1000);
+            });
+            const now = Date.now();
+            const kbps = lastStatAt ? Math.round((bytesNow - lastBytes) * 8 / (now - lastStatAt)) : 0;
+            lastBytes = bytesNow; lastStatAt = now;
+            $('statOverlay').textContent = rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+        } catch (e) {}
+    }, 2000);
+}
+function stopStats() { if (vStatsTimer) clearInterval(vStatsTimer); vStatsTimer = null; lastBytes = 0; lastStatAt = 0; }
 $('remoteCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') connectToPartner(); });
 $('viewerEnd').addEventListener('click', () => exitViewer());
 bindViewerInput();
@@ -755,6 +793,55 @@ function renderRecent() {
     });
 }
 renderRecent();
+
+// ── Address book — devices saved server-side under this install's
+// device_id; survive reinstall and are shared nowhere else. ──────────
+async function loadSavedDevices() {
+    if (!session) return;
+    try {
+        const r = await fetch(`${API}/${session.session_code}/devices`, { headers: { 'Authorization': 'Bearer ' + session.agent_token } });
+        const d = await r.json();
+        renderSaved(d.devices || []);
+    } catch (e) {}
+}
+function renderSaved(list) {
+    const box = $('savedBox');
+    if (!box) return;
+    if (!list.length) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.innerHTML = '<div style="font-size:10px;color:#475569;margin-bottom:4px;">Saved devices — tap to connect:</div>' + list.map(d =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:${d.online ? '#22c55e' : '#334155'};flex:none;"></span>
+            <a href="#" data-code="${d.code}" style="color:#22d3ee;text-decoration:none;font-family:monospace;letter-spacing:1px;">${d.code}</a>
+            <span style="color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.label || ''}</span>
+            <a href="#" data-del="${d.id}" style="color:#475569;text-decoration:none;">✕</a>
+        </div>`).join('');
+    box.querySelectorAll('a[data-code]').forEach(a => a.onclick = (e) => {
+        e.preventDefault();
+        $('remoteCode').value = a.dataset.code;
+        connectToPartner();
+    });
+    box.querySelectorAll('a[data-del]').forEach(a => a.onclick = async (e) => {
+        e.preventDefault();
+        try { await fetch(`${API}/${session.session_code}/devices/${a.dataset.del}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + session.agent_token } }); } catch (x) {}
+        loadSavedDevices();
+    });
+}
+$('saveDeviceLink').onclick = async (e) => {
+    e.preventDefault();
+    const code = $('remoteCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 6 || !session) { setStatus('Enter a code first', 'wait'); return; }
+    const label = prompt('Name this device (e.g. "Office PC"):', '');
+    if (label === null) return;
+    try {
+        await fetch(`${API}/${session.session_code}/devices`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+            body: JSON.stringify({ target_code: code, label }),
+        });
+        loadSavedDevices();
+    } catch (x) {}
+};
 
 // Unattended access — set a device PIN; viewers with code+PIN connect
 // without approval. PIN is stored server-side keyed by device_id.
