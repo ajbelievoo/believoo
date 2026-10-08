@@ -226,7 +226,7 @@ Route::get('/ghc-settings', function () {
         'ghc_site_name', 'ghc_tagline', 'ghc_logo', 'ghc_favicon', 'ghc_og_image', 'ghc_meta_title',
         'ghc_meta_description', 'ghc_meta_keywords', 'ghc_support_email', 'ghc_primary_color',
         'ghc_hero_badge', 'ghc_hero_title', 'ghc_hero_subtitle',
-        'ghc_announce_text', 'ghc_announce_url',
+        'ghc_announce_text', 'ghc_announce_url', 'ghc_whatsapp_number',
     ];
     $s = \App\Models\Setting::whereIn('key', $keys)->pluck('value', 'key');
 
@@ -258,5 +258,6 @@ Route::get('/ghc-settings', function () {
         'hero_subtitle' => $s['ghc_hero_subtitle'] ?? 'Browse real synced plans by category, compare specs, choose billing duration and buy from the client dashboard.',
         'announce_text' => $s['ghc_announce_text'] ?? '',
         'announce_url' => $s['ghc_announce_url'] ?? '',
+        'whatsapp_number' => $s['ghc_whatsapp_number'] ?? '',
     ]);
 })->name('api.ghc.settings');
