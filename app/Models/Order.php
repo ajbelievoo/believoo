@@ -221,6 +221,16 @@ class Order extends Model
             ]);
         }
 
+        // Notify admins (telegram/email channels configured in Admin Alert Settings)
+        try {
+            app(\App\Services\AlertService::class)->sendPaymentAlert($this);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Admin payment alert failed', [
+                'order_id' => $this->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+
         if (!$user->phone) {
             return;
         }
