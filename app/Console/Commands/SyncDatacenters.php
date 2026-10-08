@@ -61,18 +61,16 @@ class SyncDatacenters extends Command
     {
         try {
             $apiToken = $node->getDecryptedApiToken();
-            
-            if (!$apiToken) {
-                if (!$silent) {
-                    $this->warn("No API token for node: {$node->display_name}");
-                }
-                Log::warning('Auto-sync: No API token for node', ['node' => $node->name]);
-                return 1;
-            }
-
-            // Create Proxmox API service with node-specific credentials
             $proxmoxUrl = 'https://' . $node->hostname . ':' . $node->port;
-            $proxmox = ProxmoxApiService::forNode($proxmoxUrl, $apiToken, $node->name);
+
+            if ($apiToken) {
+                // Create Proxmox API service with node-specific credentials
+                $proxmox = ProxmoxApiService::forNode($proxmoxUrl, $apiToken, $node->name);
+            } else {
+                // Fall back to ticket auth with configured username/password
+                $proxmox = new ProxmoxApiService($proxmoxUrl, null, $node->name);
+                Log::info('Auto-sync: using password auth fallback', ['node' => $node->name]);
+            }
 
             // Fetch real-time stats from Proxmox API
             $apiStats = $proxmox->getNodeResourceUsage();
