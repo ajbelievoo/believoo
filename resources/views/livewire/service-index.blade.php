@@ -80,7 +80,7 @@
                             ['DDoS protection included free', true, false],
                             ['Instant provisioning after payment', true, false],
                             ['GST invoice for Indian businesses', true, false],
-                            ['30-day money-back guarantee on hosting', true, false],
+                            ['30-day money-back guarantee on self-hosted plans', true, false],
                         ] as [$feature, $us, $them])
                         <tr>
                             <td class="py-3 pr-4 text-slate-700 dark:text-slate-300">{{ $feature }}</td>

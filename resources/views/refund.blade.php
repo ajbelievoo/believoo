@@ -29,7 +29,8 @@
                     <ul class="list-disc ml-6 space-y-2">
                         <li><strong>Duplicate or incorrect charges:</strong> Accidental double payments or billing errors are refunded in full.</li>
                         <li><strong>Service not delivered:</strong> If a paid service cannot be provisioned or activated by us within a reasonable time, the payment for that service is refunded.</li>
-                        <li><strong>30-day hosting guarantee:</strong> First-time shared hosting and VPS orders may be cancelled within 30 days of activation for a full refund — no questions asked. Applies once per customer per service type.</li>
+                        <li><strong>30-day hosting guarantee:</strong> First-time shared hosting and VPS orders provisioned on <strong>Believoo's own infrastructure</strong> may be cancelled within 30 days of activation for a full refund — no questions asked. Applies once per customer per service type.</li>
+                        <li><strong>Upstream-provisioned services:</strong> Services delivered through third-party providers (e.g., OVH-backed cloud/VPS/dedicated products on GHC) follow the upstream provider's terms and are <strong>non-refundable once provisioned</strong>. A full refund applies only if provisioning fails or the order is cancelled before activation.</li>
                         <li><strong>SLA breaches:</strong> Extended downtime beyond our committed uptime may be compensated as service credits applied to your account.</li>
                     </ul>
                 </section>
@@ -39,6 +40,7 @@
                     <p class="mb-4">The following are strictly non-refundable:</p>
                     <ul class="list-disc ml-6 space-y-2">
                         <li>Domain name registrations, transfers, and renewals (once registered with the registry).</li>
+                        <li>Cloud/VPS/dedicated services provisioned via third-party upstream providers (e.g., OVHcloud) after activation — upstream provider terms apply.</li>
                         <li>SSL certificates, software licenses, and third-party products purchased on your behalf.</li>
                         <li>Setup fees, migration fees, and one-time configuration charges.</li>
                         <li>Custom software development, design, or consulting work after work has commenced or been delivered.</li>

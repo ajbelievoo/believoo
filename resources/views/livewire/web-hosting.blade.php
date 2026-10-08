@@ -117,7 +117,7 @@
                 @foreach([
                     ['q' => 'What is included in web hosting?', 'a' => 'All plans include SSD storage, free SSL certificate, daily backups, expert support, and a 99.9% uptime guarantee.'],
                     ['q' => 'Can I upgrade my plan later?', 'a' => 'Yes, you can upgrade your hosting plan at any time. The price difference will be prorated for the remaining billing period.'],
-                    ['q' => 'Do you offer a money-back guarantee?', 'a' => 'We offer a 30-day money-back guarantee on all hosting plans. No questions asked.'],
+                    ['q' => 'Do you offer a money-back guarantee?', 'a' => 'We offer a 30-day money-back guarantee on hosting plans hosted on Believoo\'s own infrastructure. Upstream-provisioned cloud services follow provider terms — see our Refund Policy.'],
                     ['q' => 'How do I migrate my existing website?', 'a' => 'Our team provides free website migration assistance for all new customers. Contact our support team to get started.'],
                     ['q' => 'What control panel do you use?', 'a' => 'We provide cPanel access with all hosting plans, making it easy to manage your website, databases, and email accounts.'],
                 ] as $index => $faq)
