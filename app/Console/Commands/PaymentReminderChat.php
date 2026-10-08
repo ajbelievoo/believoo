@@ -45,9 +45,10 @@ class PaymentReminderChat extends Command
             $dueDate = $inv->due_date->format('d M Y');
             $isOverdue = $inv->due_date->isPast();
 
+            $payUrl = route('invoice.view', $inv->id);
             $msg = $isOverdue
-                ? "⏰ Reminder: Your invoice #{$inv->invoice_number} of {$amount} was due on {$dueDate}. Please pay soon to avoid service interruption. Pay: " . url('/client/invoices')
-                : "💳 Upcoming payment: Invoice #{$inv->invoice_number} of {$amount} is due on {$dueDate}. Pay: " . url('/client/invoices');
+                ? "⏰ Reminder: Your invoice #{$inv->invoice_number} of {$amount} was due on {$dueDate}. Please pay soon to avoid service interruption. Pay: " . $payUrl
+                : "💳 Upcoming payment: Invoice #{$inv->invoice_number} of {$amount} is due on {$dueDate}. Pay: " . $payUrl;
 
             Message::create([
                 'session_id' => $session->session_id,

@@ -65,7 +65,7 @@ class MilestonePaymentController extends Controller
         }
 
         // Fallback to Cashfree if Razorpay not available
-        if ($cashfreeEnabled && !empty($cashfreeClientId) && !empty($cashfreeClientSecret)) {
+        if ($cashfreeEnabled && ($cashfreeIsProduction || $user->isAdmin()) && !empty($cashfreeClientId) && !empty($cashfreeClientSecret)) {
             \Illuminate\Support\Facades\Log::info('Creating Cashfree payment for milestone: ' . $milestone->id);
             return $this->createCashfreePayment($milestone, $agreement, $amountInINR, $user, $cashfreeClientId, $cashfreeClientSecret, $cashfreeIsProduction);
         }

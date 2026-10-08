@@ -1630,16 +1630,16 @@
                         </div>
                         @php
                             $walletGateways = [];
-                            if (($razorpaySettings['razorpay_enabled'] ?? '0') === '1' && !empty($razorpaySettings['razorpay_key_id'])) {
+                            if (($razorpaySettings['razorpay_enabled'] ?? '0') === '1' && !empty($razorpaySettings['razorpay_key_id']) && !empty($razorpaySettings['razorpay_key_secret'])) {
                                 $walletGateways[] = ['id' => 'razorpay', 'name' => 'Razorpay', 'icon' => 'fa-credit-card', 'color' => '#00B7FF'];
                             }
-                            if (($razorpaySettings['cashfree_enabled'] ?? '0') === '1' && !empty($razorpaySettings['cashfree_app_id'])) {
+                            if (($razorpaySettings['cashfree_enabled'] ?? '0') === '1' && ($razorpaySettings['cashfree_mode'] ?? 'sandbox') === 'production' && !empty($razorpaySettings['cashfree_app_id']) && !empty($razorpaySettings['cashfree_secret_key'])) {
                                 $walletGateways[] = ['id' => 'cashfree', 'name' => 'Cashfree', 'icon' => 'fa-wallet', 'color' => '#00D1C1'];
                             }
-                            if (($razorpaySettings['paypal_enabled'] ?? '0') === '1' && !empty($razorpaySettings['paypal_client_id'])) {
+                            if (($razorpaySettings['paypal_enabled'] ?? '0') === '1' && !empty($razorpaySettings['paypal_client_id']) && !empty($razorpaySettings['paypal_client_secret'])) {
                                 $walletGateways[] = ['id' => 'paypal', 'name' => 'PayPal', 'icon' => 'fa-paypal', 'color' => '#0070BA'];
                             }
-                            if (($razorpaySettings['payu_enabled'] ?? '0') === '1' && !empty($razorpaySettings['payu_key'])) {
+                            if (($razorpaySettings['payu_enabled'] ?? '0') === '1' && !empty($razorpaySettings['payu_key']) && !empty($razorpaySettings['payu_salt'])) {
                                 $walletGateways[] = ['id' => 'payu', 'name' => 'PayU', 'icon' => 'fa-university', 'color' => '#FF6B35'];
                             }
                             $primaryGateway = count($walletGateways) > 0 ? $walletGateways[0] : null;

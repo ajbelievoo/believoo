@@ -223,3 +223,16 @@ Examples:
   GitHub rejects blobs >100MB. Never commit APKs; use `public/downloads/` (gitignored).
 - NOTE: `/www/wwwroot/.git` is a SEPARATE parent repo (`ajbelievoo/hitune_music_backend`) that
   only tracks `music/`, `hitunesite/`, `web/` — believoo/ghc are nested independent repos.
+
+## Payment gateway gating (added 2026-10-08)
+
+- A gateway is only offered to customers when it is enabled AND fully credentialled AND in production mode:
+  - Razorpay: `razorpay_enabled` + `razorpay_key_id` + `razorpay_key_secret`
+  - Cashfree: `cashfree_enabled` + `cashfree_mode=production` + `cashfree_app_id` + `cashfree_secret_key` (sandbox is blocked server-side for non-admin users — prevents fake/free payments)
+  - PayPal: `paypal_enabled` + client id + secret
+  - PayU: `payu_enabled` + `payu_key` + `payu_salt`
+  - Stripe: `stripe_enabled` + `stripe_key` + `stripe_secret`
+- Applied in `app/Livewire/Checkout.php` (`setPaymentGatewayByCurrency` — falls back to `wallet`), `resources/views/livewire/checkout.blade.php`, `resources/views/wallet/topup.blade.php`, `resources/views/livewire/client-dashboard.blade.php`, `PaymentController::createCashfreeOrder`, `WalletController::createCashfreeTopup`, `MilestonePaymentController::createPayment`.
+- GHC side: `app/services/payment_service.py::gateway_ready()` returns False for sandbox/test env; `/api/server/gateways` only marks `isActive` for ready gateways; the Next.js hubs (OrderHub/DomainHub/NetworkHub/dashboard) filter `isActive` before listing.
+- Domain sales live on GHC: `/domains/search` and `/domains/register` 301 to `https://ghc.believoo.com/domain/`; domain-management routes (`/domains/my-domains`, dns, renew) remain for existing customers.
+- `/privacy` redirects to `/policy`.
