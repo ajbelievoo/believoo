@@ -96,6 +96,23 @@ class PollOvhServiceDelivery implements ShouldQueue
             }
 
             // Still pending/processing — keep polling with exponential backoff.
+            // SLA alert: notify admins once if delivery is still pending after ~10 attempts
+            if ($this->attempts() === 10) {
+                try {
+                    app(\App\Services\AlertService::class)->sendCriticalAlert(
+                        'provisioning_sla',
+                        "OVH order {$this->ovhOrderId} still pending after extended polling",
+                        [
+                            'Hosting ID' => $this->hostingId,
+                            'OVH Order'  => $this->ovhOrderId,
+                            'Status'     => $status,
+                            'Attempts'   => $this->attempts(),
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('Provisioning SLA alert failed', ['error' => $e->getMessage()]);
+                }
+            }
             $delay = min(3600, $this->backoff * ($this->attempts() + 1));
             $this->release($delay);
         } catch (\Exception $e) {

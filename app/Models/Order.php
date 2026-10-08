@@ -208,7 +208,20 @@ class Order extends Model
     protected function sendPaymentAlerts(): void
     {
         $user = $this->user;
-        if (!$user || !$user->phone) {
+        if (!$user) {
+            return;
+        }
+
+        try {
+            $user->notify(new \App\Notifications\OrderPaidNotification($this));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Order paid mail failed', [
+                'order_id' => $this->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+
+        if (!$user->phone) {
             return;
         }
 

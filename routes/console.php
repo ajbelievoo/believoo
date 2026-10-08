@@ -52,6 +52,20 @@ Schedule::command('licenses:reminders --days=1')
     ->dailyAt('10:00')
     ->withoutOverlapping();
 
+// Hosting/service renewal email reminders (15/7/3/1 days before expiry)
+Schedule::command('hosting:renewal-reminders --days=15')
+    ->dailyAt('09:00')
+    ->withoutOverlapping();
+Schedule::command('hosting:renewal-reminders --days=7')
+    ->dailyAt('09:15')
+    ->withoutOverlapping();
+Schedule::command('hosting:renewal-reminders --days=3')
+    ->dailyAt('09:30')
+    ->withoutOverlapping();
+Schedule::command('hosting:renewal-reminders --days=1')
+    ->dailyAt('09:45')
+    ->withoutOverlapping();
+
 // Daily node resource check report
 Schedule::call(function () {
     $monitor = app(\App\Services\HealthMonitorService::class);

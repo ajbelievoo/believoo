@@ -33,8 +33,8 @@
                 </section>
 
                 <section>
-                    <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tight">6. Governing Law</h2>
-                    <p>These terms shall be governed by and construed in accordance with the laws of India, without regard to its conflict of law provisions.</p>
+                    <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tight">6. Governing Law &amp; Jurisdiction</h2>
+                    <p>These terms shall be governed by and construed in accordance with the laws of India, without regard to its conflict of law provisions. Any dispute arising out of or relating to these terms or our services shall be subject to the exclusive jurisdiction of the courts at Budaun, Uttar Pradesh, India. Before approaching courts, parties agree to attempt good-faith resolution through negotiation for a period of 30 days from written notice of the dispute.</p>
                 </section>
 
                 <section>
