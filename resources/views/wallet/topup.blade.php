@@ -43,7 +43,7 @@
 
 @php
     $razorpayEnabled = ($settings['razorpay_enabled'] ?? '0') === '1' && !empty($settings['razorpay_key_id']) && !empty($settings['razorpay_key_secret']);
-    $cashfreeEnabled = ($settings['cashfree_enabled'] ?? '0') === '1' && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key']);
+    $cashfreeEnabled = ($settings['cashfree_enabled'] ?? '0') === '1' && ($settings['cashfree_mode'] ?? 'sandbox') === 'production' && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key']);
     $paypalEnabled = ($settings['paypal_enabled'] ?? '0') === '1' && !empty($settings['paypal_client_id']) && !empty($settings['paypal_client_secret']);
     $anyGatewayEnabled = $razorpayEnabled || $cashfreeEnabled || $paypalEnabled;
 @endphp

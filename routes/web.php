@@ -117,6 +117,10 @@ Route::get('/policy', function() {
     return view('policy', compact('settings'));
 })->name('policy');
 
+Route::get('/privacy', function () {
+    return redirect()->route('policy', [], 301);
+})->name('privacy');
+
 Route::get('/refund', function() {
     $settings = App\Models\Setting::pluck('value', 'key');
     return view('refund', compact('settings'));
