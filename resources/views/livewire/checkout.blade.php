@@ -551,6 +551,7 @@
                         $paypalEnabled = ($settings['paypal_enabled'] ?? '0') === '1';
                         $payuEnabled = ($settings['payu_enabled'] ?? '0') === '1';
                         $stripeEnabled = ($settings['stripe_enabled'] ?? '0') === '1';
+                        $cashfreeLive = ($settings['cashfree_mode'] ?? 'sandbox') === 'production';
                         $walletBalance = (float) (Auth::user()->wallet_balance ?? 0);
                     @endphp
 
@@ -590,7 +591,7 @@
                             </label>
                         @endif
 
-                        @if($cashfreeEnabled && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key']))
+                        @if($cashfreeEnabled && $cashfreeLive && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key']))
                             <label class="flex items-center p-5 rounded-2xl cursor-pointer transition-all border-2 {{ $paymentGateway === 'cashfree' ? 'border-[#00B7FF] bg-[#00B7FF]/10' : 'border-white/10 bg-white/5 hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="paymentGateway" value="cashfree" class="sr-only">
                                 <div class="flex items-center flex-1">
@@ -663,11 +664,19 @@
                             </label>
                         @endif
 
-                        @if(!$razorpayEnabled && !$cashfreeEnabled && !$paypalEnabled && !$payuEnabled && !$stripeEnabled)
+                        @php
+                            $anyGatewayUsable =
+                                ($razorpayEnabled && !empty($settings['razorpay_key_id']) && !empty($settings['razorpay_key_secret'])) ||
+                                ($cashfreeEnabled && $cashfreeLive && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key'])) ||
+                                ($paypalEnabled && !empty($settings['paypal_client_id']) && !empty($settings['paypal_client_secret'])) ||
+                                ($payuEnabled && !empty($settings['payu_key']) && !empty($settings['payu_salt'])) ||
+                                ($stripeEnabled && !empty($settings['stripe_key']) && !empty($settings['stripe_secret']));
+                        @endphp
+                        @if(!$anyGatewayUsable)
                             <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-6">
                                 <p class="text-yellow-400">
                                     <i class="fas fa-exclamation-triangle mr-2"></i>
-                                    No payment gateway is currently enabled. Please contact support to complete your purchase.
+                                    Online card/UPI payment is temporarily limited. Please pay with your wallet balance or contact support at {{ $settings['support_email'] ?? 'support@believoo.com' }} to complete your purchase.
                                 </p>
                             </div>
                         @endif

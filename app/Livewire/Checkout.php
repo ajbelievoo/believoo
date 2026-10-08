@@ -324,23 +324,29 @@ class Checkout extends Component
         $payuEnabled = ($settings['payu_enabled'] ?? '0') === '1';
         $stripeEnabled = ($settings['stripe_enabled'] ?? '0') === '1';
         
+        $cashfreeLive = ($settings['cashfree_mode'] ?? 'sandbox') === 'production';
+
         if ($this->currency === 'INR') {
             // Indian gateways for INR
-            if ($razorpayEnabled && !empty($settings['razorpay_key_id'])) {
+            if ($razorpayEnabled && !empty($settings['razorpay_key_id']) && !empty($settings['razorpay_key_secret'])) {
                 $this->paymentGateway = 'razorpay';
-            } elseif ($cashfreeEnabled && !empty($settings['cashfree_app_id'])) {
+            } elseif ($cashfreeEnabled && $cashfreeLive && !empty($settings['cashfree_app_id']) && !empty($settings['cashfree_secret_key'])) {
                 $this->paymentGateway = 'cashfree';
-            } elseif ($payuEnabled && !empty($settings['payu_key'])) {
+            } elseif ($payuEnabled && !empty($settings['payu_key']) && !empty($settings['payu_salt'])) {
                 $this->paymentGateway = 'payu';
+            } else {
+                $this->paymentGateway = 'wallet';
             }
         } else {
             // International gateways for USD
-            if ($stripeEnabled && !empty($settings['stripe_key'])) {
+            if ($stripeEnabled && !empty($settings['stripe_key']) && !empty($settings['stripe_secret'])) {
                 $this->paymentGateway = 'stripe';
-            } elseif ($paypalEnabled && !empty($settings['paypal_client_id'])) {
+            } elseif ($paypalEnabled && !empty($settings['paypal_client_id']) && !empty($settings['paypal_client_secret'])) {
                 $this->paymentGateway = 'paypal';
-            } elseif ($payuEnabled && !empty($settings['payu_key'])) {
+            } elseif ($payuEnabled && !empty($settings['payu_key']) && !empty($settings['payu_salt'])) {
                 $this->paymentGateway = 'payu';
+            } else {
+                $this->paymentGateway = 'wallet';
             }
         }
     }
