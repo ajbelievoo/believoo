@@ -98,6 +98,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/services', ServiceIndex::class)->name('services.index');
+Route::redirect('/checkout', '/services');
 // PAYU-REVIEW: streaming sales pages hidden during payment-gateway review — restore after approval
 Route::get('/services/streaming', fn() => redirect()->route('services.index'))
     ->name('services.streaming');
