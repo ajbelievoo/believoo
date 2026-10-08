@@ -142,23 +142,23 @@
         </div>
         <div class="row">
             <span class="label">Invoice Date:</span>
-            <span class="value">{{ $invoice->invoice_date->format('F d, Y') }}</span>
+            <span class="value">{{ ($invoice->invoice_date ?? $invoice->created_at)->format('F d, Y') }}</span>
         </div>
         <div class="row">
             <span class="label">Due Date:</span>
-            <span class="value">{{ $invoice->due_date->format('F d, Y') }}</span>
+            <span class="value">{{ ($invoice->due_date ?? $invoice->created_at)->format('F d, Y') }}</span>
         </div>
     </div>
 
     <div style="margin-bottom: 30px;">
         <div class="section-title">Bill To</div>
         <div style="background: #f9fafb; padding: 15px; border-radius: 8px;">
-            <strong>{{ $invoice->client->name }}</strong><br>
-            {{ $invoice->client->email }}<br>
-            @if($invoice->client->phone)
+            <strong>{{ $invoice->client->name ?? 'Client' }}</strong><br>
+            {{ $invoice->client->email ?? '' }}<br>
+            @if($invoice->client && $invoice->client->phone)
                 {{ $invoice->client->phone }}<br>
             @endif
-            @if($invoice->client->company)
+            @if($invoice->client && $invoice->client->company)
                 {{ $invoice->client->company }}<br>
             @endif
         </div>
@@ -167,11 +167,13 @@
     <div style="margin-bottom: 30px;">
         <div class="section-title">Project Details</div>
         <div style="background: #f9fafb; padding: 15px; border-radius: 8px;">
-            <strong>Project:</strong> {{ $invoice->agreement->project_name }}<br>
+            <strong>Project:</strong> {{ $invoice->agreement->project_name ?? $invoice->service_name ?? 'Service' }}<br>
             @if($invoice->milestone)
                 <strong>Milestone:</strong> {{ $invoice->milestone->title }}<br>
             @endif
-            <strong>Agreement #:</strong> {{ $invoice->agreement->agreement_number }}
+            @if($invoice->agreement)
+                <strong>Agreement #:</strong> {{ $invoice->agreement->agreement_number }}
+            @endif
         </div>
     </div>
 
@@ -191,7 +193,7 @@
                     @else
                         Project Development Services
                     @endif
-                    - {{ $invoice->agreement->project_name }}
+                    - {{ $invoice->agreement->project_name ?? $invoice->service_name ?? 'Service' }}
                 </td>
                 <td style="text-align: right;">${{ number_format($invoice->subtotal, 2) }}</td>
             </tr>
