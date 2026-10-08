@@ -243,3 +243,15 @@ Examples:
 - GHC side: `app/services/payment_service.py::gateway_ready()` returns False for sandbox/test env; `/api/server/gateways` only marks `isActive` for ready gateways; the Next.js hubs (OrderHub/DomainHub/NetworkHub/dashboard) filter `isActive` before listing.
 - Domain sales live on GHC: `/domains/search` and `/domains/register` 301 to `https://ghc.believoo.com/domain/`; domain-management routes (`/domains/my-domains`, dns, renew) remain for existing customers.
 - `/privacy` redirects to `/policy`.
+
+## ⚠️ CRITICAL — Production OVH account: READ-ONLY service operations
+
+The OVH account **ajaykumarsinghup24@gmail.com** hosts the MAIN server for all company
+websites and apps. NEVER call mutating operations on existing upstream services —
+no reinstall, terminate, suspend, IPMI/netboot, rDNS, IP moves, firewall, or contact
+changes, and no real-balance test orders. A wrong call takes every site offline.
+
+- Safe: read-only GETs (catalogs, service info, balance), code/DB changes on this repo.
+- Ordering/provisioning tests need explicit user approval in the conversation.
+- This also applies to `OvhApiService`, `OvhProvisioningService`, artisan `ovh:*`
+  commands, and the GHC Python backend OVH client.
