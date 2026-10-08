@@ -110,7 +110,9 @@ class GhcController extends Controller
         if (isset($data['gateways']) && is_array($data['gateways'])) {
             $list = [];
             foreach ($data['gateways'] as $name => $cfg) {
-                $list[] = ['name' => $name, 'isActive' => !empty($cfg['isActive']), 'config' => $cfg];
+                $isActive = !empty($cfg['isActive']);
+                unset($cfg['isActive']);
+                $list[] = ['name' => $name, 'isActive' => $isActive, 'config' => $cfg];
             }
             $data['gateways'] = $list;
         }
