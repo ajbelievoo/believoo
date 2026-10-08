@@ -138,6 +138,13 @@ Route::get('/refund', function() {
     return view('refund', compact('settings'));
 })->name('refund');
 
+Route::get('/shipping', function() {
+    $settings = App\Models\Setting::pluck('value', 'key');
+    return view('shipping', compact('settings'));
+})->name('shipping');
+Route::redirect('/shipping-policy', '/shipping', 301);
+Route::redirect('/delivery', '/shipping', 301);
+
 // XML Sitemap
 Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap');
 

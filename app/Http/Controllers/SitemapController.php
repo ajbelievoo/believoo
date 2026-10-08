@@ -24,6 +24,7 @@ class SitemapController extends Controller
             ['loc' => route('terms'), 'priority' => '0.3', 'changefreq' => 'yearly'],
             ['loc' => route('policy'), 'priority' => '0.3', 'changefreq' => 'yearly'],
             ['loc' => route('refund'), 'priority' => '0.3', 'changefreq' => 'yearly'],
+            ['loc' => route('shipping'), 'priority' => '0.3', 'changefreq' => 'yearly'],
             ['loc' => route('acceptable-use'), 'priority' => '0.3', 'changefreq' => 'yearly'],
             ['loc' => route('sla'), 'priority' => '0.3', 'changefreq' => 'yearly'],
             ['loc' => route('blog.index'), 'priority' => '0.8', 'changefreq' => 'weekly'],
