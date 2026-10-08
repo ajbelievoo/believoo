@@ -132,7 +132,8 @@ Examples:
 ## PHP/cURL TLS for modern payment APIs (PayU / Razorpay)
 
 - The PHP 8.2 build links libcurl against OpenSSL 1.1.1o (`/usr/local/openssl111`). Some endpoints (Razorpay `api.razorpay.com`) fail TLS handshake from PHP unless libcurl uses the system OpenSSL 3.x library.
-- Fix: `env[LD_LIBRARY_PATH] = /usr/lib/x86_64-linux-gnu` is set in `/www/server/php/82/etc/php-fpm.conf` and `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu` is exported in `/etc/cron.d/believoo-ecosystem` and `/etc/profile.d/believoo_php_openssl.sh` so FPM, cron, and shell `php82` calls use system OpenSSL for cURL.
+- Fix: `env[LD_LIBRARY_PATH] = /usr/lib/x86_64-linux-gnu` is set in `/www/server/php/82/etc/php-fpm.conf` and `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu` is exported in `/etc/cron.d/believoo-ecosystem` and `/etc/profile.d/believoo_php_openssl.sh` so cron and shell `php82` calls use system OpenSSL for cURL.
+- IMPORTANT: the `env[]` line in `php-fpm.conf` alone does NOT fix FPM — FPM workers are forked from the master, so the dynamic linker must see `LD_LIBRARY_PATH` at master startup. The working fix is the systemd drop-in `/etc/systemd/system/php-fpm-82.service.d/override.conf` (`Environment=LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu`), then `systemctl daemon-reload && systemctl restart php-fpm-82`. Verified 2026-10-08: `curl_version()` via FPM shows OpenSSL/3.0.2 and `api.razorpay.com` handshakes cleanly.
 - After editing `php-fpm.conf`, restart with `sudo systemctl restart php-fpm-82`.
 - Payment credentials live in `/www/wwwroot/.payment.env` and are loaded into each platform's settings by the appropriate loader command (Believoo `payment:load-credentials`, Music `scripts/load_payment_env.php`, GHC restart, ZonixPanel manual sync).
 
