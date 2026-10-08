@@ -1014,12 +1014,18 @@
         if (!empty($settings['company_legal_name'])) {
             $schema['legalName'] = $settings['company_legal_name'];
         }
+        $identifiers = [];
         if (!empty($settings['company_cin'])) {
-            $schema['identifier'] = [
-                '@type' => 'PropertyValue',
-                'propertyID' => 'CIN',
-                'value' => $settings['company_cin'],
-            ];
+            $identifiers[] = ['@type' => 'PropertyValue', 'propertyID' => 'CIN', 'value' => $settings['company_cin']];
+        }
+        if (!empty($settings['company_gstin'])) {
+            $identifiers[] = ['@type' => 'PropertyValue', 'propertyID' => 'GSTIN', 'value' => $settings['company_gstin']];
+        }
+        if (!empty($settings['company_pan'])) {
+            $identifiers[] = ['@type' => 'PropertyValue', 'propertyID' => 'PAN', 'value' => $settings['company_pan']];
+        }
+        if ($identifiers) {
+            $schema['identifier'] = count($identifiers) === 1 ? $identifiers[0] : $identifiers;
         }
         if (!empty($settings['company_incorporation_date'])) {
             $incDate = strtotime($settings['company_incorporation_date']);
@@ -1736,7 +1742,7 @@
                 <div class="text-gray-500 text-sm text-center md:text-left">
                     © {{ date('Y') }} <span class="text-cyan-400 font-semibold">B Hosting</span> by {{ $settings['company_legal_name'] ?? 'Believoo Private Limited' }}. All rights reserved.
                     @if($settings['company_cin'] ?? false)
-                        <div class="text-gray-600 text-xs mt-1">CIN: {{ $settings['company_cin'] }} · Incorporated under the Companies Act, 2013, Govt. of India</div>
+                        <div class="text-gray-600 text-xs mt-1">CIN: {{ $settings['company_cin'] }}@if($settings['company_gstin'] ?? false) · GSTIN: {{ $settings['company_gstin'] }}@endif · Incorporated under the Companies Act, 2013, Govt. of India</div>
                     @endif
                 </div>
                 <div class="flex gap-6">
@@ -1855,6 +1861,7 @@
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center">
                     @if($settings['company_cin'] ?? false)<span>CIN: {{ $settings['company_cin'] }}</span>@endif
                     @if($settings['company_pan'] ?? false)<span>PAN: {{ $settings['company_pan'] }}</span>@endif
+                    @if($settings['company_gstin'] ?? false)<span>GSTIN: {{ $settings['company_gstin'] }}</span>@endif
                 </div>
             </div>
             @endif
