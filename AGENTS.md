@@ -111,6 +111,12 @@ Examples:
 - Daily DB backups run via `/etc/cron.d/believoo-ecosystem`.
 - Believoo MySQL backup: `/www/wwwroot/ops/backup-believoo.sh`.
 - Hourly health checks: `/www/wwwroot/ops/health-check.sh`.
+- Log rotation: `/etc/logrotate.d/believoo` (weekly, 8 rotations, `storage/logs/*.log` + `ops/*.log`).
+- `status.believoo.com` is a dedicated nginx vhost → 301 to `https://ghc.believoo.com/status/` (`/www/server/panel/vhost/nginx/status.believoo.com.conf`).
+- `abuse@believoo.com` mailbox exists; password stored at `/root/.believoo-abuse-mailbox.txt`.
+- Admin alert channels configured per-admin in `admin_alert_settings` (email on for user_id=1; telegram needs bot token + chat id).
+- Payment notifications: `OrderPaidNotification` mails the customer on `Order::markAsPaid()`; `AlertService::sendPaymentAlert()` notifies admins. Gateways are shown only when fully configured (key+secret+non-sandbox for production).
+- `datacenter:sync` supports Proxmox ticket auth fallback when a node has no API token.
 
 ## B-Connect AI meeting notes and transcription (Phase 5.4)
 
