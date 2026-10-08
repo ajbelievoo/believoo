@@ -27,7 +27,7 @@ class CampaignMail extends Mailable implements ShouldQueue
 
     public function build()
     {
-        return $this
+        $mail = $this
             ->from($this->fromEmail ?? config('mail.from.address'), $this->fromName ?? config('mail.from.name'))
             ->subject($this->subjectLine)
             ->view('emails.campaign-html')
@@ -36,5 +36,14 @@ class CampaignMail extends Mailable implements ShouldQueue
                 'subject' => $this->subjectLine,
                 'unsubscribeUrl' => $this->unsubscribeUrl,
             ]);
+
+        if ($this->unsubscribeUrl) {
+            $mail->withSymfonyMessage(function (\Symfony\Component\Mime\Email $message) {
+                $message->getHeaders()->addTextHeader('List-Unsubscribe', '<' . $this->unsubscribeUrl . '>');
+                $message->getHeaders()->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+            });
+        }
+
+        return $mail;
     }
 }

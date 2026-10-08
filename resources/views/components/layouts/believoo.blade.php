@@ -1711,6 +1711,8 @@
                         <li><a href="https://support.believoo.com/contact" class="bhosting-footer-link text-sm">Live Chat</a></li>
                         <li><a href="https://support.believoo.com/tickets" class="bhosting-footer-link text-sm">Submit Ticket</a></li>
                         <li><a href="https://support.believoo.com/status" class="bhosting-footer-link text-sm">Server Status</a></li>
+                        <li><a href="/api/docs" class="bhosting-footer-link text-sm">API Docs</a></li>
+                        <li><a href="mailto:abuse@believoo.com" class="bhosting-footer-link text-sm">Report Abuse</a></li>
                     </ul>
                 </div>
             </div>

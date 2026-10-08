@@ -56,5 +56,45 @@
                 <p class="text-slate-500 dark:text-slate-300">No services found.</p>
             </div>
         @endif
+
+        <!-- Why Believoo -->
+        <div class="mt-20 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-8 md:p-12">
+            <h2 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white text-center mb-3">Why Choose Believoo?</h2>
+            <p class="text-slate-500 dark:text-slate-400 text-center mb-10 max-w-xl mx-auto">What you actually get compared to typical budget hosting providers.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700">
+                            <th class="text-left py-3 pr-4 text-slate-500 dark:text-slate-400 font-semibold">Feature</th>
+                            <th class="text-center py-3 px-4 text-amber-600 font-black">Believoo</th>
+                            <th class="text-center py-3 px-4 text-slate-400 font-semibold">Typical Budget Hosts</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                        @foreach([
+                            ['MCA-registered Indian company (CIN verifiable)', true, false],
+                            ['Real human support — tickets, chat, WhatsApp', true, false],
+                            ['Transparent pricing — no surprise renewal hikes', true, false],
+                            ['99.9% uptime SLA with published status page', true, false],
+                            ['NVMe SSD storage on all plans', true, false],
+                            ['DDoS protection included free', true, false],
+                            ['Instant provisioning after payment', true, false],
+                            ['GST invoice for Indian businesses', true, false],
+                            ['30-day money-back guarantee on hosting', true, false],
+                        ] as [$feature, $us, $them])
+                        <tr>
+                            <td class="py-3 pr-4 text-slate-700 dark:text-slate-300">{{ $feature }}</td>
+                            <td class="py-3 px-4 text-center">
+                                @if($us)<i class="fas fa-check-circle text-emerald-500"></i>@else<i class="fas fa-times-circle text-slate-300"></i>@endif
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                @if($them)<i class="fas fa-check-circle text-emerald-500"></i>@else<i class="fas fa-minus-circle text-slate-300 dark:text-slate-600"></i>@endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>

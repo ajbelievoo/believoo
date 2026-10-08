@@ -22,7 +22,15 @@ class NewsletterUpdate extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->updateSubject);
+        $unsubscribeUrl = route('newsletter.unsubscribe', $this->subscriber->unsubscribe_token);
+
+        return new Envelope(
+            subject: $this->updateSubject,
+            headers: [
+                'List-Unsubscribe' => '<' . $unsubscribeUrl . '>',
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ],
+        );
     }
 
     public function content(): Content
