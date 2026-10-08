@@ -239,6 +239,10 @@ class PaymentController extends Controller
             return response()->json(['error' => 'Cashfree not configured'], 400);
         }
 
+        if (!$config['is_production'] && !Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Cashfree is in test mode and cannot accept real payments right now'], 400);
+        }
+
         $service = Service::findOrFail($request->service_id);
         $user = Auth::user();
 

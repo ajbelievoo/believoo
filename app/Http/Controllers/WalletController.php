@@ -284,6 +284,10 @@ class WalletController extends Controller
             return response()->json(['error' => 'Cashfree is not configured for wallet top-up.'], 400);
         }
 
+        if (($settings['cashfree_mode'] ?? 'sandbox') !== 'production' && !Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Cashfree is in test mode and cannot accept real payments right now.'], 400);
+        }
+
         $user = Auth::user();
         $amount = round((float) $request->amount, 2);
 

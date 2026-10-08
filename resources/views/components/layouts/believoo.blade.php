@@ -1289,7 +1289,7 @@
                         <a href="{{ route('home') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('hosting') }}">Home</a>
                         <a href="{{ route('services.show', 'web-hosting-vps') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('web-hosting') }}">Web Hosting</a>
                         <a href="{{ route('vps-plans.index') }}" class="text-sm font-bold uppercase tracking-wider {{ $hostingActive('vps-hosting') }}">VPS</a>
-                        <a href="{{ route('client.domains.search') }}" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Domains</a>
+                        <a href="{{ 'https://ghc.believoo.com/domain/' }}" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Domains</a>
                         <a href="https://support.believoo.com" class="text-sm font-bold uppercase tracking-wider text-gray-300 hover:text-cyan-400">Support</a>
                         
                         <!-- Theme Toggle - All B Hosting Pages -->
@@ -1326,7 +1326,7 @@
                     <a href="{{ route('home') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-white font-bold">Home</a>
                     <a href="{{ route('services.show', 'web-hosting-vps') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Web Hosting</a>
                     <a href="{{ route('vps-plans.index') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">VPS Servers</a>
-                    <a href="{{ route('client.domains.search') }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Domains</a>
+                    <a href="{{ 'https://ghc.believoo.com/domain/' }}" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Domains</a>
                     <a href="https://support.believoo.com" @click="mobileMenuOpen = false" class="block py-3 px-4 rounded-lg hover:bg-white/5 text-gray-300">Support</a>
                     <!-- Mobile Theme Toggle -->
                     <button onclick="window.toggleGlobalTheme()"
@@ -1439,7 +1439,7 @@
                                 @endif
                             </a>
 
-                            <a href="{{ route('client.domains.search') }}"
+                            <a href="{{ 'https://ghc.believoo.com/domain/' }}"
                                class="relative text-sm font-medium transition-colors text-slate-600 hover:text-amber-600">
                                 Domains
                             </a>
@@ -1687,7 +1687,7 @@
                         <li><a href="{{ route('services.show', 'web-hosting-vps') }}" class="bhosting-footer-link text-sm">Web Hosting</a></li>
                         <li><a href="{{ route('vps-plans.index') }}" class="bhosting-footer-link text-sm">VPS Servers</a></li>
                         <li><a href="{{ route('vps-plans.index') }}" class="bhosting-footer-link text-sm">Dedicated Servers</a></li>
-                        <li><a href="{{ route('client.domains.search') }}" class="bhosting-footer-link text-sm">Domain Registration</a></li>
+                        <li><a href="{{ 'https://ghc.believoo.com/domain/' }}" class="bhosting-footer-link text-sm">Domain Registration</a></li>
                     </ul>
                 </div>
                 
@@ -1827,7 +1827,7 @@
                         ['Web Hosting', route('services.show', 'web-hosting-vps')],
                         ['VPS Servers', route('vps-plans.index')],
                         ['Website Builder', route('services.show', 'web-application-development')],
-                        ['Domains', route('client.domains.search')],
+                        ['Domains', 'https://ghc.believoo.com/domain/'],
                         // RAZORPAY-REVIEW: was 'Email Marketing'
                         ['SEO & Growth', route('services.show', 'seo-digital-growth')],
                         ['Reputation Management', route('services.show', 'seo-digital-growth')],

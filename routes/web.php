@@ -183,12 +183,15 @@ Route::get('/hosting-pricing.html', function() {
     return redirect('https://ghc.believoo.com', 301);
 });
 
-// Public Domain Search (no auth required)
-Route::get('/domains/search', [App\Http\Controllers\Client\DomainController::class, 'search'])->name('client.domains.search');
+// Domain sales happen on the GHC portal — public search/register entry points redirect there.
+Route::get('/domains/search', function () {
+    return redirect('https://ghc.believoo.com/domain/', 301);
+})->name('client.domains.search');
 Route::post('/domains/search', [App\Http\Controllers\Client\DomainController::class, 'searchDomains'])->name('client.domains.search.post');
 
-// Domain Registration Form (accessible to guests, will redirect to login if needed)
-Route::get('/domains/register', [App\Http\Controllers\Client\DomainController::class, 'showRegistrationForm'])->name('client.domains.register.form');
+Route::get('/domains/register', function () {
+    return redirect('https://ghc.believoo.com/domain/', 301);
+})->name('client.domains.register.form');
 
 // VPS Plans Routes (Public) — plan browsing is public; configure/order requires auth
 Route::prefix('vps')->name('vps-plans.')->group(function () {
