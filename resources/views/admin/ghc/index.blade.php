@@ -540,16 +540,41 @@
 
             <h4 style="font-size:0.85rem;font-weight:700;color:#00b7ff;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">Payment Gateways</h4>
             <div class="ghc-grid-2" style="margin-bottom:24px;">
+                @php
+                    $gwFields = [
+                        'razorpay' => ['keyId' => 'Key ID', 'keySecret' => 'Key Secret', 'webhookSecret' => 'Webhook Secret'],
+                        'cashfree' => ['keyId' => 'App ID', 'keySecret' => 'Secret Key'],
+                        'paypal'   => ['keyId' => 'Client ID', 'keySecret' => 'Client Secret'],
+                        'payu'     => ['keyId' => 'Merchant Key', 'keySecret' => 'Merchant Salt', 'merchantId' => 'Merchant ID'],
+                        'stripe'   => ['keyId' => 'Publishable Key', 'keySecret' => 'Secret Key', 'webhookSecret' => 'Webhook Secret'],
+                        'paytm'    => ['keyId' => 'Merchant ID', 'keySecret' => 'Merchant Key'],
+                    ];
+                    $gwWithEnv = ['cashfree', 'paypal', 'payu', 'stripe', 'paytm'];
+                @endphp
                 @foreach($credentials['gateways'] ?? [] as $gw)
+                @php $fields = $gwFields[$gw['name']] ?? null; @endphp
                 <div style="border:1px solid var(--border-color);border-radius:12px;padding:16px;background:rgba(148,163,184,0.03);">
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
                         <strong style="color:var(--text-primary);">{{ ucfirst($gw['name']) }}</strong>
-                        <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:#64748b;">
-                            <input type="checkbox" name="gateways[{{ $gw['name'] }}][isActive]" value="1" {{ $gw['isActive'] ? 'checked' : '' }}> Active
-                        </label>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            @if(in_array($gw['name'], $gwWithEnv))
+                            <select name="gateways[{{ $gw['name'] }}][env]" class="ghc-input" style="padding:4px 8px;font-size:0.75rem;width:auto;">
+                                <option value="sandbox" {{ ($gw['config']['env'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' }}>Test</option>
+                                <option value="production" {{ ($gw['config']['env'] ?? '') === 'production' ? 'selected' : '' }}>Live</option>
+                            </select>
+                            @endif
+                            <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:#64748b;">
+                                <input type="checkbox" name="gateways[{{ $gw['name'] }}][isActive]" value="1" {{ $gw['isActive'] ? 'checked' : '' }}> Active
+                            </label>
+                        </div>
                     </div>
-                    <input type="text" name="gateways[{{ $gw['name'] }}][keyId]" placeholder="Key ID / App ID" value="{{ $gw['config']['keyId'] ?? '' }}" class="ghc-input" style="margin-bottom:8px;">
-                    <input type="text" name="gateways[{{ $gw['name'] }}][keySecret]" placeholder="Key Secret / Secret" value="{{ $gw['config']['keySecret'] ?? '' }}" class="ghc-input">
+                    @if($fields)
+                        @foreach($fields as $cfgKey => $label)
+                        <input type="text" name="gateways[{{ $gw['name'] }}][{{ $cfgKey }}]" placeholder="{{ $label }}" value="{{ $gw['config'][$cfgKey] ?? '' }}" class="ghc-input" style="margin-bottom:8px;">
+                        @endforeach
+                    @else
+                        <p style="font-size:0.75rem;color:#64748b;margin:0;">No keys required — enable/disable only.</p>
+                    @endif
                 </div>
                 @endforeach
             </div>
