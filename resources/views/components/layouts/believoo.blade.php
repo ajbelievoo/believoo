@@ -1796,6 +1796,9 @@
                         <li><a href="https://support.believoo.com" class="hover:text-amber-500 transition-colors">Support</a></li>
                         <li><a href="{{ route('portfolio.index') }}" class="hover:text-amber-500 transition-colors">Latest Work</a></li>
                         <li><a href="{{ route('home') }}#services" class="hover:text-amber-500 transition-colors">Services</a></li>
+                        <li><a href="/api/docs" class="hover:text-amber-500 transition-colors">API Docs</a></li>
+                        <li><a href="https://support.believoo.com/status" class="hover:text-amber-500 transition-colors">System Status</a></li>
+                        <li><a href="mailto:abuse@believoo.com" class="hover:text-amber-500 transition-colors">Report Abuse</a></li>
                     </ul>
                 </div>
 
@@ -1813,10 +1816,7 @@
                     <ul class="space-y-3 text-sm">
                         <li><a href="{{ route('services.index') }}" class="hover:text-amber-500 transition-colors">Browse Services</a></li>
                         <li><a href="{{ route('client.dashboard') }}" class="hover:text-amber-500 transition-colors">My Portal</a></li>
-                        {{-- PAYU-REVIEW: external brand links hidden during payment-gateway review
-                        <li><a href="https://bmydesk.believoo.com" class="hover:text-amber-500 transition-colors">Bmydesk Workspace</a></li>
                         <li><a href="https://ghc.believoo.com" class="hover:text-amber-500 transition-colors">GHC Cloud Hosting</a></li>
-                        --}}
                         <li><a href="{{ route('login') }}" class="hover:text-amber-500 transition-colors">Account Login</a></li>
                         <li><a href="{{ route('home') }}#inquiry" class="hover:text-amber-500 transition-colors">Start Project</a></li>
                     </ul>

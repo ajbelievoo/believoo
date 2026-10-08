@@ -29,7 +29,7 @@
                     <ul class="list-disc ml-6 space-y-2">
                         <li><strong>Duplicate or incorrect charges:</strong> Accidental double payments or billing errors are refunded in full.</li>
                         <li><strong>Service not delivered:</strong> If a paid service cannot be provisioned or activated by us within a reasonable time, the payment for that service is refunded.</li>
-                        <li><strong>First-time hosting orders:</strong> New shared/VPS hosting orders may be eligible for a refund if cancelled within 7 days of activation and the service was materially not as described.</li>
+                        <li><strong>30-day hosting guarantee:</strong> First-time shared hosting and VPS orders may be cancelled within 30 days of activation for a full refund — no questions asked. Applies once per customer per service type.</li>
                         <li><strong>SLA breaches:</strong> Extended downtime beyond our committed uptime may be compensated as service credits applied to your account.</li>
                     </ul>
                 </section>
