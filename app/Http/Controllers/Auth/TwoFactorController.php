@@ -14,7 +14,7 @@ class TwoFactorController extends Controller
     /**
      * Show the 2FA challenge view.
      */
-    public function challenge(): View
+    public function challenge(): View|RedirectResponse
     {
         if (!session()->has('two_factor_user_id')) {
             return redirect()->route('login');
