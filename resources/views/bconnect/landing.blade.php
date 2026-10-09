@@ -126,7 +126,7 @@
                             <img src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=https%3A%2F%2Fbmydesk.believoo.com%2Fdl%2Fagent.apk" width="72" height="72" alt="Scan to download Android agent" class="rounded">
                             <span class="text-[10px] text-slate-400 leading-tight max-w-[90px]">Scan with your phone to install the Android agent</span>
                         </div>
-                        <a href="/downloads/BMyDesk-Agent-1.3.0-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                        <a href="/downloads/BMyDesk-Agent-1.3.1-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
                     </div>
                 </div>
             </div>
