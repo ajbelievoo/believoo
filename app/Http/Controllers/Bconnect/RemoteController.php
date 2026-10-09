@@ -240,6 +240,9 @@ class RemoteController extends Controller {
             ->broadcast(['private-remote-agent.' . $session->session_code],
                 $kind === 'end' ? 'client-end' : 'client-signal', $payload);
         $this->queueRelay($session->session_code, $role === 'host' ? 'v' : 'h', $payload);
+        \Illuminate\Support\Facades\Log::info("bmysig {$code} {$kind} " . ($role === 'host' ? 'h→v' : 'v→h')
+            . (isset($payload['sdp']) ? ' sdp=' . strlen($payload['sdp']) . 'b' : '')
+            . ($payload['candidate'] ? ' ice' : ''));
         if ($kind === 'end') $session->update(['status' => 'ended', 'ended_at' => now()]);
         return response()->json(['ok' => true]);
     }
@@ -263,6 +266,7 @@ class RemoteController extends Controller {
                 $accept ? 'client-join-accept' : 'client-join-reject', $payload);
         $this->queueRelay($session->session_code, 'v', ['kind' => $accept ? 'accept' : 'reject'] + $payload);
         $session->update(['status' => $accept ? 'active' : 'rejected']);
+        \Illuminate\Support\Facades\Log::info("bmysig {$code} respond " . ($accept ? 'accept' : 'reject'));
         return response()->json(['ok' => true]);
     }
 

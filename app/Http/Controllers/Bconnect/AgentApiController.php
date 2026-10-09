@@ -288,6 +288,7 @@ class AgentApiController extends Controller
             return response()->json(['ok' => false, 'error' => 'session busy — a viewer is already connected'], 409);
         }
 
+        \Illuminate\Support\Facades\Log::info("bmysig {$code} join name=" . (string)$r->input('name','') . " auto=" . (int)!!$autoAccept);
         $session->update([
             'viewer_token' => Str::random(48),
             'viewer_joined_at' => now(),
@@ -362,6 +363,7 @@ class AgentApiController extends Controller
                 $accept ? 'client-join-accept' : 'client-join-reject', $payload);
         $this->queueSignal($session->session_code, 'v', ['kind' => $accept ? 'accept' : 'reject'] + $payload);
         $session->update(['status' => $accept ? 'active' : 'rejected']);
+        \Illuminate\Support\Facades\Log::info("bmysig {$code} respond " . ($accept ? 'accept' : 'reject'));
         return response()->json(['ok' => true]);
     }
 
@@ -396,6 +398,9 @@ class AgentApiController extends Controller
             ->broadcast(['private-remote-agent.' . $session->session_code],
                 $kind === 'end' ? 'client-end' : 'client-signal', $payload);
         $this->queueSignal($session->session_code, $isHost ? 'v' : 'h', $payload);
+        \Illuminate\Support\Facades\Log::info("bmysig {$code} {$kind} " . ($isHost ? 'h→v' : 'v→h')
+            . (isset($payload['sdp']) ? ' sdp=' . strlen($payload['sdp']) . 'b' : '')
+            . ($payload['candidate'] ? ' ice' : ''));
         if ($kind === 'end') {
             $session->update(['status' => 'ended', 'ended_at' => now()]);
         }
