@@ -34,6 +34,10 @@ class LoadPaymentCredentials extends Command
             'razorpay_key_secret' => $values['RAZORPAY_KEY_SECRET'] ?? '',
             'razorpay_mode' => $values['RAZORPAY_MODE'] ?? 'test',
             'razorpay_enabled' => '1',
+            'cashfree_app_id' => $values['CASHFREE_APP_ID'] ?? '',
+            'cashfree_secret_key' => $values['CASHFREE_SECRET_KEY'] ?? '',
+            'cashfree_mode' => $values['CASHFREE_MODE'] ?? 'sandbox',
+            'cashfree_enabled' => '1',
         ];
 
         foreach ($map as $key => $value) {
