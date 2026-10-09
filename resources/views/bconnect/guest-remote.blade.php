@@ -133,6 +133,12 @@ function postJson(url, body) {
         body: JSON.stringify(body || {}) }).then(r => r.json()).catch(() => ({}));
 }
 function whisper(evt, data) { try { channel.trigger('client-' + evt, data); } catch (e) {} }
+    // strip SDP lines some libwebrtc/Chrome builds reject outright
+    function cleanSdp(sdp) {
+        return String(sdp || '').split(/\r?\n/)
+            .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
+    }
+
 function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); postJson(API + '/' + CODE + '/signal', Object.assign({ agent_token: VTOKEN }, msg)); }
 
 async function join() {
@@ -260,7 +266,7 @@ async function startPeer() {
     };
     const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await pc.setLocalDescription(offer);
-    sendSignal({ kind: 'offer', sdp: pc.localDescription.sdp });
+    sendSignal({ kind: 'offer', sdp: cleanSdp(pc.localDescription.sdp) });
     dbg('offer sent'); setBadge('negotiating');
     streamTimeout = setTimeout(() => {
         if (!connected) {
@@ -277,7 +283,8 @@ async function onSignal(m) {
     try {
         if (m.kind === 'answer') {
             dbg('answer');
-            await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+            try { await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); }
+            catch (e) { await pc.setRemoteDescription({ type: 'answer', sdp: cleanSdp(m.sdp) }); }
             iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {})); iceQueue.length = 0;
         } else if (m.kind === 'ice' && m.candidate) {
             if (pc.remoteDescription) await pc.addIceCandidate(m.candidate).catch(() => {});

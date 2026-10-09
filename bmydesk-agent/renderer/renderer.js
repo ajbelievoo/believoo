@@ -315,6 +315,13 @@ let offering = false;
 // Some peers emit SDP attributes this libwebrtc build won't parse
 // (a=max-message-size outside m=application, LF endings, …). Try raw,
 // then retry with CRLF normalization + exotic attribute lines dropped.
+// Strip SDP lines that are known to break strict parsers on the OTHER side
+// (e.g. a=max-message-size — some libwebrtc builds reject it outright).
+function cleanSdp(sdp) {
+    return String(sdp || '').split(/\r?\n/)
+        .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
+}
+
 async function setRemoteSdp(pc, type, sdp) {
     const raw = String(sdp || '');
     try { await pc.setRemoteDescription({ type, sdp: raw }); return; }
@@ -335,7 +342,7 @@ async function handleOffer(m) {
             await setRemoteSdp(pc, 'offer', m.sdp);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            hostSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
+            hostSignal({ kind: 'answer', sdp: cleanSdp(pc.localDescription.sdp) });
             hdbg('re-answer sent');
         } catch (e) { console.error('re-offer failed', e); }
         return;
@@ -370,7 +377,7 @@ async function handleOffer(m) {
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        hostSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
+        hostSignal({ kind: 'answer', sdp: cleanSdp(pc.localDescription.sdp) });
         hdbg('answer sent');
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
         iceQueue = [];
@@ -734,7 +741,7 @@ async function startViewerPeer() {
 
     const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await vPc.setLocalDescription(offer);
-    viewerSignal({ kind: 'offer', sdp: vPc.localDescription.sdp });
+    viewerSignal({ kind: 'offer', sdp: cleanSdp(vPc.localDescription.sdp) });
     vDbg('offer sent');
 }
 
@@ -746,7 +753,7 @@ async function viewerReoffer() {
     try {
         const offer = await vPc.createOffer({ iceRestart: true });
         await vPc.setLocalDescription(offer);
-        viewerSignal({ kind: 'offer', sdp: vPc.localDescription.sdp });
+        viewerSignal({ kind: 'offer', sdp: cleanSdp(vPc.localDescription.sdp) });
         vDbg('re-offer sent');
     } catch (e) { console.error('reoffer', e); }
 }

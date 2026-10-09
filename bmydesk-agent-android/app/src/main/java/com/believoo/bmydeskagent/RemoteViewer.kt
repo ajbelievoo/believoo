@@ -95,7 +95,7 @@ class RemoteViewer(context: Context) {
                     override fun onSetSuccess() {
                         val o = JsonObject()
                         o.addProperty("kind", "offer")
-                        o.addProperty("sdp", peer!!.localDescription.description)
+                        o.addProperty("sdp", sanitizeSdp(peer!!.localDescription.description))
                         listener?.sendSignal(o)
                     }
                 }, offer)
@@ -149,4 +149,9 @@ class RemoteViewer(context: Context) {
         runCatching { peer?.close() }
         dc = null; peer = null; remoteSet = false; iceQueue.clear()
     }
+
+    // Strip SDP lines some libwebrtc/Chrome builds fail to parse.
+    private fun sanitizeSdp(s: String): String =
+        s.split("\r?\n").filter { it.isNotEmpty() && !it.startsWith("a=max-message-size") }
+            .joinToString("\r\n")
 }

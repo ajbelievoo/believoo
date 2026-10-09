@@ -142,7 +142,7 @@ class WebRtcHost(context: Context) {
                     override fun onSetSuccess() {
                         val o = JsonObject()
                         o.addProperty("kind", "answer")
-                        o.addProperty("sdp", peer!!.localDescription.description)
+                        o.addProperty("sdp", sanitizeSdp(peer!!.localDescription.description))
                         listener?.sendSignal(o)
                     }
                 })
@@ -168,4 +168,9 @@ class WebRtcHost(context: Context) {
         override fun onCreateFailure(p0: String?) {}
         override fun onSetFailure(p0: String?) {}
     }
+
+    // Strip SDP lines some libwebrtc/Chrome builds fail to parse.
+    private fun sanitizeSdp(s: String): String =
+        s.split("\r?\n").filter { it.isNotEmpty() && !it.startsWith("a=max-message-size") }
+            .joinToString("\r\n")
 }
