@@ -149,6 +149,8 @@ async function startPeer() {
     pc.ontrack = (e) => {
         dbg('video track arrived');
         video.srcObject = e.streams[0];
+        $('statOverlay')?.classList.remove('hidden');
+        startStats();
         document.getElementById('waitOverlay').classList.add('hidden');
         if (CAN_CONTROL) document.getElementById('clickHint').classList.remove('hidden');
         setStatus('Connected', 'text-green-400');
@@ -282,7 +284,7 @@ function startStats() {
             const now = Date.now();
             const kbps = stAt ? Math.round((bytesNow - stBytes) * 8 / (now - stAt)) : 0;
             stBytes = bytesNow; stAt = now;
-            const el = $('statOverlay'); if (el) el.textContent = rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+            const el = $('statOverlay'); if (el) el.textContent = (progTxt ? progTxt + '  ·  ' : '') + rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps' + (progTxt ? '  (tap = cancel)' : '');
         } catch (e) {}
     }, 2000);
 }
@@ -324,18 +326,33 @@ function stopRec() {
 
 $('chatBtn').onclick = () => { $('chatPanel').classList.toggle('hidden'); $('chatPanel').classList.toggle('flex'); };
 $('fileBtn').onclick = () => $('fileInput').click();
+let txAbort = false, txActive = false, progTxt = null;
 $('fileInput').onchange = async e => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f || !dc2 || dc2.readyState !== 'open') return;
-    if (f.size > 30 * 1024 * 1024) { addChat('System', 'File too large (30 MB max)', false); return; }
-    const buf = await f.arrayBuffer();
-    ctlSend({ t: 'file-meta', name: f.name, size: buf.byteLength });
-    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
-        dc2.send(buf.slice(off, off + FILE_CHUNK));
-        if (off % (512 * 1024) < FILE_CHUNK) await new Promise(r => setTimeout(r, 0));
-    }
-    addChat('System', 'Sent ' + f.name, false);
+    if (f.size > 200 * 1024 * 1024) { addChat('System', 'File too large (200 MB max)', false); return; }
+    await sendBuf(await f.arrayBuffer(), f.name);
 };
+async function sendBuf(buf, name) {
+    if (txActive) { addChat('System', 'A transfer is already running', false); return; }
+    txActive = true; txAbort = false;
+    ctlSend({ t: 'file-meta', name, size: buf.byteLength });
+    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
+        if (txAbort) { ctlSend({ t: 'file-cancel' }); progTxt = null; addChat('System', 'Transfer cancelled', false); txActive = false; return; }
+        dc2.send(buf.slice(off, off + FILE_CHUNK));
+        if (off % (256 * 1024) < FILE_CHUNK) { progTxt = 'Sending ' + name + ' — ' + Math.round(off * 100 / buf.byteLength) + '%'; await new Promise(r => setTimeout(r, 0)); }
+    }
+    txActive = false; progTxt = null;
+    addChat('System', '↑ Sent ' + name + ' (' + Math.round(buf.byteLength / 1024) + ' KB)', false);
+}
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const f = e.dataTransfer?.files?.[0];
+    if (!f || !dc2 || dc2.readyState !== 'open') return;
+    await sendBuf(await f.arrayBuffer(), f.name);
+});
+$('statOverlay').onclick = () => { if (rxFile) { rxFile = null; ctlSend({ t: 'file-cancel' }); progTxt = null; addChat('System', 'Transfer cancelled', false); } else if (txActive) txAbort = true; };
 document.addEventListener('keydown', async e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && dc2 && dc2.readyState === 'open') {
         try { const t = await navigator.clipboard.readText(); if (t) ctlSend({ t: 'clip', text: t }); } catch (x) {}

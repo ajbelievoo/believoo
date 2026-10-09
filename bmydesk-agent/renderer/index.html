@@ -82,7 +82,7 @@
         <div class="label">Your Session Code</div>
         <div class="code" id="code">— — —</div>
         <div style="margin-top:4px;">
-            <a href="#" id="newCodeLink" style="font-size:10px;color:#475569;text-decoration:none;">↻ new code</a>
+            <a href="#" id="newCodeLink" style="font-size:10px;color:#475569;text-decoration:none;">↻ new code</a> · <a href="#" id="copyLink" style="font-size:10px;color:#475569;text-decoration:none;">⧉ copy link</a>
             <span style="color:#334155;font-size:10px;"> · </span>
             <a href="#" id="pinLink" style="font-size:10px;color:#475569;text-decoration:none;">🔒 unattended access</a>
         </div>
@@ -117,7 +117,9 @@
     <div id="sessBar" class="hidden" style="position:fixed;top:10px;right:10px;z-index:60;display:flex;gap:6px;">
         <button id="fileBtn" title="Send a file" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">📎</button>
         <button id="chatToggle" title="Session chat" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">💬</button>
+        <button id="privacyBtn" title="Blank my screen during session" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🙈</button>
     </div>
+    <div id="fileProg" class="hidden" style="position:fixed;top:44px;right:10px;z-index:60;font-size:11px;background:#0f172a;padding:5px 10px;border-radius:8px;border:1px solid #1e293b;"></div>
     <div id="chatPanel" class="hidden" style="position:fixed;bottom:0;left:0;right:0;background:#0f172a;border-top:1px solid #1e293b;padding:8px;z-index:50;">
         <div id="chatMsgs" style="max-height:110px;overflow-y:auto;font-size:12px;margin-bottom:6px;color:#e2e8f0;"></div>
         <div style="display:flex;gap:6px;">

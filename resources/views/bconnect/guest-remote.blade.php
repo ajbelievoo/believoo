@@ -298,14 +298,17 @@ async function onCtlMessage(e) {
             if (m.t === 'chat') addChat(m.from || 'Remote', m.text, false);
             else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
+            else if (m.t === 'file-cancel') { rxFile = null; setProg(null); addChat('System', 'Transfer cancelled by peer', false); }
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
+            setProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%');
             if (rxFile.got >= rxFile.size) {
                 const f = rxFile; rxFile = null;
                 const url = URL.createObjectURL(new Blob(f.chunks));
                 const a = document.createElement('a'); a.href = url; a.download = f.name; a.click();
                 setTimeout(() => URL.revokeObjectURL(url), 5000);
-                addChat('System', 'Saved ' + f.name, false);
+                setProg(null);
+                addChat('System', '↓ Saved ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB)', false);
             }
         }
     } catch (err) {}
@@ -341,7 +344,7 @@ function startStats() {
             const now = Date.now();
             const kbps = stAt ? Math.round((bytesNow - stBytes) * 8 / (now - stAt)) : 0;
             stBytes = bytesNow; stAt = now;
-            $('statOverlay').textContent = rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+            $('statOverlay').textContent = (progTxt ? progTxt + '  ·  ' : '') + rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps' + (progTxt ? '  (tap = cancel)' : '');
         } catch (e) {}
     }, 2000);
 }
@@ -384,18 +387,35 @@ function stopRec() {
 
 $('chatBtn').onclick = () => { const p = $('chatPanel'); p.style.display = p.style.display === 'none' ? 'flex' : 'none'; };
 $('fileBtn').onclick = () => $('fileInput').click();
+let txAbort = false, txActive = false, progTxt = null;
+function setProg(txt) { progTxt = txt; }
 $('fileInput').onchange = async e => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f || !dc2 || dc2.readyState !== 'open') return;
-    if (f.size > 30 * 1024 * 1024) { addChat('System', 'File too large (30 MB max)', false); return; }
-    const buf = await f.arrayBuffer();
-    ctlSend({ t: 'file-meta', name: f.name, size: buf.byteLength });
-    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
-        dc2.send(buf.slice(off, off + FILE_CHUNK));
-        if (off % (512 * 1024) < FILE_CHUNK) await new Promise(r => setTimeout(r, 0));
-    }
-    addChat('System', 'Sent ' + f.name, false);
+    if (f.size > 200 * 1024 * 1024) { addChat('System', 'File too large (200 MB max)', false); return; }
+    await sendBuf(await f.arrayBuffer(), f.name);
 };
+async function sendBuf(buf, name) {
+    if (txActive) { addChat('System', 'A transfer is already running', false); return; }
+    txActive = true; txAbort = false;
+    ctlSend({ t: 'file-meta', name, size: buf.byteLength });
+    for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
+        if (txAbort) { ctlSend({ t: 'file-cancel' }); setProg(null); addChat('System', 'Transfer cancelled', false); txActive = false; return; }
+        dc2.send(buf.slice(off, off + FILE_CHUNK));
+        if (off % (256 * 1024) < FILE_CHUNK) { setProg('Sending ' + name + ' — ' + Math.round(off * 100 / buf.byteLength) + '%'); await new Promise(r => setTimeout(r, 0)); }
+    }
+    txActive = false; setProg(null);
+    addChat('System', '↑ Sent ' + name + ' (' + Math.round(buf.byteLength / 1024) + ' KB)', false);
+}
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const f = e.dataTransfer?.files?.[0];
+    if (!f || !dc2 || dc2.readyState !== 'open') return;
+    await sendBuf(await f.arrayBuffer(), f.name);
+});
+// tapping the stats overlay while transferring cancels it
+$('statOverlay').onclick = () => { if (rxFile) { rxFile = null; ctlSend({ t: 'file-cancel' }); setProg(null); addChat('System', 'Transfer cancelled', false); } else if (txActive) txAbort = true; };
 // Ctrl+C on this page → clipboard text goes to the host
 document.addEventListener('keydown', async e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && dc2 && dc2.readyState === 'open') {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell, session, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, shell, session, dialog, clipboard, Tray, Menu } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -83,6 +83,9 @@ function createWindow() {
         },
     });
     win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+    win.on('close', (e) => {
+        if (!isQuitting && tray) { e.preventDefault(); win.hide(); }
+    });
 }
 
 app.whenReady().then(() => {
@@ -138,6 +141,49 @@ ipcMain.handle('set-view-mode', (_e, on) => {
 ipcMain.handle('open-external', async (_e, url) => {
     if (typeof url === 'string' && /^https:\/\/([a-z0-9-]+\.)*believoo\.com\//.test(url)) {
         await shell.openExternal(url);
+    }
+});
+
+// ── System tray: app keeps running + reachable when the window is closed ──
+let tray = null, isQuitting = false;
+function wireTray() {
+    try { tray = new Tray(path.join(__dirname, 'assets', 'icon.png')); } catch (e) { return; }
+    const menu = Menu.buildFromTemplate([
+        { label: 'Open BMyDesk', click: () => { win?.show(); win?.focus(); } },
+        { label: 'Start with Windows', type: 'checkbox',
+          checked: app.getLoginItemSettings().openAtLogin,
+          click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
+        { type: 'separator' },
+        { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
+    ]);
+    tray.setToolTip('BMyDesk Agent');
+    tray.setContextMenu(menu);
+    tray.on('click', () => { win?.show(); win?.focus(); });
+}
+app.whenReady().then(() => { if (gotLock) wireTray(); });
+app.on('before-quit', () => { isQuitting = true; });
+
+// ── Privacy screen: black out the host's own displays while a viewer works ──
+// App-level (fullscreen topmost windows); blocking the host's keyboard/mouse
+// needs a service/driver — tracked separately.
+let privacyWins = [];
+ipcMain.on('privacy-screen', (_e, on) => {
+    if (on) {
+        if (privacyWins.length) return;
+        privacyWins = screen.getAllDisplays().map(d => {
+            const w = new BrowserWindow({
+                x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height,
+                frame: false, fullscreen: true, alwaysOnTop: true, skipTaskbar: true,
+                backgroundColor: '#000000', focusable: false,
+                webPreferences: { offscreen: false },
+            });
+            w.loadURL('data:text/html,<body style="background:#000;margin:0;display:flex;align-items:center;justify-content:center;height:100vh"><div style="color:#334155;font:14px sans-serif;text-align:center">BMyDesk — remote session in progress<br><span style="font-size:11px">screen hidden for privacy</span></div></body>');
+            w.setAlwaysOnTop(true, 'screen-saver');
+            return w;
+        });
+    } else {
+        privacyWins.forEach(w => { try { w.destroy(); } catch (e) {} });
+        privacyWins = [];
     }
 });
 

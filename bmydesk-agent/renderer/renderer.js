@@ -388,7 +388,29 @@ async function handleOffer(m) {
 
 // ══ ctl channel — reliable/ordered: chat, clipboard, file transfer ══
 let ctl = null, rxFile = null, ctlPeer = 'peer';
+let txAbort = false, txActive = false;
 const FILE_CHUNK = 16384;
+
+// progress line inside the session bar — shows during any transfer
+function fileProg(txt, cancellable) {
+    const el = $('fileProg'); if (!el) return;
+    if (!txt) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = txt; span.style.color = '#94a3b8';
+    el.appendChild(span);
+    if (cancellable) {
+        const x = document.createElement('a');
+        x.href = '#'; x.textContent = ' ✕ cancel'; x.style.color = '#f43f5e';
+        x.onclick = (e) => { e.preventDefault(); cancelTransfer(); };
+        el.appendChild(x);
+    }
+}
+function cancelTransfer() {
+    if (rxFile) { rxFile = null; ctlSend({ t: 'file-cancel' }); fileProg(null); addChat('System', 'Transfer cancelled', false); return; }
+    txAbort = true; // sender loop checks this between chunks
+}
 
 function wireCtl(ch) {
     ctl = ch;
@@ -406,9 +428,10 @@ async function onCtlMessage(e) {
             else if (m.t === 'clip') { try { window.agent?.clipboardSet(m.text); } catch (x) {} }
             else if (m.t === 'quality') { applyQuality(m.mode); }
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
+            else if (m.t === 'file-cancel') { rxFile = null; fileProg(null); addChat('System', 'Transfer cancelled by peer', false); }
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
-            if (rxFile.got % (256 * 1024) < FILE_CHUNK) hdbg('rx ' + Math.round(rxFile.got / 1024) + 'K');
+            fileProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%', true);
             if (rxFile.got >= rxFile.size) await finishRxFile();
         }
     } catch (err) { console.warn('ctl msg', err); }
@@ -418,6 +441,8 @@ async function finishRxFile() {
     const b64 = await blobToB64(new Blob(f.chunks));
     if (window.agent?.saveFile) {
         const p = await window.agent.saveFile(f.name, b64);
+        fileProg(null);
+        if (p) histPush('↓ ' + f.name);
         hdbg(p ? 'saved ' + f.name : 'save cancelled');
         addChat('System', p ? 'File saved: ' + f.name : 'File receive cancelled', false);
     }
@@ -431,14 +456,33 @@ function blobToB64(blob) {
 }
 async function sendFile(buf, name) {
     if (!ctl || ctl.readyState !== 'open') { setStatus('No session — connect first', 'wait'); return; }
+    if (txActive) { addChat('System', 'A transfer is already running — wait or cancel it', false); return; }
+    txActive = true; txAbort = false;
     ctlSend({ t: 'file-meta', name, size: buf.byteLength });
     for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
+        if (txAbort) { ctlSend({ t: 'file-cancel' }); fileProg(null); addChat('System', 'Transfer cancelled', false); txActive = false; return; }
         ctl.send(buf.slice(off, off + FILE_CHUNK));
-        if (off % (512 * 1024) < FILE_CHUNK) { hdbg('tx ' + Math.round(off / 1024) + 'K'); await new Promise(r => setTimeout(r, 0)); }
+        if (off % (256 * 1024) < FILE_CHUNK) {
+            fileProg('Sending ' + name + ' — ' + Math.round(off * 100 / buf.byteLength) + '%', true);
+            await new Promise(r => setTimeout(r, 0)); // let bufferedAmount drain
+        }
     }
-    hdbg('sent ' + name);
-    addChat('System', 'Sent file: ' + name, false);
+    txActive = false; fileProg(null);
+    addChat('System', 'Sent file: ' + name + ' (' + Math.round(buf.byteLength / 1024) + ' KB)', false);
+    histPush('↑ ' + name);
 }
+
+// transfer history — last few sends/receives, kept in chat
+function histPush(t) { addChat('System', t, false); }
+
+// drag-drop a file anywhere on the window → send over ctl
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer?.files?.[0];
+    if (!f || !ctl || ctl.readyState !== 'open') return;
+    sendFile(await f.arrayBuffer(), f.name);
+});
 
 // Viewer picks quality → we retune the outbound video sender live.
 function applyQuality(mode) {
@@ -699,7 +743,7 @@ async function viewerReoffer() {
 // Input capture on the remote video → host's DataChannel handler
 function bindViewerInput() {
     const v = $('remoteVideo');
-    const send = (o) => { if (vDc && vDc.readyState === 'open') { try { vDc.send(JSON.stringify(o)); } catch (e) {} } };
+    const send = (o) => { if (vDc && vDc.readyState === 'open') { try { vDc.send(JSON.stringify(o)); vLastInput = Date.now(); } catch (e) {} } };
     let last = 0;
     v.addEventListener('mousemove', (e) => {
         const n = performance.now(); if (n - last < 33) return; last = n;
