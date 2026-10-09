@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+// Theme init — before first paint, no flash
+(function(){
+    var t = localStorage.getItem('bconnect_theme');
+    if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.classList.remove('dark','light');
+    document.documentElement.classList.add(t);
+})();
+function bcToggleTheme(){
+    var el = document.documentElement;
+    var t = el.classList.contains('light') ? 'dark' : 'light';
+    el.classList.remove('dark','light'); el.classList.add(t);
+    localStorage.setItem('bconnect_theme', t);
+    var b = document.getElementById('bcThemeBtn');
+    if (b) b.innerHTML = '<i class="fas ' + (t === 'light' ? 'fa-moon' : 'fa-sun') + '"></i>';
+}
+</script>
 <title>@yield('title', $bconnectBrand['title'])</title>
 <meta name="description" content="{{ $bconnectBrand['description'] }}">
 <meta name="keywords" content="{{ $bconnectBrand['keywords'] }}">
@@ -35,7 +52,7 @@
 </head>
 <body class="min-h-screen flex">
 <div id="mobileOverlay" class="bc-overlay" onclick="toggleSidebar()"></div>
-<aside id="sidebar" class="bc-sidebar w-64 bg-[#0b1220] border-r border-[var(--bc-border)] flex flex-col h-screen z-50">
+<aside id="sidebar" class="bc-sidebar w-64 border-r border-[var(--bc-border)] flex flex-col h-screen z-50">
     <div class="p-4 border-b border-[var(--bc-border)]">
         <img src="{{ $bconnectBrand['logo'] }}" class="w-auto max-h-11 max-w-full object-contain object-left" alt="{{ $bconnectBrand['name'] }}">
         <p class="text-[11px] text-slate-500 mt-1.5 truncate">{{ $bconnectCompany->name ?? 'Workspace' }}</p>
@@ -91,6 +108,9 @@
             <a href="{{ route('bconnect.billing') }}" class="hidden sm:flex items-center gap-2 text-xs text-slate-400 hover:text-white bc-badge bc-badge-slate">
                 <i class="fas fa-crown text-cyan-400"></i>{{ ucfirst($bconnectCompany?->plan ?? 'free') }}
             </a>
+            <button id="bcThemeBtn" onclick="bcToggleTheme()" class="bc-theme-btn" title="Toggle light / dark">
+                <i class="fas fa-sun"></i>
+            </button>
             <a href="{{ route('bconnect.notifications') }}" class="relative text-slate-400 hover:text-white text-lg">
                 <i class="fas fa-bell"></i>
                 @php $unread = \App\Models\Bconnect\Notification::where('member_id', optional($bconnectMember)->id)->where('is_read', false)->count(); @endphp
@@ -110,6 +130,10 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('mobileOverlay').classList.toggle('open');
 }
+(function(){
+    var b = document.getElementById('bcThemeBtn');
+    if (b) b.innerHTML = '<i class="fas ' + (document.documentElement.classList.contains('light') ? 'fa-moon' : 'fa-sun') + '"></i>';
+})();
 </script>
 </body>
 </html>

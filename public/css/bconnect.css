@@ -1,11 +1,13 @@
 /* B-CONNECT Global Styles */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-:root {
+:root, html.dark {
     --bc-bg: #0b1220;
-    --bc-panel: #0f172a;
-    --bc-card: #131c2e;
-    --bc-border: rgba(148, 163, 184, 0.12);
+    --bc-panel: rgba(15, 23, 42, 0.72);
+    --bc-panel-solid: #0f172a;
+    --bc-card: rgba(19, 28, 46, 0.66);
+    --bc-card-solid: #131c2e;
+    --bc-border: rgba(148, 163, 184, 0.14);
     --bc-cyan: #00b7ff;
     --bc-cyan-dark: #06b6d4;
     --bc-text: #e2e8f0;
@@ -13,6 +15,34 @@
     --bc-danger: #ef4444;
     --bc-success: #22c55e;
     --bc-warning: #f59e0b;
+    --bc-glow: rgba(0, 183, 255, 0.22);
+    --bc-input: #1e293b;
+    --bc-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+    --bc-ambient1: rgba(0, 183, 255, 0.07);
+    --bc-ambient2: rgba(139, 92, 246, 0.06);
+    color-scheme: dark;
+}
+
+html.light {
+    --bc-bg: #eef1f7;
+    --bc-panel: rgba(255, 255, 255, 0.72);
+    --bc-panel-solid: #ffffff;
+    --bc-card: rgba(255, 255, 255, 0.75);
+    --bc-card-solid: #ffffff;
+    --bc-border: rgba(15, 23, 42, 0.09);
+    --bc-cyan: #0284c7;
+    --bc-cyan-dark: #0369a1;
+    --bc-text: #0f172a;
+    --bc-muted: #5b6b82;
+    --bc-danger: #dc2626;
+    --bc-success: #16a34a;
+    --bc-warning: #d97706;
+    --bc-glow: rgba(2, 132, 199, 0.18);
+    --bc-input: #f1f5f9;
+    --bc-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+    --bc-ambient1: rgba(0, 183, 255, 0.10);
+    --bc-ambient2: rgba(139, 92, 246, 0.08);
+    color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -205,3 +235,106 @@ body {
 .bc-timer-ring { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: rgba(34,197,94,0.12); color: var(--bc-success); font-weight: 700; }
 .bc-timer-ring.active::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--bc-success); box-shadow: 0 0 8px var(--bc-success); animation: bc-pulse 1.5s infinite; }
 @keyframes bc-pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+/* ══════════ Apple-style theme engine — glass, glow, light/dark ══════════ */
+
+html { transition: background-color .3s ease; }
+body {
+    position: relative;
+    transition: background-color .3s ease, color .3s ease;
+}
+
+/* Ambient glow blobs behind everything (Apple keynote feel) */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(900px 480px at 8% -10%, var(--bc-ambient1), transparent 60%),
+        radial-gradient(800px 420px at 95% 5%, var(--bc-ambient2), transparent 60%),
+        radial-gradient(700px 500px at 50% 110%, var(--bc-ambient1), transparent 65%);
+    transition: opacity .3s ease;
+}
+
+/* Frosted glass surfaces */
+.bc-sidebar, header, .bc-card,
+.bg-slate-900, .bc-glass {
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.bc-card {
+    background: var(--bc-card);
+    box-shadow: var(--bc-shadow), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+html.light .bc-card {
+    box-shadow: var(--bc-shadow), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+/* Active nav item — soft cyan pill with glow */
+.bc-sidebar-link.active {
+    background: linear-gradient(135deg, rgba(0,183,255,0.16), rgba(139,92,246,0.10));
+    box-shadow: 0 0 18px var(--bc-glow), inset 0 0 0 1px rgba(0,183,255,0.25);
+}
+.bc-sidebar-link:hover { transform: translateX(2px); }
+
+/* Buttons — tactile, glowing primary */
+.bc-btn-primary {
+    box-shadow: 0 4px 16px var(--bc-glow);
+}
+.bc-btn-primary:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 26px var(--bc-glow);
+    transform: translateY(-1px);
+}
+.bc-btn:active { transform: scale(0.98); }
+
+/* Theme toggle */
+.bc-theme-btn {
+    width: 38px; height: 38px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    border: 1px solid var(--bc-border);
+    background: var(--bc-card);
+    color: var(--bc-muted);
+    font-size: 15px; cursor: pointer;
+    transition: all .2s ease;
+}
+.bc-theme-btn:hover { color: var(--bc-cyan); box-shadow: 0 0 14px var(--bc-glow); }
+
+/* Inputs adopt theme */
+.bc-input { background: var(--bc-input); }
+html.light .bc-input { border-color: rgba(15,23,42,.12); }
+
+/* Scrollbar follows theme */
+html.light ::-webkit-scrollbar-track { background: #eef1f7; }
+html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Light-mode overrides for hardcoded dark utilities used across blades ── */
+html.light body, html.light .text-slate-200, html.light .text-white { color: var(--bc-text); }
+html.light .bg-\[\#0b1220\], html.light .bc-sidebar { background: rgba(255,255,255,.78) !important; }
+html.light .bg-slate-900, html.light .bg-slate-800, html.light .bg-slate-950 {
+    background-color: var(--bc-card) !important;
+}
+html.light .bg-slate-700, html.light .hover\\:bg-slate-700:hover { background-color: #e2e8f0 !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400, html.light .text-slate-500 { color: var(--bc-muted) !important; }
+html.light .border-slate-800, html.light .border-slate-700, html.light .border-slate-600,
+html.light .border-slate-700\/60 { border-color: var(--bc-border) !important; }
+html.light header { background: rgba(255,255,255,.72) !important; }
+html.light .bg-cyan-500\/20 { background: rgba(2,132,199,.12) !important; }
+html.light .text-cyan-400, html.light .text-cyan-300 { color: var(--bc-cyan) !important; }
+html.light .bg-green-500\/10 { background: rgba(22,163,74,.10) !important; }
+html.light .text-green-400 { color: var(--bc-success) !important; }
+html.light .bg-red-500\/10 { background: rgba(220,38,38,.08) !important; }
+html.light .text-red-400 { color: var(--bc-danger) !important; }
+html.light .bg-cyan-500\/10 { background: rgba(2,132,199,.10) !important; }
+html.light .bg-amber-500\/10 { background: rgba(217,119,6,.10) !important; }
+html.light .text-amber-400 { color: var(--bc-warning) !important; }
+html.light .bc-empty i { color: #cbd5e1; }
+
+/* Dark-mode-safe: sidebar uses var, not hardcoded hex */
+.bc-sidebar { background: var(--bc-panel); }
