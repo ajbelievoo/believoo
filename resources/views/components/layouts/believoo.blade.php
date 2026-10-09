@@ -86,6 +86,12 @@
         </script>
     @endif
 
+    <!-- Google AdSense -->
+    @if(!empty($settings['google_adsense']))
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $settings['google_adsense'] }}"
+            crossorigin="anonymous"></script>
+    @endif
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <!-- GLOBAL THEME SYSTEM - Must run before any rendering -->

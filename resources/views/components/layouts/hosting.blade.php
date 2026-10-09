@@ -292,6 +292,12 @@
             box-shadow: 0 0 40px rgba(79, 70, 229, 0.3);
         }
     </style>
+    <!-- Google AdSense -->
+    @php $adsenseClient = \App\Models\Setting::where('key', 'google_adsense')->value('value'); @endphp
+    @if(!empty($adsenseClient))
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClient }}"
+            crossorigin="anonymous"></script>
+    @endif
 </head>
 <body class="antialiased" x-data="{ currency: localStorage.getItem('currency') || 'INR', cookieAccepted: localStorage.getItem('cookieAccepted') }" x-init="$watch('currency', val => localStorage.setItem('currency', val))">
 
