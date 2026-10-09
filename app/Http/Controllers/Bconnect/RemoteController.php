@@ -222,10 +222,18 @@ class RemoteController extends Controller {
         [$session, $role] = $this->codeParticipant($r, $code);
         $kind = (string) $r->input('kind', '');
         if (!in_array($kind, ['offer', 'answer', 'ice', 'end'], true)) abort(422);
+        $sdp = $r->input('sdp');
+        if (is_string($sdp)) {
+            // strip attribute lines some libwebrtc builds reject outright
+            $sdp = implode("\r\n", array_values(array_filter(
+                preg_split('/\r?\n/', $sdp),
+                fn($l) => $l !== '' && strpos($l, 'a=max-message-size') !== 0
+            )));
+        }
         $payload = [
             'n' => (string) ($r->input('n') ?: Str::random(10)),
             'kind' => $kind,
-            'sdp' => $r->input('sdp'),
+            'sdp' => $sdp,
             'candidate' => $r->input('candidate'),
         ];
         \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))

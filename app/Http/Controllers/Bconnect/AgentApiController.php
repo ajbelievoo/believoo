@@ -389,7 +389,7 @@ class AgentApiController extends Controller
         $payload = [
             'n' => (string) ($r->input('n') ?: Str::random(10)),
             'kind' => $kind,
-            'sdp' => $r->input('sdp'),
+            'sdp' => is_string($r->input('sdp')) ? $this->sanitizeSdp($r->input('sdp')) : $r->input('sdp'),
             'candidate' => $r->input('candidate'),
         ];
         \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
@@ -431,6 +431,12 @@ class AgentApiController extends Controller
 
     protected function queueSignal(string $code, string $toRole, array $payload): void
     {
+        // Sanitize SDP in transit — some libwebrtc builds reject exotic
+        // attribute lines (a=max-message-size outside m=application, …).
+        // Cleaning here protects OLD agent builds that can't strip on receive.
+        if (isset($payload['sdp']) && is_string($payload['sdp'])) {
+            $payload['sdp'] = $this->sanitizeSdp($payload['sdp']);
+        }
         $payload['at'] = $payload['at'] ?? now()->toIso8601String();
         $key = $this->signalKey($code, $toRole);
         $list = \Illuminate\Support\Facades\Cache::get($key, []);
@@ -444,6 +450,18 @@ class AgentApiController extends Controller
     protected function drainSignals(string $code, string $role): array
     {
         return \Illuminate\Support\Facades\Cache::pull($this->signalKey($code, $role), []) ?: [];
+    }
+
+    private function sanitizeSdp(string $sdp): string
+    {
+        $lines = preg_split('/\r?\n/', $sdp);
+        $out = [];
+        foreach ($lines as $l) {
+            if ($l === '') continue;
+            if (strpos($l, 'a=max-message-size') === 0) continue;
+            $out[] = $l;
+        }
+        return implode("\r\n", $out);
     }
 
     // POST /api/v1/bmydesk/agent/{code}/end — agent ends its own session
