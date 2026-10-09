@@ -338,3 +338,39 @@ html.light .bc-empty i { color: #cbd5e1; }
 
 /* Dark-mode-safe: sidebar uses var, not hardcoded hex */
 .bc-sidebar { background: var(--bc-panel); }
+
+/* ── Light-mode coverage — every dark utility used across blades ── */
+html.light .text-slate-600 { color: #475569 !important; }
+html.light .text-slate-700 { color: #334155 !important; }
+html.light .text-slate-900 { color: #0f172a !important; }
+html.light .text-slate-100, html.light .text-slate-200 { color: var(--bc-text) !important; }
+html.light .bg-\[\#0f172a\], html.light .bg-slate-800\/60, html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/80, html.light .bg-slate-800\/50 {
+    background-color: var(--bc-card) !important;
+}
+html.light .bg-slate-50, html.light .bg-slate-100, html.light .bg-slate-200 {
+    background-color: var(--bc-input) !important;
+}
+html.light .border-slate-100, html.light .border-slate-200, html.light .border-slate-300,
+html.light .border-slate-400, html.light .border-slate-500 {
+    border-color: var(--bc-border) !important;
+}
+html.light .text-cyan-500, html.light .text-cyan-100, html.light .text-cyan-300 { color: var(--bc-cyan) !important; }
+html.light .text-amber-300, html.light .text-amber-500 { color: var(--bc-warning) !important; }
+html.light .text-red-300, html.light .text-red-500 { color: var(--bc-danger) !important; }
+html.light .text-green-500, html.light .text-emerald-400, html.light .text-green-600 { color: var(--bc-success) !important; }
+html.light .text-rose-400 { color: #e11d48 !important; }
+html.light .bg-cyan-500\/30 { background: rgba(2,132,199,.18) !important; }
+html.light .bg-cyan-500\/5 { background: rgba(2,132,199,.06) !important; }
+html.light .bg-amber-500\/20 { background: rgba(217,119,6,.14) !important; }
+html.light .bg-red-500\/30 { background: rgba(220,38,38,.16) !important; }
+html.light .bg-green-500\/20, html.light .bg-emerald-500\/15 { background: rgba(22,163,74,.14) !important; }
+html.light .bg-rose-500\/20 { background: rgba(225,29,72,.12) !important; }
+html.light .hover\\:bg-slate-800:hover { background-color: #e8edf4 !important; }
+html.light .hover\\:text-white:hover { color: var(--bc-cyan) !important; }
+html.light .hover\\:border-slate-500:hover { border-color: var(--bc-cyan) !important; }
+html.light .divide-slate-800 > * + *, html.light .divide-slate-700 > * + * { border-color: var(--bc-border) !important; }
+html.light .placeholder-slate-500::placeholder { color: #94a3b8 !important; }
+html.light .shadow-xl, html.light .shadow-2xl, html.light .shadow-lg {
+    --tw-shadow-color: rgba(15,23,42,.10);
+}
