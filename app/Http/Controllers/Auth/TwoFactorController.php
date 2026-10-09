@@ -58,6 +58,14 @@ class TwoFactorController extends Controller
         $request->session()->remove('two_factor_user_id');
         $request->session()->remove('two_factor_remember');
 
+        if ($request->session()->pull('two_factor_bconnect')) {
+            $member = \App\Models\Bconnect\Member::where('user_id', $user->id)->where('is_active', true)->first();
+            if ($member) {
+                session(['bconnect_company_id' => $member->company_id, 'bconnect_role' => $member->role]);
+            }
+            return redirect()->intended(route('bconnect.dashboard'));
+        }
+
         if ($request->is('admin/*') || $request->is('admin')) {
             return redirect()->intended('/admin');
         }

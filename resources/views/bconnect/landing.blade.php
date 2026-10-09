@@ -119,10 +119,14 @@
                 </form>
                 <div class="mt-5 pt-4 border-t border-slate-700/60">
                     <p class="text-[11px] text-slate-500 mb-3"><i class="fas fa-download mr-1"></i>Hosting a session? Get the agent — shows your permanent code &amp; shares your screen:</p>
-                    <div class="flex flex-wrap gap-2">
-                        <a href="/dl/agent.exe" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows</a>
-                        <a href="/dl/agent.apk" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android</a>
-                        <a href="/downloads/BMyDesk-Agent-1.1.0-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="/dl/agent.exe" download id="dlWin" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows</a>
+                        <a href="/dl/agent.apk" download id="dlApk" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android</a>
+                        <div id="apkQr" class="hidden items-center gap-2 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=https%3A%2F%2Fbmydesk.believoo.com%2Fdl%2Fagent.apk" width="72" height="72" alt="Scan to download Android agent" class="rounded">
+                            <span class="text-[10px] text-slate-400 leading-tight max-w-[90px]">Scan with your phone to install the Android agent</span>
+                        </div>
+                        <a href="/downloads/BMyDesk-Agent-1.3.0-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
                     </div>
                 </div>
             </div>
@@ -372,5 +376,15 @@
     </div>
 </footer>
 
+
+<script>
+(function () {
+    var ua = navigator.userAgent || '';
+    var isAndroid = /Android/i.test(ua), isWin = /Windows/i.test(ua);
+    var el = isAndroid ? document.getElementById('dlApk') : (isWin ? document.getElementById('dlWin') : null);
+    if (el) { el.classList.remove('bg-slate-800'); el.classList.add('bg-cyan-600', 'ring-2', 'ring-cyan-300'); }
+    if (!isAndroid) { var q = document.getElementById('apkQr'); if (q) { q.classList.remove('hidden'); q.classList.add('flex'); } }
+})();
+</script>
 </body>
 </html>

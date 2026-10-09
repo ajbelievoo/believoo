@@ -562,6 +562,7 @@ function startClipSync() {
 function stopClipSync() { if (clipTimer) { clearInterval(clipTimer); clipTimer = null; } }
 
 function teardown(msg) {
+    resetPrivacy();
     stopClipSync();
     ctl = null; rxFile = null;
     $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
@@ -784,13 +785,15 @@ function exitViewer(delay = 0) {
     delay ? setTimeout(doIt, delay) : doIt();
 }
 
-// Invite — copies a web guest link so someone can view this device instantly
-$('inviteBtn') && ($('inviteBtn').onclick = async () => {
-    const code = ($('myCode') || {}).textContent?.trim() || hostCode || '';
-    const link = 'https://bmydesk.believoo.com/remote/guest?code=' + encodeURIComponent(code);
-    try { await window.agent.clipboardSet(link); hdbg('invite link copied: ' + link); }
-    catch (e) { hdbg('invite: ' + link); }
-});
+// copy link — invite URL anyone can open in a browser to view this device
+$('copyLink').onclick = async (e) => {
+    e.preventDefault();
+    const code = ($('code').textContent || '').replace(/\D/g, '');
+    if (!code) return;
+    const link = 'https://bmydesk.believoo.com/remote/guest?code=' + code;
+    try { window.agent.clipboardSet(link); hdbg('invite link copied'); }
+    catch (err) { hdbg('invite: ' + link); }
+};
 
 // Ctrl+C while viewing → send clipboard text to host (clipboard sync)
 document.addEventListener('keydown', async (e) => {
@@ -802,6 +805,43 @@ document.addEventListener('keydown', async (e) => {
 
 $('connectBtn').addEventListener('click', connectToPartner);
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
+
+// 📷 screenshot — grab the current remote frame as PNG
+$('shotBtn').onclick = () => {
+    const v = $('remoteVideo');
+    if (!v || !v.videoWidth) return;
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    c.toBlob(b => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = 'bmydesk-' + Date.now() + '.png';
+        a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    });
+};
+
+// ⏺ session recording — MediaRecorder on the remote stream, webm download
+let rec = null, recChunks = [];
+$('recBtn').onclick = () => {
+    if (rec) { rec.stop(); return; }
+    const st = $('remoteVideo').srcObject;
+    if (!st) return;
+    recChunks = [];
+    try { rec = new MediaRecorder(st, { mimeType: 'video/webm' }); } catch (e) { try { rec = new MediaRecorder(st); } catch (e2) { rec = null; return; } }
+    rec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => {
+        const blob = new Blob(recChunks, { type: 'video/webm' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'bmydesk-session-' + Date.now() + '.webm';
+        a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+        rec = null; recChunks = [];
+        $('recBtn').style.background = '#1e293b';
+    };
+    rec.start(1000);
+    $('recBtn').style.background = '#f43f5e';
+};
 
 let vStatsTimer = null, lastBytes = 0, lastStatAt = 0;
 function startStats() {

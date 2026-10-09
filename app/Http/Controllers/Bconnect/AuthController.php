@@ -23,14 +23,25 @@ class AuthController extends Controller {
 
     public function login(Request $r) {
         $r->validate(['email' => 'required|email', 'password' => 'required']);
-        if (Auth::attempt($r->only('email', 'password'), $r->boolean('remember'))) {
-            $member = Member::where('user_id', Auth::id())->where('is_active', true)->first();
-            if ($member) {
-                session(['bconnect_company_id' => $member->company_id, 'bconnect_role' => $member->role]);
-            }
-            return redirect()->intended(route('bconnect.dashboard'));
+        if (!Auth::validate($r->only('email', 'password'))) {
+            return back()->with('error', 'Invalid credentials');
         }
-        return back()->with('error', 'Invalid credentials');
+        $user = User::where('email', $r->email)->first();
+        if ($user && $user->twoFactorEnabled()) {
+            session([
+                'two_factor_user_id' => $user->id,
+                'two_factor_remember' => $r->boolean('remember'),
+                'two_factor_bconnect' => true,
+            ]);
+            return redirect()->route('two-factor.challenge');
+        }
+        Auth::login($user, $r->boolean('remember'));
+        $r->session()->regenerate();
+        $member = Member::where('user_id', Auth::id())->where('is_active', true)->first();
+        if ($member) {
+            session(['bconnect_company_id' => $member->company_id, 'bconnect_role' => $member->role]);
+        }
+        return redirect()->intended(route('bconnect.dashboard'));
     }
 
     public function showRegister() { return view('bconnect.register'); }
