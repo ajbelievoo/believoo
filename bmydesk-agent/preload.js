@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('agent', {
     clipboardGet: () => ipcRenderer.invoke('clipboard-get'),
     clipboardSet: (t) => ipcRenderer.send('clipboard-set', t),
     privacyScreen: (on) => ipcRenderer.send('privacy-screen', !!on),
+    attention: (name) => ipcRenderer.send('attention', name),
     onUpdate: (cb) => ipcRenderer.on('agent-update', (_e, d) => cb(d)),
     installUpdate: () => ipcRenderer.send('update-install'),
     onAuth: (cb) => ipcRenderer.on('agent-auth', (_e, d) => cb(d)),

@@ -163,7 +163,7 @@ function sigNew(m) {
 }
 // queued signals get a server timestamp — drop stale ones so a leftover
 // "end"/"offer" from a dead pairing can't kill a fresh session.
-const sigFresh = (m) => !m.at || (Date.now() - Date.parse(m.at)) < 45000;
+const sigFresh = (m) => m.kind === 'ice' ? (!m.at || (Date.now() - Date.parse(m.at)) < 45000) : true; // only ICE ages out — offers/answers/accepts are state, not noise
 const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 function postSignal(code, token, msg) {
     msg.n = nonce();
@@ -190,11 +190,19 @@ function startStatusPoll() {
             });
             const d = await r.json();
             const joinMs = d.ok && d.viewer_joined_at ? Date.parse(d.viewer_joined_at) : 0;
-            if (joinMs && joinMs > respondedAt && (Date.now() - joinMs < 120000)
+            // Server status is the truth — 'connecting' means a viewer is
+            // waiting for our answer regardless of how long ago they joined.
+            if (joinMs && joinMs > respondedAt && d.status === 'connecting'
                 && $('reqBox').classList.contains('hidden') && !pc) {
-                $('reqName').textContent = d.viewer || 'Someone';
+                $('reqName').textContent = (d.viewer || 'Someone') +
+                    (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : '');
                 $('reqBox').classList.remove('hidden');
+                window.agent.attention(d.viewer);
                 setStatus('Connection request…', 'wait');
+            }
+            // viewer gave up / server moved past it — hide a stale prompt
+            if (d.status !== 'connecting' && $('reqBox') && !$('reqBox').classList.contains('hidden') && !pc) {
+                $('reqBox').classList.add('hidden');
             }
             // drain queued signals — this is the full ws-free signaling path
             const sr = await fetch(`${API}/${session.session_code}/signals`, {
@@ -254,6 +262,7 @@ function connectChannel() {
     ch.bind('client-join-request', (m) => {
         $('reqName').textContent = m.name || 'Someone';
         $('reqBox').classList.remove('hidden');
+        window.agent.attention(m.name);
         setStatus('Connection request…', 'wait');
         try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play().catch(()=>{}); } catch(e){}
     });

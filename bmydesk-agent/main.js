@@ -167,6 +167,16 @@ app.on('before-quit', () => { isQuitting = true; });
 // App-level (fullscreen topmost windows); blocking the host's keyboard/mouse
 // needs a service/driver — tracked separately.
 let privacyWins = [];
+// Viewer knocked — flash taskbar + bring the window up so the host notices
+ipcMain.on('attention', (_e, name) => {
+    try {
+        if (win && !win.isDestroyed()) { win.show(); win.flashFrame(true); win.focus(); }
+        new (require('electron').Notification)({
+            title: 'BMyDesk — connection request',
+            body: (name || 'Someone') + ' wants to view your screen',
+        }).show();
+    } catch (e) {}
+});
 ipcMain.on('privacy-screen', (_e, on) => {
     if (on) {
         if (privacyWins.length) return;
