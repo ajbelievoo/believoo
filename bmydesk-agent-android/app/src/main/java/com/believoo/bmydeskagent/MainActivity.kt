@@ -135,6 +135,7 @@ class MainActivity : Activity() {
         buildUi()
         if (!handleAuthIntent(intent)) register()
         checkUpdate()
+        promptBatteryOnce()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -392,6 +393,18 @@ class MainActivity : Activity() {
             setPadding(0, 10, 0, 0)
             setOnClickListener { promptUnattendedPin() }
         })
+        col.addView(TextView(this).apply {
+            text = "⧉ Share invite link"
+            setTextColor(Color.parseColor("#475569")); textSize = 12f; gravity = Gravity.CENTER
+            setPadding(0, 10, 0, 0)
+            setOnClickListener {
+                val c = reg?.code ?: return@setOnClickListener
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, "Connect to my device on BMyDesk: https://bmydesk.believoo.com/remote/guest/$c")
+                }, "Share invite link"))
+            }
+        })
 
         endBtn = Button(this).apply {
             text = "End session"; visibility = View.GONE
@@ -429,11 +442,32 @@ class MainActivity : Activity() {
         vSessRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
         vSessRow.addView(Button(this).apply { text = "💬"; setOnClickListener { toggleChat() } })
         vSessRow.addView(Button(this).apply { text = "📎"; setOnClickListener { pickFile() } })
+        vSessRow.addView(Button(this).apply { text = "⌨"; setOnClickListener { keysRow.visibility = if (keysRow.visibility == View.VISIBLE) View.GONE else View.VISIBLE } })
         vBar.addView(vSessRow)
         vBar.addView(Button(this).apply { text = "Disconnect"; setOnClickListener { exitViewer() } })
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP))
+        // special-keys row — sits under the viewer bar, toggled by ⌨
+        keysRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#f00f172a")); setPadding(10, 4, 10, 4)
+        }
+        mapOf("Esc" to "Escape", "Tab" to "Tab", "Ctrl" to "ControlLeft", "Alt" to "AltLeft",
+              "◀" to "ArrowLeft", "▲" to "ArrowUp", "▼" to "ArrowDown", "▶" to "ArrowRight",
+              "Del" to "Delete", "Home" to "Home", "Win" to "MetaLeft").forEach { (lbl, code) ->
+            keysRow.addView(Button(this).apply {
+                text = lbl; textSize = 11f
+                setOnClickListener { sendKey(code) }
+            })
+        }
+        keysRow.addView(Button(this).apply {
+            text = "⌨"; textSize = 11f
+            setOnClickListener { typeDialog() }
+        })
+        viewerPane.addView(keysRow, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM))
         frame.addView(viewerPane)
 
         // Session chat panel — overlays bottom of whichever screen is up
@@ -470,6 +504,7 @@ class MainActivity : Activity() {
     }
 
     private lateinit var vSessRow: LinearLayout
+    private lateinit var keysRow: LinearLayout
 
     // ── Session tools: chat / file / clipboard (host + viewer share these) ──
     private fun activeCtl(): CtlChannel? =
@@ -571,6 +606,92 @@ class MainActivity : Activity() {
     }
 
     private fun toast(t: String) = android.widget.Toast.makeText(this, t, android.widget.Toast.LENGTH_SHORT).show()
+
+    // ── Special keys + typing to the remote ──
+    private fun sendKey(code: String) {
+        remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", true) })
+        remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", false) })
+    }
+
+    // simple char→DOM-code map; shift-aware for capitals + common symbols
+    private fun charCode(c: Char): Pair<String, Boolean>? = when {
+        c in 'a'..'z' -> "Key" + c.uppercaseChar() to false
+        c in 'A'..'Z' -> "Key$c" to true
+        c in '0'..'9' -> "Digit$c" to false
+        c == ' ' -> "Space" to false
+        c == '\n' -> "Enter" to false
+        c == '.' -> "Period" to false; c == ',' -> "Comma" to false
+        c == '-' -> "Minus" to false; c == '=' -> "Equal" to false
+        c == '/' -> "Slash" to false; c == '\\' -> "Backslash" to false
+        c == '!' -> "Digit1" to true;  c == '@' -> "Digit2" to true
+        c == '#' -> "Digit3" to true;  c == '$' -> "Digit4" to true
+        c == '%' -> "Digit5" to true;  c == '^' -> "Digit6" to true
+        c == '&' -> "Digit7" to true;  c == '*' -> "Digit8" to true
+        c == '(' -> "Digit9" to true;  c == ')' -> "Digit0" to true
+        else -> null
+    }
+    private fun typeText(t: String) {
+        for (c in t) {
+            if (c == '\b') { sendKey("Backspace"); continue }
+            val m = charCode(c) ?: continue
+            if (m.second) remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", "ShiftLeft"); addProperty("down", true) })
+            sendKey(m.first)
+            if (m.second) remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", "ShiftLeft"); addProperty("down", false) })
+        }
+    }
+
+    private fun typeDialog() {
+        val input = android.widget.EditText(this).apply { hint = "Type to remote…" }
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Send text")
+            .setView(input)
+            .setPositiveButton("Send") { _, _ -> typeText(input.text.toString()) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Ask once to enable the accessibility service that injects viewer input.
+    private fun promptAccessibilityOnce() {
+        if (RemoteControlService.enabled()) return
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("access_prompted", false)) return
+        prefs.edit().putBoolean("access_prompted", true).apply()
+        ui {
+            android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Enable remote control?")
+                .setMessage("Viewers can tap and control this device if you enable the BMyDesk accessibility service. Without it sessions are view-only.\n\nTurn on 'BMyDesk Agent' in the list that opens.")
+                .setPositiveButton("Enable") { _, _ ->
+                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                }
+                .setNegativeButton("View only", null)
+                .show()
+        }
+    }
+
+    // Battery optimization kills background agents — ask once to exempt.
+    private fun promptBatteryOnce() {
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("batt_prompted", false)) return
+        prefs.edit().putBoolean("batt_prompted", true).apply()
+        thread {
+            Thread.sleep(4000) // let registration settle first
+            ui {
+                runCatching {
+                    val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                    if (android.os.Build.VERSION.SDK_INT >= 23 && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                            .setTitle("Keep BMyDesk reachable")
+                            .setMessage("Battery optimization can put the agent to sleep. Exempt it so your code stays reachable?")
+                            .setPositiveButton("Exempt") { _, _ ->
+                                runCatching { startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:$packageName"))) }
+                            }
+                            .setNegativeButton("Later", null)
+                            .show()
+                    }
+                }
+            }
+        }
+    }
 
     private fun ui(block: () -> Unit) = runOnUiThread(block)
     private fun setStatus(t: String, color: String = "#94a3b8") {
@@ -707,6 +828,7 @@ class MainActivity : Activity() {
         pendingProjection = false
         respondTo("accept")
         setStatus("Accepted — waiting for stream…", "#22c55e")
+        promptAccessibilityOnce()
         endBtn.visibility = View.VISIBLE
         waitingOfferSdp?.let { sdp -> waitingOfferSdp = null; handleOffer(sdp) }
     }
@@ -847,22 +969,50 @@ class MainActivity : Activity() {
     }
 
     // Touch → input events (same JSON protocol as the web/Electron viewer)
+    // + 2-finger pinch = local zoom, drag while zoomed = pan, double-tap resets.
     private var touchMoved = false
     private var lastMove = 0L
+    private var vScale = 1f
+    private var panX = 0f; private var panY = 0f
+    private var lastTX = 0f; private var lastTY = 0f
     private fun bindViewerTouch() {
+        val scaleDet = android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(d: android.view.ScaleGestureDetector): Boolean {
+                vScale = (vScale * d.scaleFactor).coerceIn(1f, 5f)
+                remoteSurface?.let { it.scaleX = vScale; it.scaleY = vScale }
+                clampPan()
+                return true
+            }
+        })
+        val tapDet = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                vScale = 1f; panX = 0f; panY = 0f
+                remoteSurface?.let { it.scaleX = 1f; it.scaleY = 1f; it.translationX = 0f; it.translationY = 0f }
+                return true
+            }
+        })
         remoteSurface?.setOnTouchListener { _, ev ->
+            scaleDet.onTouchEvent(ev); tapDet.onTouchEvent(ev)
+            if (ev.pointerCount >= 2) { touchMoved = true; return@setOnTouchListener true } // pinch = not input
             val w = remoteSurface!!.width.toFloat().coerceAtLeast(1f)
             val h = remoteSurface!!.height.toFloat().coerceAtLeast(1f)
-            when (ev.action) {
-                android.view.MotionEvent.ACTION_DOWN -> touchMoved = false
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> { touchMoved = false; lastTX = ev.x; lastTY = ev.y }
                 android.view.MotionEvent.ACTION_MOVE -> {
-                    touchMoved = true
-                    val now = android.os.SystemClock.elapsedRealtime()
-                    if (now - lastMove >= 33) {
-                        lastMove = now
-                        remoteViewer?.sendInput(JsonObject().apply {
-                            addProperty("t", "move"); addProperty("x", ev.x / w); addProperty("y", ev.y / h)
-                        })
+                    if (vScale > 1.01f) { // zoomed → pan locally instead of remote-drag
+                        panX += ev.x - lastTX; panY += ev.y - lastTY; lastTX = ev.x; lastTY = ev.y
+                        clampPan()
+                        remoteSurface?.let { it.translationX = panX; it.translationY = panY }
+                        touchMoved = true
+                    } else {
+                        touchMoved = true
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastMove >= 33) {
+                            lastMove = now
+                            remoteViewer?.sendInput(JsonObject().apply {
+                                addProperty("t", "move"); addProperty("x", ev.x / w); addProperty("y", ev.y / h)
+                            })
+                        }
                     }
                 }
                 android.view.MotionEvent.ACTION_UP -> {
@@ -878,6 +1028,12 @@ class MainActivity : Activity() {
             true
         }
     }
+    private fun clampPan() {
+        remoteSurface?.let {
+            val mx = it.width * (vScale - 1) / 2f; val my = it.height * (vScale - 1) / 2f
+            panX = panX.coerceIn(-mx, mx); panY = panY.coerceIn(-my, my)
+        }
+    }
 
     private fun exitViewer() {
         runCatching { signaling.sendViewer("end", JsonObject()) }
@@ -885,6 +1041,7 @@ class MainActivity : Activity() {
         remoteViewer?.stop(); remoteViewer = null
         signaling.disconnectViewer()
         runCatching { remoteSurface?.release() }
+        vScale = 1f; panX = 0f; panY = 0f; keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
     }

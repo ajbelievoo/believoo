@@ -236,7 +236,7 @@ function mapKey(code, key) {
 ipcMain.on('input-event', async (_e, msg) => {
     const n = loadNut();
     if (!n) return;
-    const { mouse, keyboard, Point, Button } = n;
+    const { mouse, keyboard, Point, Button, Key } = n;
     const disp = screen.getPrimaryDisplay();
     const W = disp.size.width, H = disp.size.height;
 
@@ -261,9 +261,31 @@ ipcMain.on('input-event', async (_e, msg) => {
                 }
                 break;
             case 'key': {
+                // modifiers travel as flags on the key event — press them around
+                // the key so Ctrl+C etc. actually arrives as a chord.
+                const mods = [];
+                if (msg.ctrl) mods.push(Key.LeftControl);
+                if (msg.alt) mods.push(Key.LeftAlt);
+                if (msg.shift) mods.push(Key.LeftShift);
+                if (msg.meta) mods.push(Key.LeftSuper);
+                if (msg.k && msg.k.length === 1) {
+                    // printable char — type() applies layout/shift itself
+                    if (msg.down) {
+                        for (const mm of mods) await keyboard.pressKey(mm);
+                        await keyboard.type(msg.k);
+                        for (const mm of mods) await keyboard.releaseKey(mm);
+                    }
+                    break;
+                }
                 const k = mapKey(msg.code, msg.k);
                 if (k === null) break;
-                if (msg.down) await keyboard.pressKey(k); else await keyboard.releaseKey(k);
+                if (msg.down) {
+                    for (const mm of mods) await keyboard.pressKey(mm);
+                    await keyboard.pressKey(k);
+                } else {
+                    await keyboard.releaseKey(k);
+                    for (const mm of mods) await keyboard.releaseKey(mm);
+                }
                 break;
             }
         }

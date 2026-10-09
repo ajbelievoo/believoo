@@ -518,6 +518,16 @@ function sendChat() {
     $('chatInput').value = '';
 }
 $('chatToggle').onclick = () => $('chatPanel').classList.toggle('hidden');
+
+// 🙈 privacy — blank this machine's screens while being viewed (host-side only)
+let privacyOn = false;
+$('privacyBtn').onclick = () => {
+    privacyOn = !privacyOn;
+    window.agent.privacyScreen(privacyOn);
+    $('privacyBtn').style.background = privacyOn ? '#f43f5e' : '#1e293b';
+    hdbg(privacyOn ? 'privacy: screen blanked' : 'privacy: screen visible');
+};
+function resetPrivacy() { if (privacyOn) { privacyOn = false; window.agent.privacyScreen(false); $('privacyBtn').style.background = '#1e293b'; } }
 $('fileBtn').onclick = async () => {
     if (window.agent?.pickFile) {
         // host in-app send — main reads the file, we stream it
@@ -773,6 +783,14 @@ function exitViewer(delay = 0) {
     };
     delay ? setTimeout(doIt, delay) : doIt();
 }
+
+// Invite — copies a web guest link so someone can view this device instantly
+$('inviteBtn') && ($('inviteBtn').onclick = async () => {
+    const code = ($('myCode') || {}).textContent?.trim() || hostCode || '';
+    const link = 'https://bmydesk.believoo.com/remote/guest?code=' + encodeURIComponent(code);
+    try { await window.agent.clipboardSet(link); hdbg('invite link copied: ' + link); }
+    catch (e) { hdbg('invite: ' + link); }
+});
 
 // Ctrl+C while viewing → send clipboard text to host (clipboard sync)
 document.addEventListener('keydown', async (e) => {

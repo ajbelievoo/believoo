@@ -11,6 +11,7 @@ import org.webrtc.*
  * viewer's offer, and exchanges ICE over the signaling channel.
  */
 class WebRtcHost(context: Context) {
+    private val appContext = context.applicationContext
 
     interface Listener {
         fun sendSignal(payload: JsonObject)
@@ -91,10 +92,15 @@ class WebRtcHost(context: Context) {
                     override fun onStateChange() {}
                     override fun onMessage(buf: DataChannel.Buffer) {
                         val bytes = ByteArray(buf.data.remaining()); buf.data.get(bytes)
-                        val m = gson.fromJson(String(bytes), JsonObject::class.java)
+                        val m = runCatching { gson.fromJson(String(bytes), JsonObject::class.java) }.getOrNull() ?: return
                         if (m.get("t")?.asString == "ping") {
                             m.addProperty("t", "pong")
                             dc.send(DataChannel.Buffer(java.nio.ByteBuffer.wrap(gson.toJson(m).toByteArray()), false))
+                        } else {
+                            // remote-control injection — AccessibilityService
+                            // turns viewer touch/keys into real gestures
+                            val dm = appContext.resources.displayMetrics
+                            RemoteControlService.instance?.handleInput(m, dm.widthPixels, dm.heightPixels)
                         }
                     }
                 })
