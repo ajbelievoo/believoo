@@ -255,3 +255,25 @@ changes, and no real-balance test orders. A wrong call takes every site offline.
 - Ordering/provisioning tests need explicit user approval in the conversation.
 - This also applies to `OvhApiService`, `OvhProvisioningService`, artisan `ovh:*`
   commands, and the GHC Python backend OVH client.
+
+## Pending user-side tasks (cannot be done by agents)
+
+Updated 2026-10-09. These need the owner's accounts/credentials:
+
+- **OVH payment method / prepaid balance** — biggest blocker. Everything else works;
+  real order E2E verified up to checkout which returns `You are not allowed`
+  (cart→items→configure all succeed). Add a payment method or fund the balance in
+  OVH Manager (account IN, `info@believoo.com`).
+- **Razorpay live keys** — test keys `rzp_test_TlUs2b2DKDd2Xf` are in
+  `gateway_configs.razorpay` (env=production so the gateway shows). Verified:
+  order creation + signature verify + fulfill + invoice all work. Swap to
+  `rzp_live_*` in admin → Credentials before going live.
+- **Cashfree** — still TEST creds (`cfsk_ma_test_*`). Add production creds in admin.
+- **PayU / Stripe** — inactive, no keys supplied yet.
+- **Telegram bot token** — for admin alerts (`admin_alert_settings`), not set.
+- **WhatsApp number** — set `ghc_whatsapp_number` in believoo Settings to make the
+  storefront support widget show the WhatsApp option.
+- **Search Console / Google Business / DNSSEC / UptimeRobot** — owner accounts.
+- Test data: user `e2e-test@ghc.local` + order `0b3964ae` (PROVISIONING_FAILED,
+  ₹453.12 PAID invoice `GHC-INV-202610-D2EB1142`) are synthetic E2E artifacts —
+  safe to delete from admin.
