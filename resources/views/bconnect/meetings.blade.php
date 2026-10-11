@@ -26,15 +26,21 @@ $meetingUsage = \App\Models\Bconnect\Meeting::where('company_id', request()->inp
             <tbody>
                 @forelse($meetings as $m)
                 <tr>
-                    <td class="font-medium">{{ $m->title }}</td>
+                    <td class="font-medium">{{ $m->title }}
+                        @if($m->password)<i class="fas fa-lock text-[10px] text-slate-500 ml-1" title="Password protected"></i>@endif
+                        @if($m->waiting_room)<i class="fas fa-hourglass-half text-[10px] text-amber-400 ml-1" title="Waiting room on"></i>@endif
+                        @if($m->recurrence)<i class="fas fa-repeat text-[10px] text-cyan-400 ml-1" title="Repeats {{ $m->recurrence }}"></i>@endif
+                    </td>
                     <td class="text-slate-400">{{ $m->scheduled_at?->format('M d, Y H:i') ?? 'Instant' }}</td>
                     <td class="text-slate-400">{{ $m->creator?->user?->name ?? '—' }}</td>
                     <td>
                         <span class="bc-badge {{ $m->ended_at ? 'bc-badge-slate' : ($m->scheduled_at?->isFuture() ? 'bc-badge-cyan' : 'bc-badge-green') }}">{{ $m->ended_at ? 'Ended' : ($m->scheduled_at?->isFuture() ? 'Upcoming' : 'Live') }}</span>
                         @if($m->ended_at && $m->transcript_status === 'completed')<br><span class="text-xs text-cyan-400">Transcript</span>@endif
                     </td>
-                    <td>
+                    <td class="whitespace-nowrap">
                         <a href="{{ route('bconnect.meeting.room', $m->room_id) }}" target="_blank" class="bc-btn bc-btn-primary py-1 px-2 text-xs">{{ $m->ended_at ? 'View' : 'Join' }}</a>
+                        <a href="{{ route('bconnect.meeting.ics', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1" title="Add to calendar (.ics)"><i class="fas fa-calendar-plus"></i></a>
+                        <a href="{{ route('bconnect.meeting.attendance', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1" title="Attendance"><i class="fas fa-clipboard-user"></i></a>
                         @if($m->ended_at)
                         <a href="{{ route('bconnect.meeting.notes', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1">Notes</a>
                         @endif
@@ -57,6 +63,15 @@ $meetingUsage = \App\Models\Bconnect\Meeting::where('company_id', request()->inp
             <select name="project_id" class="bc-input" @if(!$canMeet) disabled @endif><option value="">— No Project —</option>@foreach($projects as $p)<option value="{{ $p->id }}">{{ $p->name }}</option>@endforeach</select>
             <input type="datetime-local" name="scheduled_at" class="bc-input" @if(!$canMeet) disabled @endif>
             <input type="number" name="duration_minutes" placeholder="Duration (minutes)" min="1" class="bc-input" @if(!$canMeet) disabled @endif>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" name="password" placeholder="Password (optional)" maxlength="60" class="bc-input text-sm" @if(!$canMeet) disabled @endif>
+                <select name="recurrence" class="bc-input text-sm" @if(!$canMeet) disabled @endif>
+                    <option value="">One-time</option>
+                    <option value="daily">Repeats daily</option>
+                    <option value="weekly">Repeats weekly</option>
+                </select>
+            </div>
+            <label class="flex items-center gap-2 text-sm text-slate-400"><input type="checkbox" name="waiting_room" value="1" class="accent-cyan-500" @if(!$canMeet) disabled @endif>Waiting room — host admits each participant</label>
             <button type="submit" class="bc-btn bc-btn-primary w-full" @if(!$canMeet) disabled @endif><i class="fas fa-video"></i>Create / Schedule</button>
         </form>
     </div>

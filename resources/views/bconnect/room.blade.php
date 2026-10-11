@@ -7,10 +7,29 @@
             <h3 class="font-bold text-lg">{{ $meeting->title }}</h3>
             <code class="text-xs text-slate-400">Room: {{ $room }}</code>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2 items-center">
             <button id="micBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"><i class="fas fa-microphone"></i></button>
             <button id="camBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"><i class="fas fa-video"></i></button>
             <button id="screenBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"><i class="fas fa-desktop"></i></button>
+            <button id="blurBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white" title="Blur background"><i class="fas fa-droplet"></i></button>
+            <button id="handBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white" title="Raise hand"><i class="fas fa-hand-paper"></i></button>
+            <div class="relative">
+                <button id="reactBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white" title="Reactions"><i class="fas fa-face-smile"></i></button>
+                <div id="reactMenu" class="hidden absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg p-1 flex gap-1 text-xl z-20">
+                    <button class="react px-2 py-1 hover:bg-slate-700 rounded" data-r="👍">👍</button>
+                    <button class="react px-2 py-1 hover:bg-slate-700 rounded" data-r="👏">👏</button>
+                    <button class="react px-2 py-1 hover:bg-slate-700 rounded" data-r="😂">😂</button>
+                    <button class="react px-2 py-1 hover:bg-slate-700 rounded" data-r="❤️">❤️</button>
+                    <button class="react px-2 py-1 hover:bg-slate-700 rounded" data-r="🎉">🎉</button>
+                </div>
+            </div>
+            <label class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white cursor-pointer" title="Share file">
+                <i class="fas fa-file-arrow-up"></i><input type="file" id="shareFileInput" class="hidden">
+            </label>
+            @if($isHost)
+            <button id="hostPanelBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-cyan-400 hover:text-white" title="Participants / host controls"><i class="fas fa-users-gear"></i></button>
+            <button id="muteAllBtn" class="px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white text-sm" title="Mute everyone"><i class="fas fa-microphone-slash"></i></button>
+            @endif
             @if($canRecord)
             <button id="recordBtn" class="px-4 py-2 bg-pink-500/20 text-pink-400 rounded-lg font-bold hover:bg-pink-500/30 text-sm"><i class="fas fa-circle mr-1"></i>Record</button>
             @endif
@@ -26,7 +45,20 @@
     </div>
     <div class="flex-1 bg-slate-900 rounded-2xl border border-slate-800 relative overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-2 p-2" id="video-grid">
         <div id="local-player" class="bg-slate-800 rounded-xl flex items-center justify-center relative min-h-[180px]"><span class="text-slate-500 text-sm">Loading camera...</span></div>
+        <div id="reactionLayer" class="pointer-events-none absolute inset-0 z-10"></div>
     </div>
+
+    @if($isHost)
+    {{-- Host participants drawer --}}
+    <div id="hostPanel" class="hidden fixed right-0 top-16 bottom-0 w-80 z-40 border-l border-[var(--bc-border)] p-4 overflow-y-auto" style="background:var(--bc-card)">
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="font-bold">Participants</h4>
+            <button onclick="document.getElementById('hostPanel').classList.add('hidden')" class="text-slate-500 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="waitingList"></div>
+        <div id="joinedList"></div>
+    </div>
+    @endif
     @if($canAi)
     <div id="transcriptBox" class="hidden mt-4 p-4 bg-slate-900 border border-cyan-500/30 rounded-xl max-h-48 overflow-y-auto">
         <h4 class="font-bold text-cyan-400 mb-2"><i class="fas fa-closed-captioning mr-1"></i>Live Transcript</h4>
@@ -44,6 +76,9 @@
 const room = @json($room);
 const uid = Math.floor(Math.random() * 1000000);
 const channel = 'believoo-' + room;
+const isHost = @json($isHost ?? false);
+const myName = @json(($member->user->name ?? 'Me'));
+const csrfTok = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
 let appId = '';
 let token = '';
 let client = null;
@@ -52,6 +87,8 @@ let localVideoTrack = null;
 let localScreenTrack = null;
 let isMicOn = true;
 let isCamOn = true;
+let blurOn = false;
+let rawCamStream = null;
 
 async function initAgora() {
     try {
@@ -78,6 +115,11 @@ async function initAgora() {
             if (mediaType === 'audio') user.audioTrack?.play();
         });
         client.on('user-unpublished', (user) => removeRemoteVideo(user));
+
+        // Data-channel messages: hand raises, reactions, host commands, file links
+        client.on('stream-message', (u, data) => {
+            try { handleMsg(JSON.parse(new TextDecoder().decode(data)), u); } catch(e) {}
+        });
 
         [localAudioTrack, localVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
         localVideoTrack.play('local-player');
@@ -106,6 +148,144 @@ function removeRemoteVideo(user) {
     const el = document.getElementById('remote-' + user.uid);
     if (el) el.remove();
 }
+
+// ── Stream messages ──
+function sendMsg(obj) {
+    if (!client) return;
+    try { client.sendStreamMessage(new TextEncoder().encode(JSON.stringify(obj))); } catch(e) {}
+}
+function handleMsg(m, fromUid) {
+    if (m.t === 'hand') toast(`✋ ${m.name} raised their hand`);
+    if (m.t === 'react') floatReaction(m.r);
+    if (m.t === 'file') toast(`📎 ${m.name} shared: <a class="text-cyan-400 underline" href="${m.url}" target="_blank">${escapeHtml(m.fname)}</a>`);
+    if (m.t === 'muteAll' && !isHost && localAudioTrack) {
+        isMicOn = false; localAudioTrack.setMuted(true);
+        document.getElementById('micBtn').className = 'px-3 py-2 rounded-lg bg-red-500/20 text-red-400';
+        toast('🔇 Host muted everyone');
+    }
+    if (m.t === 'kick' && (m.uid === uid || m.name === myName)) {
+        alert('You were removed by the host');
+        fetch(`/meetings/${room}/leave`, {method:'POST',headers:{'X-CSRF-TOKEN':csrfTok()}}).finally(()=>location.href='/meetings');
+    }
+}
+function toast(html) {
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-white text-sm px-4 py-2.5 rounded-xl shadow-xl z-50';
+    t.innerHTML = html;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+}
+function floatReaction(r) {
+    const layer = document.getElementById('reactionLayer');
+    const s = document.createElement('span');
+    s.textContent = r;
+    s.className = 'absolute text-4xl';
+    s.style.left = (10 + Math.random() * 80) + '%';
+    s.style.bottom = '0';
+    s.style.transition = 'all 2.5s ease-out';
+    layer.appendChild(s);
+    requestAnimationFrame(() => { s.style.bottom = '85%'; s.style.opacity = '0'; });
+    setTimeout(() => s.remove(), 2600);
+}
+
+document.getElementById('handBtn').addEventListener('click', () => {
+    sendMsg({t:'hand', name: myName});
+    toast('✋ Hand raised');
+});
+document.getElementById('reactBtn').addEventListener('click', () => {
+    document.getElementById('reactMenu').classList.toggle('hidden');
+});
+document.querySelectorAll('.react').forEach(b => b.addEventListener('click', () => {
+    sendMsg({t:'react', r: b.dataset.r, name: myName});
+    floatReaction(b.dataset.r);
+    document.getElementById('reactMenu').classList.add('hidden');
+}));
+
+// ── Background blur — canvas-processed camera track ──
+let blurProc = null;
+document.getElementById('blurBtn').addEventListener('click', async () => {
+    if (!client) return;
+    try {
+        if (!blurOn) {
+            rawCamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640 } });
+            const video = document.createElement('video');
+            video.srcObject = rawCamStream; video.muted = true; await video.play();
+            const canvas = document.createElement('canvas');
+            canvas.width = 640; canvas.height = 360;
+            const ctx = canvas.getContext('2d');
+            ctx.filter = 'blur(8px)';
+            const draw = () => { ctx.filter = 'blur(8px)'; ctx.drawImage(video, 0, 0, 640, 360); if (blurOn) requestAnimationFrame(draw); };
+            blurOn = true; draw();
+            const track = canvas.captureStream(15).getVideoTracks()[0];
+            const newTrack = await AgoraRTC.createCustomVideoTrack({ mediaStreamTrack: track });
+            if (localVideoTrack) { await client.unpublish(localVideoTrack); localVideoTrack.stop(); localVideoTrack.close(); }
+            localVideoTrack = newTrack;
+            await client.publish(localVideoTrack);
+            localVideoTrack.play('local-player');
+            document.getElementById('blurBtn').className = 'px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400';
+        } else {
+            blurOn = false;
+            rawCamStream?.getTracks().forEach(t => t.stop());
+            if (localVideoTrack) { await client.unpublish(localVideoTrack); localVideoTrack.stop(); localVideoTrack.close(); }
+            localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+            await client.publish(localVideoTrack);
+            localVideoTrack.play('local-player');
+            document.getElementById('blurBtn').className = 'px-3 py-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white';
+        }
+    } catch(e) { toast('Blur not supported here'); }
+});
+
+// ── File share ──
+document.getElementById('shareFileInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const fd = new FormData();
+    fd.append('file', f); fd.append('_token', csrfTok());
+    try {
+        const r = await fetch(`/meetings/${room}/share-file`, { method:'POST', headers:{'X-CSRF-TOKEN':csrfTok()}, body: fd });
+        const d = await r.json();
+        if (d.ok) { sendMsg({t:'file', url:d.url, fname:d.name, name:myName}); toast('📎 Shared ' + escapeHtml(d.name)); }
+    } catch(err) { toast('Share failed'); }
+    e.target.value = '';
+});
+
+// ── Host controls ──
+if (isHost) {
+    document.getElementById('muteAllBtn')?.addEventListener('click', () => {
+        sendMsg({t:'muteAll'}); toast('🔇 Muted everyone');
+    });
+    document.getElementById('hostPanelBtn')?.addEventListener('click', () => {
+        document.getElementById('hostPanel').classList.toggle('hidden');
+    });
+    async function pollParticipants() {
+        try {
+            const r = await fetch(`/meetings/${room}/participants`, {headers:{'Accept':'application/json'}});
+            const d = await r.json();
+            const w = d.participants.filter(p => p.status === 'waiting');
+            const j = d.participants.filter(p => ['joined','left'].includes(p.status));
+            document.getElementById('waitingList').innerHTML = w.length
+                ? '<p class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">Waiting (' + w.length + ')</p>'
+                  + w.map(p => `<div class="flex items-center justify-between bg-slate-800/60 rounded-lg p-2.5 mb-2"><span class="text-sm">${escapeHtml(p.name)}</span><span class="flex gap-1"><button onclick="admitP(${p.id},1)" class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Admit</button><button onclick="admitP(${p.id},0)" class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">Deny</button></span></div>`).join('')
+                : '';
+            document.getElementById('joinedList').innerHTML = '<p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">In call (' + j.filter(p=>p.status==='joined').length + ')</p>'
+                + j.map(p => `<div class="flex items-center justify-between p-2"><span class="text-sm">${escapeHtml(p.name)} <span class="text-[10px] text-slate-500">${p.status}</span></span>${p.status==='joined' && p.member_id ? `<button onclick="kickP('${p.name}')" class="text-xs text-red-400 hover:underline">Remove</button>` : ''}</div>`).join('');
+        } catch(e) {}
+    }
+    window.admitP = async (pid, ok) => {
+        await fetch(`/meetings/${room}/${ok ? 'admit' : 'deny'}/${pid}`, {method:'POST', headers:{'X-CSRF-TOKEN':csrfTok()}});
+        pollParticipants();
+    };
+    window.kickP = (name) => { sendMsg({t:'kick', name}); toast('Removed ' + name); };
+    pollParticipants(); setInterval(pollParticipants, 5000);
+}
+
+// ── Leave tracking ──
+window.addEventListener('beforeunload', () => {
+    navigator.sendBeacon(`/meetings/${room}/leave`, new Blob([JSON.stringify({})], {type:'application/json'}));
+});
+document.getElementById('endMeetingBtn')?.addEventListener('click', () => {
+    fetch(`/meetings/${room}/leave`, {method:'POST', headers:{'X-CSRF-TOKEN':csrfTok()}}).catch(()=>{});
+});
 
 document.getElementById('micBtn').addEventListener('click', async () => {
     if (!localAudioTrack) return;

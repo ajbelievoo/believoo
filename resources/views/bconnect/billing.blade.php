@@ -55,38 +55,69 @@
 
 <div class="grid lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 bc-card p-6">
-        <h3 class="font-bold mb-4">Invoices</h3>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold">Invoices</h3>
+            <div class="flex gap-2">
+                <a href="{{ route('bconnect.quotes') }}" class="bc-btn bc-btn-secondary text-xs"><i class="fas fa-file-lines mr-1"></i>Quotes</a>
+                <a href="{{ route('bconnect.recurring') }}" class="bc-btn bc-btn-secondary text-xs"><i class="fas fa-repeat mr-1"></i>Recurring</a>
+                <a href="{{ route('bconnect.billing.billable_time') }}" class="bc-btn bc-btn-secondary text-xs"><i class="fas fa-clock mr-1"></i>Bill time</a>
+                <a href="{{ route('bconnect.billing.remote-minutes') }}" class="bc-btn bc-btn-secondary text-xs"><i class="fas fa-desktop mr-1"></i>Remote minutes</a>
+            </div>
+        </div>
         <div class="overflow-x-auto">
             <table class="bc-table">
-                <thead><tr><th>Number</th><th>Client</th><th>Amount</th><th>Due</th><th>Status</th><th>Action</th></tr></thead>
+                <thead><tr><th>Number</th><th>Client</th><th>Amount</th><th>Tax</th><th>Due</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                     @forelse($invoices as $i)
                     <tr>
                         <td class="font-medium">{{ $i->invoice_number }}</td>
                         <td class="text-slate-400">{{ $i->client?->user?->name ?? '—' }}</td>
                         <td>₹{{ number_format($i->amount, 2) }}</td>
+                        <td class="text-slate-400">{{ $i->tax_rate ? $i->tax_rate . '%' : '—' }}</td>
                         <td class="text-slate-400">{{ $i->due_at?->format('M d, Y') ?? '—' }}</td>
                         <td><span class="bc-badge {{ $i->status == 'paid' ? 'bc-badge-green' : 'bc-badge-amber' }}">{{ ucfirst($i->status) }}</span></td>
                         <td class="py-3 flex gap-2">
                             <a href="{{ route('bconnect.billing.download', $i->id) }}" class="bc-btn bc-btn-secondary p-1.5 text-xs"><i class="fas fa-download"></i></a>
                             @if($i->status != 'paid')
                                 <a href="{{ route('bconnect.billing.pay', $i->id) }}" class="bc-btn bc-btn-primary py-1.5 px-2.5 text-xs"><i class="fas fa-credit-card mr-1"></i>Pay</a>
+                            @else
+                                <form method="POST" action="{{ route('bconnect.invoices.credit', $i->id) }}" onsubmit="return confirm('Issue a credit note against this invoice?')" class="inline">@csrf
+                                    <button class="bc-btn bc-btn-secondary p-1.5 text-xs" title="Credit note"><i class="fas fa-rotate-left"></i></button>
+                                </form>
                             @endif
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="bc-empty">No invoices.</td></tr>
+                    <tr><td colspan="7" class="bc-empty">No invoices.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
         {{ $invoices->links() }}
+
+        @if($creditNotes->isNotEmpty())
+        <h4 class="font-bold mt-6 mb-3">Credit notes</h4>
+        <table class="bc-table">
+            <thead><tr><th>Number</th><th>Invoice</th><th>Amount</th><th>Reason</th></tr></thead>
+            <tbody>
+                @foreach($creditNotes as $cn)
+                <tr>
+                    <td class="font-medium">{{ $cn->credit_number }}</td>
+                    <td class="text-slate-400">#{{ $cn->invoice_id }}</td>
+                    <td>₹{{ number_format($cn->amount, 2) }}</td>
+                    <td class="text-slate-400">{{ $cn->reason ?? '—' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
     </div>
     <div class="bc-card p-6">
         <h3 class="font-bold mb-4">Create Invoice</h3>
         <form method="POST" action="{{ route('bconnect.invoices.store') }}" class="space-y-4">@csrf
             <select name="client_id" required class="bc-input"><option value="">Select client</option>@foreach(\App\Models\Bconnect\Member::with('user')->where('company_id', request()->input('bconnect_company_id'))->where('role', 'client')->get() as $c)<option value="{{ $c->id }}">{{ $c->user->name }}</option>@endforeach</select>
             <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required class="bc-input">
+            <input type="number" step="0.01" name="tax_rate" placeholder="Tax rate % (e.g. 18 GST)" min="0" max="100" class="bc-input">
             <textarea name="description" rows="3" placeholder="Description" required class="bc-input"></textarea>
             <button type="submit" class="bc-btn bc-btn-primary w-full"><i class="fas fa-plus"></i>Create Invoice</button>
         </form>

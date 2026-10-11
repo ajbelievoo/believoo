@@ -12,6 +12,35 @@
     <a href="{{ route('bconnect.remote.connect') }}" class="bc-btn bc-btn-primary px-8 py-3 shrink-0"><i class="fas fa-arrow-right mr-2"></i>Connect</a>
 </div>
 
+{{-- Address book — member-scoped saved devices with live online state --}}
+<div class="bc-card p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold"><i class="fas fa-address-book mr-2" style="color:var(--bc-cyan)"></i>My Devices</h3>
+        <form method="POST" action="{{ route('bconnect.remote.devices.save') }}" class="flex gap-2">@csrf
+            <input name="code" maxlength="12" required placeholder="CODE" class="bc-input !w-32 font-mono uppercase text-sm">
+            <input name="label" placeholder="Label (optional)" class="bc-input !w-40 text-sm">
+            <button class="bc-btn bc-btn-secondary text-xs">Save</button>
+        </form>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        @forelse($savedDevices as $d)
+        <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-4 flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0 {{ $d->online ? 'bg-green-400' : 'bg-slate-600' }}" title="{{ $d->online ? 'Online' : 'Offline' }}"></span>
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm truncate">{{ $d->label ?: 'Device' }}</div>
+                <div class="text-[11px] font-mono text-slate-500">{{ $d->code }}{{ $d->host_label ? ' · '.$d->host_label : '' }}</div>
+            </div>
+            <a href="{{ route('bconnect.remote.code', $d->code) }}" class="bc-btn bc-btn-primary text-xs py-1 px-2.5">Connect</a>
+            <form method="POST" action="{{ route('bconnect.remote.devices.forget', $d->id) }}" onsubmit="return confirm('Remove?')">@csrf @method('DELETE')
+                <button class="text-slate-600 hover:text-red-400 text-xs"><i class="fas fa-trash"></i></button>
+            </form>
+        </div>
+        @empty
+        <p class="text-slate-500 text-sm col-span-3">No saved devices. Save a code after a successful connect or add one above.</p>
+        @endforelse
+    </div>
+</div>
+
 <div class="grid lg:grid-cols-2 gap-6 mb-6">
     <div class="bc-card p-6">
         <h3 class="font-bold mb-4"><i class="fas fa-desktop mr-2 text-green-400"></i>Request Control</h3>

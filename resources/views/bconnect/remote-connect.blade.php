@@ -26,6 +26,25 @@
         </form>
 
         <p class="text-xs text-slate-500 mt-6">The host sees a request and must accept before the screen is shared.</p>
+
+        {{-- Share invite — the host sends this link/code to their viewer --}}
+        <div class="mt-4 flex items-center justify-center gap-2 text-xs">
+            <span class="text-slate-500">Invite a viewer:</span>
+            <button type="button" onclick="shareVia('wa')" class="px-3 py-1.5 rounded-lg bg-green-500/15 text-green-400 font-semibold hover:bg-green-500/25"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+            <button type="button" onclick="shareVia('sms')" class="px-3 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 font-semibold hover:bg-cyan-500/25"><i class="fas fa-comment-sms mr-1"></i>SMS</button>
+            <button type="button" onclick="shareVia('copy')" class="px-3 py-1.5 rounded-lg bg-slate-500/15 text-slate-300 font-semibold hover:bg-slate-500/25"><i class="fas fa-link mr-1"></i>Copy link</button>
+        </div>
+        <script>
+        function shareVia(kind) {
+            var code = document.getElementById('codeInput').value.trim().toUpperCase();
+            if (code.length < 6) { code = prompt('Enter the host code to share:'); if (!code) return; code = code.toUpperCase(); }
+            var url = 'https://bmydesk.believoo.com/remote/guest/' + code;
+            var text = 'Connect to my device on BMyDesk — open ' + url;
+            if (kind === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+            else if (kind === 'sms') location.href = 'sms:?&body=' + encodeURIComponent(text);
+            else { navigator.clipboard.writeText(url).then(() => alert('Link copied: ' + url)); }
+        }
+        </script>
     </div>
 
     <div class="grid md:grid-cols-2 gap-4 mt-6">

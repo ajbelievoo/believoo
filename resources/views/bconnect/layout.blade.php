@@ -84,6 +84,15 @@ function bcToggleTheme(){
         <a href="{{ route('bconnect.files') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.files*') ? 'active' : '' }}"><i class="fas fa-folder-open"></i>Files</a>
         <a href="{{ route('bconnect.audit') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.audit*') ? 'active' : '' }}"><i class="fas fa-shield-alt"></i>Audit Logs</a>
         <a href="{{ route('bconnect.support') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.support*') ? 'active' : '' }}"><i class="fas fa-question-circle"></i>Support</a>
+        @if(($bconnectRole ?? '') === 'company_admin')
+        <div class="mt-4 pt-3 border-t border-[var(--bc-border)]">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 mb-2">Admin</p>
+            <a href="{{ route('bconnect.admin.fleet') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.admin.fleet') ? 'active' : '' }}"><i class="fas fa-server"></i>Device Fleet</a>
+            <a href="{{ route('bconnect.admin.monitor') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.admin.monitor') ? 'active' : '' }}"><i class="fas fa-satellite-dish"></i>Live Monitor</a>
+            <a href="{{ route('bconnect.admin.policies') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.admin.policies') ? 'active' : '' }}"><i class="fas fa-list-check"></i>Remote Policies</a>
+            <a href="{{ route('bconnect.admin.health') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.admin.health') ? 'active' : '' }}"><i class="fas fa-heart-pulse"></i>Server Health</a>
+        </div>
+        @endif
     </nav>
     <div class="p-4 border-t border-[var(--bc-border)]">
         <div class="flex items-center gap-3 mb-3">

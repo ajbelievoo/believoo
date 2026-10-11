@@ -154,3 +154,27 @@ Schedule::command('bconnect:plan-expiry')
     ->dailyAt('05:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/bconnect-plan-expiry.log'));
+
+// SLA breach sweep — marks tickets + alerts admins
+Schedule::command('bconnect:sla-check')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/bconnect-sla.log'));
+
+// Ticket/sprint due-date reminders
+Schedule::command('bconnect:due-date-reminders')
+    ->hourly()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/bconnect-due-reminders.log'));
+
+// Billing automation — recurring invoices, payment reminders, remote minutes
+Schedule::command('bconnect:billing-automation')
+    ->dailyAt('06:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/bconnect-billing-automation.log'));
+
+// Email → ticket import (support@believoo.com)
+Schedule::command('bconnect:mail-tickets')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/bconnect-mail-tickets.log'));

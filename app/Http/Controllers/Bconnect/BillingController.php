@@ -30,6 +30,7 @@ class BillingController extends Controller
     }
 
     public function index(Request $r) {
+        $creditNotes = \DB::table('bconnect_credit_notes')->where('company_id', $r->input('bconnect_company_id'))->latest()->get();
         $company = Company::findOrFail($r->input('bconnect_company_id'));
         $invoices = Invoice::where('company_id', $company->id)->latest()->paginate(20);
         $status = BconnectSubscriptionService::status($company);
@@ -39,7 +40,7 @@ class BillingController extends Controller
             ->whereNull('invoice_id')
             ->where('billed_amount', '>', 0)
             ->sum('billed_amount');
-        return view('bconnect.billing', compact('company', 'invoices', 'status', 'days', 'unbilledTotal'));
+        return view('bconnect.billing', compact('company', 'invoices', 'status', 'days', 'unbilledTotal', 'creditNotes'));
     }
 
     public function billableTime(Request $r) {
@@ -172,6 +173,7 @@ class BillingController extends Controller
             ],
             'amount' => 'required|numeric|min:0',
             'description' => 'required',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $company = Company::findOrFail($companyId);
@@ -186,6 +188,7 @@ class BillingController extends Controller
             'status' => 'pending',
             'due_at' => now()->addDays(7),
             'description' => $data['description'],
+            'tax_rate' => $data['tax_rate'] ?? 0,
         ]);
 
         try {
@@ -427,5 +430,162 @@ class BillingController extends Controller
             'amount' => $invoice->amount,
             'status' => $invoice->status,
         ]);
+    }
+
+    // ── Quotes / estimates ──
+    public function quotes(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $quotes = \DB::table('bconnect_quotes')->where('company_id', $companyId)->latest()->get();
+        $clients = Member::with('user')->where('company_id', $companyId)->where('role', 'client')->get();
+        return view('bconnect.billing.quotes', compact('quotes', 'clients'));
+    }
+
+    public function storeQuote(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $data = $r->validate([
+            'client_id' => ['required', Rule::exists('bconnect_members', 'id')->where('company_id', $companyId)],
+            'amount' => 'required|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'description' => 'nullable|string|max:2000',
+        ]);
+        \DB::table('bconnect_quotes')->insert([
+            'company_id' => $companyId,
+            'client_id' => $data['client_id'],
+            'quote_number' => 'BCQ-' . strtoupper(uniqid()),
+            'amount' => $data['amount'],
+            'currency' => 'INR',
+            'tax_rate' => $data['tax_rate'] ?? 0,
+            'status' => 'sent',
+            'description' => $data['description'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        return back()->with('success', 'Quote created');
+    }
+
+    // One click: quote → payable invoice
+    public function convertQuote(Request $r, $id) {
+        $companyId = $r->input('bconnect_company_id');
+        $q = \DB::table('bconnect_quotes')->where('id', $id)->where('company_id', $companyId)->firstOrFail();
+        if ($q->converted_invoice_id) return back()->with('error', 'Already converted');
+        $inv = Invoice::create([
+            'company_id' => $companyId,
+            'client_id' => $q->client_id,
+            'invoice_number' => 'BCI-' . strtoupper(uniqid()),
+            'amount' => $q->amount,
+            'currency' => $q->currency,
+            'status' => 'pending',
+            'due_at' => now()->addDays(7),
+            'description' => ($q->description ?: 'Quote ' . $q->quote_number),
+            'tax_rate' => $q->tax_rate,
+        ]);
+        \DB::table('bconnect_quotes')->where('id', $id)->update(['status' => 'converted', 'converted_invoice_id' => $inv->id]);
+        return redirect()->route('bconnect.billing')->with('success', 'Quote converted to invoice ' . $inv->invoice_number);
+    }
+
+    public function setQuoteStatus(Request $r, $id) {
+        $companyId = $r->input('bconnect_company_id');
+        $r->validate(['status' => 'required|in:draft,sent,accepted,declined']);
+        \DB::table('bconnect_quotes')->where('id', $id)->where('company_id', $companyId)->update(['status' => $r->status]);
+        return back();
+    }
+
+    // ── Credit notes ──
+    public function creditNote(Request $r, $invoice) {
+        $companyId = $r->input('bconnect_company_id');
+        $inv = Invoice::where('id', $invoice)->where('company_id', $companyId)->firstOrFail();
+        \DB::table('bconnect_credit_notes')->insert([
+            'company_id' => $companyId,
+            'invoice_id' => $inv->id,
+            'credit_number' => 'BCN-' . strtoupper(uniqid()),
+            'amount' => $r->amount ?? $inv->amount,
+            'reason' => $r->reason,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $inv->update(['status' => 'refunded', 'metadata' => array_merge($inv->metadata ?? [], ['credit_note' => true])]);
+        return back()->with('success', 'Credit note issued');
+    }
+
+    // ── Recurring invoices ──
+    public function recurring(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $list = \DB::table('bconnect_recurring_invoices')->where('company_id', $companyId)->latest()->get();
+        $clients = Member::with('user')->where('company_id', $companyId)->where('role', 'client')->get();
+        return view('bconnect.billing.recurring', compact('list', 'clients'));
+    }
+
+    public function storeRecurring(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $data = $r->validate([
+            'client_id' => ['required', Rule::exists('bconnect_members', 'id')->where('company_id', $companyId)],
+            'amount' => 'required|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'interval' => 'required|in:monthly,quarterly,yearly',
+            'description' => 'nullable|string|max:2000',
+            'next_run' => 'required|date',
+        ]);
+        \DB::table('bconnect_recurring_invoices')->insert([
+            'company_id' => $companyId,
+            'client_id' => $data['client_id'],
+            'amount' => $data['amount'],
+            'currency' => 'INR',
+            'tax_rate' => $data['tax_rate'] ?? 0,
+            'interval' => $data['interval'],
+            'description' => $data['description'] ?? null,
+            'next_run' => $data['next_run'],
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        return back()->with('success', 'Recurring invoice scheduled');
+    }
+
+    public function toggleRecurring(Request $r, $id) {
+        \DB::table('bconnect_recurring_invoices')->where('id', $id)->where('company_id', $r->input('bconnect_company_id'))
+            ->update(['active' => \DB::raw('NOT active'), 'updated_at' => now()]);
+        return back();
+    }
+
+    // ── Remote-session minutes → invoice ──
+    public function remoteMinutes(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        // Un-billed remote sessions grouped by viewer/member
+        $sessions = \DB::table('bconnect_remote_sessions')
+            ->whereNotNull('ended_at')
+            ->whereNull('invoiced_at')
+            ->select('viewer_member_id', \DB::raw('COUNT(*) as sessions'), \DB::raw('SUM(TIMESTAMPDIFF(SECOND, started_at, ended_at)) as secs'))
+            ->groupBy('viewer_member_id')->get();
+        $clients = Member::with('user')->where('company_id', $companyId)->where('role', 'client')->get();
+        return view('bconnect.billing.remote-minutes', compact('sessions', 'clients'));
+    }
+
+    public function invoiceRemoteMinutes(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $data = $r->validate([
+            'client_id' => ['required', Rule::exists('bconnect_members', 'id')->where('company_id', $companyId)],
+            'rate_per_hour' => 'required|numeric|min:0',
+            'member_id' => 'required|integer',
+        ]);
+        $rows = \DB::table('bconnect_remote_sessions')
+            ->whereNotNull('ended_at')->whereNull('invoiced_at')
+            ->where('viewer_member_id', $data['member_id'])
+            ->get(['id', 'started_at', 'ended_at']);
+        $secs = $rows->sum(fn($s) => $s->ended_at && $s->started_at ? strtotime($s->ended_at) - strtotime($s->started_at) : 0);
+        $hours = round($secs / 3600, 2);
+        $amount = round($hours * $data['rate_per_hour'], 2);
+
+        $inv = Invoice::create([
+            'company_id' => $companyId,
+            'client_id' => $data['client_id'],
+            'invoice_number' => 'BCI-' . strtoupper(uniqid()),
+            'amount' => $amount,
+            'currency' => 'INR',
+            'status' => 'pending',
+            'due_at' => now()->addDays(7),
+            'description' => "Remote support — {$hours}h @ ₹{$data['rate_per_hour']}/h",
+        ]);
+        \DB::table('bconnect_remote_sessions')->whereIn('id', $rows->pluck('id'))->update(['invoiced_at' => now()]);
+        return redirect()->route('bconnect.billing')->with('success', "Invoiced {$hours}h remote time");
     }
 }

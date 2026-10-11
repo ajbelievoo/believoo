@@ -6,6 +6,17 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>Remote Desktop Access — BMyDesk</title>
 <link rel="icon" type="image/png" href="{{ $bconnectBrand['favicon'] ?? '/favicon.png' }}">
+{{-- PWA — guest remote page installs like an app --}}
+<link rel="manifest" href="/remote-manifest.json">
+<meta name="theme-color" content="#0b1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BMyDesk Remote">
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/remote-sw.js').catch(() => {});
+}
+</script>
 <style>
 :root { --bg:#0b1220; --card:#101a2e; --border:#1e293b; --cyan:#22d3ee; --rose:#f43f5e; --txt:#e2e8f0; --dim:#64748b; }
 * { box-sizing:border-box; margin:0; }

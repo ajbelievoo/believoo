@@ -36,7 +36,38 @@ class RemoteController extends Controller {
             ->where('id', '!=', $r->input('bconnect_member')->id)
             ->with('user')
             ->get();
-        return view('bconnect.remote', compact('sessions', 'members'));
+
+        // Address book — codes this member saved, with live online state
+        $memberId = $r->input('bconnect_member')->id;
+        $savedDevices = \DB::table('bconnect_saved_devices')
+            ->where('owner_key', 'member:' . $memberId)
+            ->orderByDesc('last_used_at')->orderByDesc('id')->limit(50)->get()
+            ->map(function ($d) {
+                $target = \DB::table('bconnect_remote_sessions')->where('session_code', $d->code)->latest('id')->first();
+                $d->online = $target && $target->updated_at
+                    && \Illuminate\Support\Carbon::parse($target->updated_at)->gt(now()->subMinutes(3));
+                $d->host_label = $target?->host_label;
+                return $d;
+            });
+
+        return view('bconnect.remote', compact('sessions', 'members', 'savedDevices'));
+    }
+
+    // Save a device code to this member's address book.
+    public function saveDevice(Request $r) {
+        $data = $r->validate(['code' => 'required|string|min:6|max:12', 'label' => 'nullable|string|max:120']);
+        \DB::table('bconnect_saved_devices')->updateOrInsert(
+            ['owner_key' => 'member:' . $r->input('bconnect_member')->id, 'code' => strtoupper($data['code'])],
+            ['label' => $data['label'] ?? null, 'last_used_at' => now(), 'updated_at' => now(), 'created_at' => now()]
+        );
+        return back()->with('success', 'Device saved');
+    }
+
+    public function forgetDevice(Request $r, int $id) {
+        \DB::table('bconnect_saved_devices')
+            ->where('owner_key', 'member:' . $r->input('bconnect_member')->id)
+            ->where('id', $id)->delete();
+        return back()->with('success', 'Device removed');
     }
 
     public function requestControl(Request $r) {

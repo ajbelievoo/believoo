@@ -77,6 +77,22 @@ class AgentApiController extends Controller
             $member = \App\Models\Bconnect\Member::where('api_token', $data['member_token'])->where('is_active', true)->first();
         }
 
+        // Track fleet metadata for the admin device dashboard
+        if (!empty($data['device_id'])) {
+            \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->updateOrInsert(
+                ['device_id' => $data['device_id']],
+                [
+                    'platform' => $data['os'] ?? null,
+                    'version' => $data['version'] ?? null,
+                    'label' => $member?->user?->name ?? $data['host_name'] ?? null,
+                    'company_id' => $member?->company_id,
+                    'last_seen_at' => now(),
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+
         if (!empty($data['device_id'])) {
             $existing = RemoteSession::where('device_id', $data['device_id'])
                 ->where('host_kind', 'agent')->latest()->first();

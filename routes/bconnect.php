@@ -77,6 +77,15 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::get('/calendar', [\App\Http\Controllers\Bconnect\CalendarController::class, 'index'])->name('bconnect.calendar');
     Route::get('/meetings/{room}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'room'])->middleware('bconnect.permission:meetings.view')->name('bconnect.meeting.room');
     Route::get('/meetings/{room}/recording', [\App\Http\Controllers\Bconnect\MeetingController::class, 'recording'])->name('bconnect.meeting.recording');
+    Route::post('/meetings/{room}/password', [\App\Http\Controllers\Bconnect\MeetingController::class, 'checkPassword'])->name('bconnect.meeting.password');
+    Route::get('/meetings/{room}/wait-status', [\App\Http\Controllers\Bconnect\MeetingController::class, 'waitStatus'])->name('bconnect.meeting.wait');
+    Route::get('/meetings/{room}/participants', [\App\Http\Controllers\Bconnect\MeetingController::class, 'participants'])->name('bconnect.meeting.participants');
+    Route::post('/meetings/{room}/admit/{pid}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'admit'])->name('bconnect.meeting.admit');
+    Route::post('/meetings/{room}/deny/{pid}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'deny'])->name('bconnect.meeting.deny');
+    Route::post('/meetings/{room}/leave', [\App\Http\Controllers\Bconnect\MeetingController::class, 'leave'])->name('bconnect.meeting.leave');
+    Route::get('/meetings/{room}/attendance', [\App\Http\Controllers\Bconnect\MeetingController::class, 'attendance'])->name('bconnect.meeting.attendance');
+    Route::get('/meetings/{room}.ics', [\App\Http\Controllers\Bconnect\MeetingController::class, 'ics'])->name('bconnect.meeting.ics');
+    Route::post('/meetings/{room}/share-file', [\App\Http\Controllers\Bconnect\MeetingController::class, 'shareFile'])->name('bconnect.meeting.sharefile');
     Route::get('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'index'])->middleware('bconnect.permission:tickets.view')->name('bconnect.tickets');
     Route::get('/search', [\App\Http\Controllers\Bconnect\SearchController::class, 'index'])->name('bconnect.search');
     Route::get('/profile', [\App\Http\Controllers\Bconnect\ProfileController::class, 'show'])->name('bconnect.profile');
@@ -98,6 +107,8 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::get('/remote/agent', [\App\Http\Controllers\Bconnect\AgentController::class, 'index'])->name('bconnect.remote.agent');
     Route::get('/remote/app-login', [\App\Http\Controllers\Bconnect\AgentController::class, 'appLogin'])->name('bconnect.remote.applogin');
     Route::get('/remote/connect', [\App\Http\Controllers\Bconnect\RemoteController::class, 'connect'])->name('bconnect.remote.connect');
+    Route::post('/remote/devices', [\App\Http\Controllers\Bconnect\RemoteController::class, 'saveDevice'])->name('bconnect.remote.devices.save');
+    Route::delete('/remote/devices/{id}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'forgetDevice'])->name('bconnect.remote.devices.forget');
     Route::post('/remote/join', [\App\Http\Controllers\Bconnect\RemoteController::class, 'joinByCode'])->name('bconnect.remote.join');
     Route::get('/remote/code/{code}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'codeRoom'])->name('bconnect.remote.code');
     Route::post('/remote/code/{code}/end', [\App\Http\Controllers\Bconnect\RemoteController::class, 'endByCode'])->name('bconnect.remote.code.end');
@@ -156,6 +167,15 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
 
     // Company admin only
     Route::middleware(['bconnect.role:company_admin'])->group(function () {
+        // Remote fleet / session admin
+        Route::get('/admin/fleet', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'fleet'])->name('bconnect.admin.fleet');
+        Route::get('/admin/monitor', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'monitor'])->name('bconnect.admin.monitor');
+        Route::post('/admin/monitor/{id}/end', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'forceEnd'])->name('bconnect.admin.forceend');
+        Route::get('/admin/remote-policies', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'policies'])->name('bconnect.admin.policies');
+        Route::post('/admin/remote-policies', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'savePolicies'])->name('bconnect.admin.policies.save');
+        Route::get('/admin/health', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'health'])->name('bconnect.admin.health');
+        Route::get('/admin/audit.csv', [\App\Http\Controllers\Bconnect\RemoteAdminController::class, 'auditExport'])->name('bconnect.admin.audit.csv');
+
         // Member management
         Route::middleware(['bconnect.permission:members.manage'])->group(function () {
             Route::post('/members', [\App\Http\Controllers\Bconnect\MemberController::class, 'store'])->name('bconnect.members.store');
@@ -176,6 +196,16 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
             Route::get('/billing/billable-time', [\App\Http\Controllers\Bconnect\BillingController::class, 'billableTime'])->name('bconnect.billing.billable_time');
             Route::post('/billing/invoices/from-time', [\App\Http\Controllers\Bconnect\BillingController::class, 'invoiceFromTime'])->name('bconnect.billing.invoice_from_time');
             Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\Bconnect\BillingController::class, 'markPaid'])->name('bconnect.billing.markPaid');
+            Route::post('/invoices/{invoice}/credit', [\App\Http\Controllers\Bconnect\BillingController::class, 'creditNote'])->name('bconnect.invoices.credit');
+            Route::get('/billing/quotes', [\App\Http\Controllers\Bconnect\BillingController::class, 'quotes'])->name('bconnect.quotes');
+            Route::post('/billing/quotes', [\App\Http\Controllers\Bconnect\BillingController::class, 'storeQuote'])->name('bconnect.quotes.store');
+            Route::post('/billing/quotes/{id}/convert', [\App\Http\Controllers\Bconnect\BillingController::class, 'convertQuote'])->name('bconnect.quotes.convert');
+            Route::post('/billing/quotes/{id}/status', [\App\Http\Controllers\Bconnect\BillingController::class, 'setQuoteStatus'])->name('bconnect.quotes.status');
+            Route::get('/billing/recurring', [\App\Http\Controllers\Bconnect\BillingController::class, 'recurring'])->name('bconnect.recurring');
+            Route::post('/billing/recurring', [\App\Http\Controllers\Bconnect\BillingController::class, 'storeRecurring'])->name('bconnect.recurring.store');
+            Route::post('/billing/recurring/{id}/toggle', [\App\Http\Controllers\Bconnect\BillingController::class, 'toggleRecurring'])->name('bconnect.recurring.toggle');
+            Route::get('/billing/remote-minutes', [\App\Http\Controllers\Bconnect\BillingController::class, 'remoteMinutes'])->name('bconnect.billing.remote-minutes');
+            Route::post('/billing/remote-minutes', [\App\Http\Controllers\Bconnect\BillingController::class, 'invoiceRemoteMinutes'])->name('bconnect.billing.remote-minutes.store');
         });
 
         // Billing / subscription management
