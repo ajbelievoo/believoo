@@ -1,47 +1,53 @@
-/* B-CONNECT Global Styles */
+/* B-CONNECT Global Styles — product-grade neutral palette
+   One accent (brand rose), zinc neutrals, flat surfaces, hairline borders.
+   No gradients, no glow, no glass — restraint is what reads "designed". */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root, html.dark {
-    --bc-bg: #0b1220;
-    --bc-panel: rgba(15, 23, 42, 0.72);
-    --bc-panel-solid: #0f172a;
-    --bc-card: rgba(19, 28, 46, 0.66);
-    --bc-card-solid: #131c2e;
-    --bc-border: rgba(148, 163, 184, 0.14);
-    --bc-cyan: #00b7ff;
-    --bc-cyan-dark: #06b6d4;
-    --bc-text: #e2e8f0;
-    --bc-muted: #94a3b8;
+    --bc-bg: #131316;
+    --bc-panel: #1a1a1f;
+    --bc-panel-solid: #1a1a1f;
+    --bc-card: #1e1e24;
+    --bc-card-solid: #1e1e24;
+    --bc-border: rgba(255, 255, 255, 0.09);
+    --bc-border-strong: rgba(255, 255, 255, 0.16);
+    --bc-accent: #e11d48;
+    --bc-accent-hover: #be123c;
+    --bc-accent-soft: rgba(225, 29, 72, 0.14);
+    --bc-cyan: #e11d48;          /* legacy alias — the accent */
+    --bc-cyan-dark: #be123c;
+    --bc-text: #e4e4e7;
+    --bc-muted: #a1a1aa;
     --bc-danger: #ef4444;
     --bc-success: #22c55e;
     --bc-warning: #f59e0b;
-    --bc-glow: rgba(0, 183, 255, 0.22);
-    --bc-input: #1e293b;
-    --bc-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    --bc-ambient1: rgba(0, 183, 255, 0.07);
-    --bc-ambient2: rgba(139, 92, 246, 0.06);
+    --bc-glow: transparent;       /* glow is dead — kept for compat */
+    --bc-input: #26262c;
+    --bc-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     color-scheme: dark;
 }
 
 html.light {
-    --bc-bg: #eef1f7;
-    --bc-panel: rgba(255, 255, 255, 0.72);
+    --bc-bg: #f4f4f5;
+    --bc-panel: #ffffff;
     --bc-panel-solid: #ffffff;
-    --bc-card: rgba(255, 255, 255, 0.75);
+    --bc-card: #ffffff;
     --bc-card-solid: #ffffff;
-    --bc-border: rgba(15, 23, 42, 0.09);
-    --bc-cyan: #0284c7;
-    --bc-cyan-dark: #0369a1;
-    --bc-text: #0f172a;
-    --bc-muted: #5b6b82;
+    --bc-border: #e4e4e7;
+    --bc-border-strong: #d4d4d8;
+    --bc-accent: #e11d48;
+    --bc-accent-hover: #be123c;
+    --bc-accent-soft: rgba(225, 29, 72, 0.08);
+    --bc-cyan: #e11d48;
+    --bc-cyan-dark: #be123c;
+    --bc-text: #18181b;
+    --bc-muted: #52525b;
     --bc-danger: #dc2626;
     --bc-success: #16a34a;
     --bc-warning: #d97706;
-    --bc-glow: rgba(2, 132, 199, 0.18);
-    --bc-input: #f1f5f9;
-    --bc-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
-    --bc-ambient1: rgba(0, 183, 255, 0.10);
-    --bc-ambient2: rgba(139, 92, 246, 0.08);
+    --bc-glow: transparent;
+    --bc-input: #f4f4f5;
+    --bc-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     color-scheme: light;
 }
 
@@ -52,131 +58,138 @@ body {
     color: var(--bc-text);
     font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
+    transition: background-color .2s ease, color .2s ease;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bc-panel); }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
-/* Glass / Card base */
+/* Cards — flat, hairline border, minimal shadow */
 .bc-card {
     background: var(--bc-card);
     border: 1px solid var(--bc-border);
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+    border-radius: 12px;
+    box-shadow: var(--bc-shadow);
 }
 
 .bc-card-hover:hover {
-    border-color: rgba(0, 183, 255, 0.25);
-    box-shadow: 0 8px 32px rgba(0, 183, 255, 0.08);
-    transform: translateY(-2px);
-    transition: all 0.2s ease;
+    border-color: var(--bc-border-strong);
+    transition: border-color 0.15s ease;
 }
 
-/* Buttons */
+/* Buttons — flat solid accent, weight does the talking */
 .bc-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 10px 18px;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    transition: all 0.15s ease;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
     border: none;
     cursor: pointer;
 }
 
 .bc-btn-primary {
-    background: linear-gradient(135deg, #00b7ff, #06b6d4);
-    color: #0b1220;
+    background: var(--bc-accent);
+    color: #ffffff;
 }
-.bc-btn-primary:hover { filter: brightness(1.1); box-shadow: 0 0 20px rgba(0, 183, 255, 0.25); }
+.bc-btn-primary:hover { background: var(--bc-accent-hover); }
+.bc-btn:active { transform: translateY(1px); }
 
 .bc-btn-secondary {
-    background: rgba(148, 163, 184, 0.12);
+    background: transparent;
     color: var(--bc-text);
-    border: 1px solid var(--bc-border);
+    border: 1px solid var(--bc-border-strong);
 }
-.bc-btn-secondary:hover { background: rgba(148, 163, 184, 0.2); }
+.bc-btn-secondary:hover { border-color: var(--bc-muted); }
 
 .bc-btn-danger {
-    background: rgba(239, 68, 68, 0.12);
-    color: #fca5a5;
-    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: rgba(239, 68, 68, 0.10);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.30);
 }
-.bc-btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+.bc-btn-danger:hover { background: rgba(239, 68, 68, 0.16); }
 
-/* Badges */
+/* Badges — quiet pills */
 .bc-badge {
     display: inline-flex;
     align-items: center;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.5px;
 }
 
-.bc-badge-cyan { background: rgba(0, 183, 255, 0.12); color: var(--bc-cyan); }
+.bc-badge-cyan { background: var(--bc-accent-soft); color: var(--bc-accent); }
 .bc-badge-green { background: rgba(34, 197, 94, 0.12); color: var(--bc-success); }
 .bc-badge-amber { background: rgba(245, 158, 11, 0.12); color: var(--bc-warning); }
-.bc-badge-red { background: rgba(239, 68, 68, 0.12); color: #fca5a5; }
-.bc-badge-slate { background: rgba(148, 163, 184, 0.12); color: var(--bc-muted); }
+.bc-badge-red { background: rgba(239, 68, 68, 0.12); color: var(--bc-danger); }
+.bc-badge-slate { background: rgba(161, 161, 170, 0.14); color: var(--bc-muted); }
 
-/* Sidebar */
+/* Sidebar — flat list, active = accent text + soft tint + left tick */
 .bc-sidebar-link {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
-    border-radius: 12px;
-    font-size: 0.9rem;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 0.875rem;
     font-weight: 500;
     color: var(--bc-muted);
-    transition: all 0.15s ease;
-    margin-bottom: 4px;
+    transition: background-color 0.12s ease, color 0.12s ease;
+    margin-bottom: 2px;
+    border-left: 2px solid transparent;
 }
 
-.bc-sidebar-link:hover,
+.bc-sidebar-link:hover {
+    background: rgba(161, 161, 170, 0.08);
+    color: var(--bc-text);
+}
+
 .bc-sidebar-link.active {
-    background: rgba(0, 183, 255, 0.1);
-    color: var(--bc-cyan);
+    background: var(--bc-accent-soft);
+    color: var(--bc-accent);
+    border-left-color: var(--bc-accent);
+    font-weight: 600;
 }
 
-.bc-sidebar-link i { width: 22px; text-align: center; }
+.bc-sidebar-link i { width: 20px; text-align: center; }
 
 /* Form inputs */
 .bc-input {
     width: 100%;
-    padding: 12px 16px;
-    border-radius: 10px;
-    background: #1e293b;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--bc-input);
     border: 1px solid var(--bc-border);
     color: var(--bc-text);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     transition: border-color 0.15s ease;
 }
 
 .bc-input:focus {
     outline: none;
-    border-color: var(--bc-cyan);
-    box-shadow: 0 0 0 3px rgba(0, 183, 255, 0.1);
+    border-color: var(--bc-accent);
+    box-shadow: 0 0 0 3px var(--bc-accent-soft);
 }
 
 /* Tables */
 .bc-table { width: 100%; border-collapse: collapse; }
-.bc-table th { text-align: left; padding: 12px; font-size: 0.75rem; text-transform: uppercase; color: var(--bc-muted); border-bottom: 1px solid var(--bc-border); }
-.bc-table td { padding: 14px 12px; border-bottom: 1px solid var(--bc-border); color: var(--bc-text); font-size: 0.9rem; }
+.bc-table th { text-align: left; padding: 10px 12px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--bc-muted); border-bottom: 1px solid var(--bc-border); }
+.bc-table td { padding: 12px; border-bottom: 1px solid var(--bc-border); color: var(--bc-text); font-size: 0.875rem; }
 .bc-table tr:last-child td { border-bottom: none; }
 
 /* Empty state */
 .bc-empty { text-align: center; padding: 48px 24px; color: var(--bc-muted); }
-.bc-empty i { font-size: 2.5rem; margin-bottom: 12px; color: #334155; }
+.bc-empty i { font-size: 2rem; margin-bottom: 12px; color: var(--bc-border-strong); }
 
 /* Mobile menu */
 .bc-mobile-menu-btn { display: none; }
@@ -191,186 +204,154 @@ body {
 
 /* Animations */
 @keyframes bc-fade-in {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
 }
-.bc-animate { animation: bc-fade-in 0.35s ease; }
+.bc-animate { animation: bc-fade-in 0.3s ease; }
 
 /* Status ring for plan */
 .bc-plan-ring {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
     border: 1px solid var(--bc-border);
     background: var(--bc-card);
 }
 .bc-plan-ring::before {
     content: '';
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: var(--bc-cyan);
-    box-shadow: 0 0 8px var(--bc-cyan);
+    background: var(--bc-success);
 }
-.bc-plan-ring.expired::before { background: var(--bc-danger); box-shadow: 0 0 8px var(--bc-danger); }
-.bc-plan-ring.grace::before { background: var(--bc-warning); box-shadow: 0 0 8px var(--bc-warning); }
+.bc-plan-ring.expired::before { background: var(--bc-danger); }
+.bc-plan-ring.grace::before { background: var(--bc-warning); }
 
 /* Kanban board */
-.bc-kanban { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; }
+.bc-kanban { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; }
 .bc-kanban-column { min-width: 280px; max-width: 320px; flex: 1; display: flex; flex-direction: column; }
-.bc-kanban-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; font-weight: 700; font-size: 0.85rem; border-bottom: 1px solid var(--bc-border); }
-.bc-kanban-list { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 16px; min-height: 140px; }
-.bc-kanban-card { padding: 14px; border: 1px solid var(--bc-border); border-radius: 12px; background: var(--bc-panel); cursor: grab; transition: transform 0.15s, box-shadow 0.15s; }
-.bc-kanban-card:hover { border-color: rgba(0,183,255,0.25); box-shadow: 0 8px 24px rgba(0,183,255,0.08); }
+.bc-kanban-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-weight: 600; font-size: 0.82rem; border-bottom: 1px solid var(--bc-border); }
+.bc-kanban-list { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 12px; min-height: 140px; }
+.bc-kanban-card { padding: 12px; border: 1px solid var(--bc-border); border-radius: 10px; background: var(--bc-panel); cursor: grab; transition: border-color 0.15s; }
+.bc-kanban-card:hover { border-color: var(--bc-border-strong); }
 .bc-kanban-card.dragging { opacity: 0.4; cursor: grabbing; }
-.bc-kanban-card.over { border-style: dashed; border-color: var(--bc-cyan); }
-.bc-kanban-dropzone { min-height: 40px; border-radius: 10px; border: 2px dashed transparent; }
-.bc-kanban-dropzone.over { border-color: rgba(0,183,255,0.3); background: rgba(0,183,255,0.05); }
+.bc-kanban-card.over { border-style: dashed; border-color: var(--bc-accent); }
+.bc-kanban-dropzone { min-height: 40px; border-radius: 8px; border: 2px dashed transparent; }
+.bc-kanban-dropzone.over { border-color: var(--bc-accent-soft); background: var(--bc-accent-soft); }
 
 /* Time tracking */
-.bc-timer-ring { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: rgba(34,197,94,0.12); color: var(--bc-success); font-weight: 700; }
-.bc-timer-ring.active::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--bc-success); box-shadow: 0 0 8px var(--bc-success); animation: bc-pulse 1.5s infinite; }
+.bc-timer-ring { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; background: rgba(34,197,94,0.12); color: var(--bc-success); font-weight: 600; }
+.bc-timer-ring.active::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--bc-success); animation: bc-pulse 1.5s infinite; }
 @keyframes bc-pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-
-/* ══════════ Apple-style theme engine — glass, glow, light/dark ══════════ */
-
-html { transition: background-color .3s ease; }
-body {
-    position: relative;
-    transition: background-color .3s ease, color .3s ease;
-}
-
-/* Ambient glow blobs behind everything (Apple keynote feel) */
-body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background:
-        radial-gradient(900px 480px at 8% -10%, var(--bc-ambient1), transparent 60%),
-        radial-gradient(800px 420px at 95% 5%, var(--bc-ambient2), transparent 60%),
-        radial-gradient(700px 500px at 50% 110%, var(--bc-ambient1), transparent 65%);
-    transition: opacity .3s ease;
-}
-
-/* Frosted glass surfaces */
-.bc-sidebar, header, .bc-card,
-.bg-slate-900, .bc-glass {
-    backdrop-filter: blur(22px) saturate(160%);
-    -webkit-backdrop-filter: blur(22px) saturate(160%);
-}
-
-.bc-card {
-    background: var(--bc-card);
-    box-shadow: var(--bc-shadow), inset 0 1px 0 rgba(255,255,255,0.04);
-}
-html.light .bc-card {
-    box-shadow: var(--bc-shadow), inset 0 1px 0 rgba(255,255,255,0.9);
-}
-
-/* Active nav item — soft cyan pill with glow */
-.bc-sidebar-link.active {
-    background: linear-gradient(135deg, rgba(0,183,255,0.16), rgba(139,92,246,0.10));
-    box-shadow: 0 0 18px var(--bc-glow), inset 0 0 0 1px rgba(0,183,255,0.25);
-}
-.bc-sidebar-link:hover { transform: translateX(2px); }
-
-/* Buttons — tactile, glowing primary */
-.bc-btn-primary {
-    box-shadow: 0 4px 16px var(--bc-glow);
-}
-.bc-btn-primary:hover {
-    filter: brightness(1.08);
-    box-shadow: 0 6px 26px var(--bc-glow);
-    transform: translateY(-1px);
-}
-.bc-btn:active { transform: scale(0.98); }
 
 /* Theme toggle */
 .bc-theme-btn {
-    width: 38px; height: 38px;
+    width: 34px; height: 34px;
     display: inline-flex; align-items: center; justify-content: center;
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid var(--bc-border);
-    background: var(--bc-card);
+    background: transparent;
     color: var(--bc-muted);
-    font-size: 15px; cursor: pointer;
-    transition: all .2s ease;
+    font-size: 14px; cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
 }
-.bc-theme-btn:hover { color: var(--bc-cyan); box-shadow: 0 0 14px var(--bc-glow); }
-
-/* Inputs adopt theme */
-.bc-input { background: var(--bc-input); }
-html.light .bc-input { border-color: rgba(15,23,42,.12); }
+.bc-theme-btn:hover { color: var(--bc-text); border-color: var(--bc-border-strong); }
 
 /* Scrollbar follows theme */
-html.light ::-webkit-scrollbar-track { background: #eef1f7; }
-html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
-html.light ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+html.light ::-webkit-scrollbar-thumb { background: #d4d4d8; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+
+/* Sidebar surface */
+.bc-sidebar { background: var(--bc-panel); }
 
 /* ── Light-mode overrides for hardcoded dark utilities used across blades ── */
 html.light body, html.light .text-slate-200, html.light .text-white { color: var(--bc-text); }
-html.light .bg-\[\#0b1220\], html.light .bc-sidebar { background: rgba(255,255,255,.78) !important; }
-html.light .bg-slate-900, html.light .bg-slate-800, html.light .bg-slate-950 {
-    background-color: var(--bc-card) !important;
-}
-html.light .bg-slate-700, html.light .hover\\:bg-slate-700:hover { background-color: #e2e8f0 !important; }
-html.light .text-slate-300 { color: #334155 !important; }
-html.light .text-slate-400, html.light .text-slate-500 { color: var(--bc-muted) !important; }
-html.light .border-slate-800, html.light .border-slate-700, html.light .border-slate-600,
-html.light .border-slate-700\/60 { border-color: var(--bc-border) !important; }
-html.light header { background: rgba(255,255,255,.72) !important; }
-html.light .bg-cyan-500\/20 { background: rgba(2,132,199,.12) !important; }
-html.light .text-cyan-400, html.light .text-cyan-300 { color: var(--bc-cyan) !important; }
-html.light .bg-green-500\/10 { background: rgba(22,163,74,.10) !important; }
-html.light .text-green-400 { color: var(--bc-success) !important; }
-html.light .bg-red-500\/10 { background: rgba(220,38,38,.08) !important; }
-html.light .text-red-400 { color: var(--bc-danger) !important; }
-html.light .bg-cyan-500\/10 { background: rgba(2,132,199,.10) !important; }
-html.light .bg-amber-500\/10 { background: rgba(217,119,6,.10) !important; }
-html.light .text-amber-400 { color: var(--bc-warning) !important; }
-html.light .bc-empty i { color: #cbd5e1; }
-
-/* Dark-mode-safe: sidebar uses var, not hardcoded hex */
-.bc-sidebar { background: var(--bc-panel); }
-
-/* ── Light-mode coverage — every dark utility used across blades ── */
-html.light .text-slate-600 { color: #475569 !important; }
-html.light .text-slate-700 { color: #334155 !important; }
-html.light .text-slate-900 { color: #0f172a !important; }
-html.light .text-slate-100, html.light .text-slate-200 { color: var(--bc-text) !important; }
+html.light .bg-\[\#0b1220\], html.light .bc-sidebar { background: #ffffff !important; }
+html.light .bg-slate-900, html.light .bg-slate-800, html.light .bg-slate-950,
 html.light .bg-\[\#0f172a\], html.light .bg-slate-800\/60, html.light .bg-slate-900\/60,
 html.light .bg-slate-900\/80, html.light .bg-slate-800\/50 {
     background-color: var(--bc-card) !important;
 }
+html.light .bg-slate-700, html.light .hover\\:bg-slate-700:hover { background-color: #e4e4e7 !important; }
+html.light .hover\\:bg-slate-800:hover { background-color: #f4f4f5 !important; }
 html.light .bg-slate-50, html.light .bg-slate-100, html.light .bg-slate-200 {
     background-color: var(--bc-input) !important;
 }
-html.light .border-slate-100, html.light .border-slate-200, html.light .border-slate-300,
-html.light .border-slate-400, html.light .border-slate-500 {
+html.light .text-slate-300, html.light .text-slate-700 { color: #3f3f46 !important; }
+html.light .text-slate-400, html.light .text-slate-500, html.light .text-slate-600 { color: var(--bc-muted) !important; }
+html.light .text-slate-900 { color: #18181b !important; }
+html.light .text-slate-100, html.light .text-slate-200 { color: var(--bc-text) !important; }
+html.light .border-slate-800, html.light .border-slate-700, html.light .border-slate-600,
+html.light .border-slate-700\/60, html.light .border-slate-100, html.light .border-slate-200,
+html.light .border-slate-300, html.light .border-slate-400, html.light .border-slate-500 {
     border-color: var(--bc-border) !important;
 }
-html.light .text-cyan-500, html.light .text-cyan-100, html.light .text-cyan-300 { color: var(--bc-cyan) !important; }
-html.light .text-amber-300, html.light .text-amber-500 { color: var(--bc-warning) !important; }
-html.light .text-red-300, html.light .text-red-500 { color: var(--bc-danger) !important; }
-html.light .text-green-500, html.light .text-emerald-400, html.light .text-green-600 { color: var(--bc-success) !important; }
-html.light .text-rose-400 { color: #e11d48 !important; }
-html.light .bg-cyan-500\/30 { background: rgba(2,132,199,.18) !important; }
-html.light .bg-cyan-500\/5 { background: rgba(2,132,199,.06) !important; }
+html.light header { background: #ffffff !important; }
+html.light .divide-slate-800 > * + *, html.light .divide-slate-700 > * + * { border-color: var(--bc-border) !important; }
+html.light .placeholder-slate-500::placeholder { color: #a1a1aa !important; }
+html.light .bc-empty i { color: #d4d4d8; }
+html.light .shadow-xl, html.light .shadow-2xl, html.light .shadow-lg {
+    --tw-shadow-color: rgba(0,0,0,.06);
+}
+
+/* accent utilities → brand rose in both themes */
+html.light .text-cyan-400, html.light .text-cyan-300, html.light .text-cyan-500,
+html.light .text-cyan-100 { color: var(--bc-accent) !important; }
+html.light .bg-cyan-500\/20 { background: rgba(225,29,72,.12) !important; }
+html.light .bg-cyan-500\/10 { background: rgba(225,29,72,.10) !important; }
+html.light .bg-cyan-500\/30 { background: rgba(225,29,72,.18) !important; }
+html.light .bg-cyan-500\/5 { background: rgba(225,29,72,.06) !important; }
+html.light .bg-green-500\/10 { background: rgba(22,163,74,.10) !important; }
+html.light .text-green-400, html.light .text-green-500, html.light .text-emerald-400,
+html.light .text-green-600 { color: var(--bc-success) !important; }
+html.light .bg-red-500\/10 { background: rgba(220,38,38,.08) !important; }
+html.light .text-red-400, html.light .text-red-300, html.light .text-red-500 { color: var(--bc-danger) !important; }
+html.light .bg-amber-500\/10 { background: rgba(217,119,6,.10) !important; }
+html.light .text-amber-400, html.light .text-amber-300, html.light .text-amber-500 { color: var(--bc-warning) !important; }
 html.light .bg-amber-500\/20 { background: rgba(217,119,6,.14) !important; }
 html.light .bg-red-500\/30 { background: rgba(220,38,38,.16) !important; }
 html.light .bg-green-500\/20, html.light .bg-emerald-500\/15 { background: rgba(22,163,74,.14) !important; }
+html.light .text-rose-400 { color: var(--bc-accent) !important; }
 html.light .bg-rose-500\/20 { background: rgba(225,29,72,.12) !important; }
-html.light .hover\\:bg-slate-800:hover { background-color: #e8edf4 !important; }
-html.light .hover\\:text-white:hover { color: var(--bc-cyan) !important; }
-html.light .hover\\:border-slate-500:hover { border-color: var(--bc-cyan) !important; }
-html.light .divide-slate-800 > * + *, html.light .divide-slate-700 > * + * { border-color: var(--bc-border) !important; }
-html.light .placeholder-slate-500::placeholder { color: #94a3b8 !important; }
-html.light .shadow-xl, html.light .shadow-2xl, html.light .shadow-lg {
-    --tw-shadow-color: rgba(15,23,42,.10);
+html.light .hover\\:text-white:hover { color: var(--bc-accent) !important; }
+html.light .hover\\:border-slate-500:hover { border-color: var(--bc-accent) !important; }
+
+/* ── Accent remap, both themes ─────────────────────────────────────
+   Old blades hardcode cyan as the accent (Tailwind emits raw cyan).
+   Route every cyan utility to the brand accent; purple/pink/fuchsia/
+   violet decorative tiles → accent too. Green/amber/red stay semantic. */
+.text-cyan-400, .text-cyan-300, .text-cyan-500, .text-cyan-100,
+.text-purple-400, .text-purple-500, .text-pink-400, .text-pink-500,
+.text-fuchsia-400, .text-fuchsia-500, .text-violet-400, .text-violet-500,
+.text-indigo-400 {
+    color: var(--bc-accent) !important;
+}
+.bg-cyan-500\/10, .bg-cyan-500\/20, .bg-cyan-500\/30, .bg-cyan-500\/5,
+.bg-purple-500\/10, .bg-purple-500\/20, .bg-pink-500\/10, .bg-pink-500\/20,
+.bg-fuchsia-500\/10, .bg-violet-500\/10, .bg-indigo-500\/10 {
+    background: var(--bc-accent-soft) !important;
+}
+.bg-cyan-500, .bg-cyan-600, .bg-purple-500, .bg-purple-600,
+.bg-pink-500, .bg-violet-600, .bg-indigo-600, .bg-fuchsia-600 {
+    background-color: var(--bc-accent) !important;
+}
+.border-cyan-400, .border-cyan-500, .border-cyan-500\/50, .border-cyan-500\/30,
+.border-purple-500, .border-pink-500, .border-violet-500 {
+    border-color: var(--bc-accent) !important;
+}
+.focus\:border-cyan-400:focus, .focus\:border-cyan-500:focus {
+    border-color: var(--bc-accent) !important;
+}
+.ring-cyan-300, .ring-cyan-400 { --tw-ring-color: var(--bc-accent) !important; }
+.hover\:bg-cyan-600:hover, .hover\:bg-cyan-500:hover { background-color: var(--bc-accent-hover) !important; }
+
+/* Brand logo is dark-on-transparent — needs a light chip in dark mode */
+html.dark .bc-logo-chip {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 6px 10px;
 }

@@ -1,7 +1,7 @@
 @extends('bconnect.layout')
 @section('title', 'Remote Desktop')
 @section('content')
-<div class="bc-card p-6 mb-6 flex flex-col md:flex-row items-center gap-5" style="background:linear-gradient(135deg,rgba({{ $bconnectBrand['brand_rgb'] }},0.10),transparent 60%);">
+<div class="bc-card p-6 mb-6 flex flex-col md:flex-row items-center gap-5">
     <div class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style="background:rgba({{ $bconnectBrand['brand_rgb'] }},0.15);">
         <i class="fas fa-plug text-2xl" style="color:var(--bc-cyan)"></i>
     </div>

@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/css/bconnect.css">
 <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}}}</script>
-<style>body{background:radial-gradient(circle at top right, rgba({{ $bconnectBrand['brand_rgb'] }},0.08), transparent 40%), #0b1220;}</style>
+<style>body{background:#131316;}</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 <div class="w-full max-w-md p-8 bg-[#0f172a] rounded-2xl border border-[var(--bc-border)] shadow-2xl">
