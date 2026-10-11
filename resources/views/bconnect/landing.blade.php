@@ -151,7 +151,7 @@
 </section>
 
 <!-- Video walkthrough -->
-@php $demoVideo = \App\Models\Setting::get('bmydesk_demo_video_url'); @endphp
+@php $demoVideo = \App\Helpers\BconnectHelper::setting('bmydesk_demo_video_url'); @endphp
 <section class="py-16 bg-white border-t border-slate-100">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 class="text-2xl lg:text-4xl font-extrabold text-slate-900 mb-8">See it in 2 minutes</h2>
