@@ -40,7 +40,7 @@ function bcToggleTheme(){
 @endif
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="/css/bconnect.css">
+<link rel="stylesheet" href="/css/bconnect.css?v={{ filemtime(public_path('css/bconnect.css')) }}">
 <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}};</script>
 <style>:root{--bc-cyan:{{ $bconnectBrand['brand_color_light'] }};--bc-cyan-dark:{{ $bconnectBrand['brand_color'] }};}.bc-badge-cyan{background:rgba({{ $bconnectBrand['brand_rgb_light'] }},0.12);}</style>
 <meta name="csrf-token" content="{{ csrf_token() }}">

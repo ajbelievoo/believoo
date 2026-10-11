@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Bmydesk Setup</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="/css/bconnect.css">
+<link rel="stylesheet" href="/css/bconnect.css?v={{ filemtime(public_path('css/bconnect.css')) }}">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}}};</script>
 <style>body{background:var(--bc-bg);color:var(--bc-text);font-family:Inter,ui-sans-serif,system-ui,sans-serif;}</style>
