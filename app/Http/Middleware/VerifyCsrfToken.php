@@ -12,6 +12,7 @@ class VerifyCsrfToken extends Middleware
         'admin/ghc/*',
         // Payment gateway webhooks are server-to-server POSTs verified by signature.
         'payment/razorpay/webhook',
+        'payment/stripe/webhook',
         'payment/cashfree/webhook',
         'payment/paypal/webhook',
     ];

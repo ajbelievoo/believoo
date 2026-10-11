@@ -293,6 +293,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/payment/razorpay/create', [PaymentController::class, 'createRazorpayOrder'])->name('payment.razorpay.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::post('/payment/razorpay/callback', [PaymentController::class, 'razorpayCallback'])->name('payment.razorpay.callback')->middleware('check.phone');
 
+    // Payment Routes - Stripe
+    Route::post('/payment/stripe/create', [PaymentController::class, 'createStripeOrder'])->name('payment.stripe.create')->middleware(['check.phone', 'throttle:20,1']);
+    Route::get('/payment/stripe/callback', [PaymentController::class, 'stripeCallback'])->name('payment.stripe.callback')->middleware('check.phone');
+
     // Payment Routes - Cashfree
     Route::post('/payment/cashfree/create', [PaymentController::class, 'createCashfreeOrder'])->name('payment.cashfree.create')->middleware(['check.phone', 'throttle:20,1']);
     Route::get('/payment/cashfree/callback', [PaymentController::class, 'cashfreeCallback'])->name('payment.cashfree.callback')->middleware('check.phone');
@@ -445,6 +449,7 @@ Route::post('/webhook/inbound-email', [\App\Http\Controllers\IntegrationWebhookC
 Route::post('/webhook/email-ticket', [\App\Http\Controllers\IntegrationWebhookController::class, 'emailToTicket']);
 
 Route::post('/payment/razorpay/webhook', [PaymentController::class, 'razorpayWebhook'])->name('payment.razorpay.webhook');
+Route::post('/payment/stripe/webhook', [PaymentController::class, 'stripeWebhook'])->name('payment.stripe.webhook');
 Route::post('/payment/cashfree/webhook', [PaymentController::class, 'cashfreeWebhook'])->name('payment.cashfree.webhook');
 Route::post('/payment/paypal/webhook', [PaymentController::class, 'paypalWebhook'])->name('payment.paypal.webhook');
 

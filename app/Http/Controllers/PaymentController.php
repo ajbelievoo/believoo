@@ -643,6 +643,215 @@ class PaymentController extends Controller
         }
     }
 
+    // ── Stripe (hosted Checkout) ────────────────────────────────────────
+
+    private function getStripeConfig(): array
+    {
+        $settings = Setting::where('group', 'Payment')->pluck('value', 'key');
+        return [
+            'enabled' => ($settings['stripe_enabled'] ?? '0') === '1',
+            'key' => $settings['stripe_key'] ?? '',
+            'secret' => $settings['stripe_secret'] ?? '',
+        ];
+    }
+
+    public function createStripeOrder(Request $request)
+    {
+        $request->validate([
+            'service_id' => 'required|exists:services,id',
+            'tier_name' => 'nullable|string',
+            'amount' => 'required|numeric|min:1',
+            'billing_months' => 'required|integer|min:1',
+            'quantity' => 'nullable|integer|min:1|max:10',
+        ]);
+
+        $config = $this->getStripeConfig();
+
+        if (!$config['enabled']) {
+            return response()->json(['error' => 'Stripe payment gateway is disabled'], 400);
+        }
+
+        if (empty($config['key']) || empty($config['secret'])) {
+            return response()->json(['error' => 'Stripe not configured'], 400);
+        }
+
+        $service = Service::findOrFail($request->service_id);
+        $user = Auth::user();
+
+        $totalAmount = $this->resolveOrderAmountInInr($request, $service);
+
+        $gstRate = 0.18;
+        $subtotal = round($totalAmount / (1 + $gstRate), 2);
+        $gstAmount = round($totalAmount - $subtotal, 2);
+        $amountInPaise = (int) round($totalAmount * 100);
+
+        $order = Order::create([
+            'user_id' => $user->id,
+            'service_id' => $service->id,
+            'service_name' => $service->title,
+            'tier_name' => $request->tier_name,
+            'billing_months' => $request->billing_months ?? 1,
+            'subtotal' => $subtotal,
+            'gst_amount' => $gstAmount,
+            'gst_rate' => $gstRate,
+            'amount' => $totalAmount,
+            'currency' => 'INR',
+            'status' => 'pending',
+            'payment_gateway' => 'stripe',
+            'metadata' => $this->buildOrderMetadata($request, $service),
+        ]);
+
+        try {
+            $response = Http::withBasicAuth($config['secret'], '')
+                ->asForm()
+                ->post('https://api.stripe.com/v1/checkout/sessions', [
+                    'mode' => 'payment',
+                    'success_url' => route('payment.stripe.callback') . '?session_id={CHECKOUT_SESSION_ID}',
+                    'cancel_url' => $request->headers->get('referer', url()->previous()),
+                    'client_reference_id' => $order->order_number,
+                    'customer_email' => $user->email,
+                    'line_items[0][quantity]' => 1,
+                    'line_items[0][price_data][currency]' => 'inr',
+                    'line_items[0][price_data][unit_amount]' => $amountInPaise,
+                    'line_items[0][price_data][product_data][name]' => $service->title,
+                    'metadata[internal_order_id]' => $order->id,
+                    'payment_intent_data[metadata][internal_order_id]' => $order->id,
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Stripe session creation failed', ['body' => $response->body()]);
+                $order->update(['status' => 'failed', 'notes' => 'Stripe session creation failed']);
+                return response()->json(['error' => 'Failed to create payment session'], 500);
+            }
+
+            $session = $response->json();
+            $order->update(['payment_id' => $session['id']]);
+
+            return response()->json(['checkout_url' => $session['url']]);
+
+        } catch (\Exception $e) {
+            Log::error('Stripe order creation failed: ' . $e->getMessage());
+            $order->update(['status' => 'failed', 'notes' => $e->getMessage()]);
+            return response()->json(['error' => 'Failed to create payment order'], 500);
+        }
+    }
+
+    public function stripeCallback(Request $request)
+    {
+        $config = $this->getStripeConfig();
+        $sessionId = (string) $request->query('session_id', '');
+
+        if ($sessionId === '' || empty($config['secret'])) {
+            return redirect()->route('client.orders')->with('error', 'Invalid payment session.');
+        }
+
+        try {
+            $response = Http::withBasicAuth($config['secret'], '')
+                ->get("https://api.stripe.com/v1/checkout/sessions/{$sessionId}");
+
+            if (!$response->successful()) {
+                throw new \Exception('Session lookup failed: ' . $response->status());
+            }
+
+            $session = $response->json();
+            $order = Order::where('payment_id', $sessionId)->firstOrFail();
+
+            if (($session['payment_status'] ?? '') !== 'paid') {
+                return redirect()->route('client.orders')->with('error', 'Payment not completed.');
+            }
+
+            // Guard against amount tampering — Stripe reports the paid amount in paise
+            if (isset($session['amount_total']) && abs($session['amount_total'] - (int) round($order->amount * 100)) > 1) {
+                Log::warning('Stripe amount mismatch', ['order_id' => $order->id, 'session_amount' => $session['amount_total']]);
+                return redirect()->route('client.orders')->with('error', 'Payment amount mismatch.');
+            }
+
+            if (session('upgrade_hosting_id')) {
+                $upgradeController = new UpgradeController();
+                $upgradeController->processUpgrade($order);
+            }
+
+            $order->markAsPaid(
+                'stripe',
+                $session['payment_intent'] ?? $sessionId,
+                $sessionId,
+                $session
+            );
+
+            return redirect()->route('client.orders')->with('success', 'Payment successful!');
+
+        } catch (\Exception $e) {
+            Log::error('Stripe verification failed: ' . $e->getMessage());
+            return redirect()->route('client.orders')->with('error', 'Payment verification failed.');
+        }
+    }
+
+    public function stripeWebhook(Request $request)
+    {
+        $rawBody = $request->getContent();
+        $payload = json_decode($rawBody, true) ?? [];
+
+        $webhookSecret = Setting::where('key', 'stripe_webhook_secret')->value('value') ?? '';
+        $sigHeader = (string) $request->header('Stripe-Signature', '');
+
+        if (empty($webhookSecret) || empty($sigHeader)) {
+            Log::warning('Stripe webhook rejected: signature not configured or missing');
+            return response()->json(['status' => 'unauthorized'], 401);
+        }
+
+        $timestamp = null;
+        $signatures = [];
+        foreach (explode(',', $sigHeader) as $part) {
+            [$k, $v] = array_pad(explode('=', $part, 2), 2, '');
+            if ($k === 't') $timestamp = $v;
+            if ($k === 'v1') $signatures[] = $v;
+        }
+
+        if (!$timestamp || empty($signatures) || abs(time() - (int) $timestamp) > 300) {
+            Log::warning('Stripe webhook: bad timestamp or missing v1 signature');
+            return response()->json(['status' => 'invalid_signature'], 401);
+        }
+
+        $expected = hash_hmac('sha256', $timestamp . '.' . $rawBody, $webhookSecret);
+        $valid = false;
+        foreach ($signatures as $sig) {
+            if (hash_equals($expected, $sig)) { $valid = true; break; }
+        }
+
+        if (!$valid) {
+            Log::warning('Stripe webhook: invalid signature');
+            return response()->json(['status' => 'invalid_signature'], 401);
+        }
+
+        Log::info('Stripe webhook received', ['event' => $payload['type'] ?? null]);
+
+        if (($payload['type'] ?? '') === 'checkout.session.completed') {
+            $session = $payload['data']['object'] ?? [];
+            if (($session['payment_status'] ?? '') === 'paid') {
+                $internalOrderId = $session['metadata']['internal_order_id'] ?? null;
+                $order = $internalOrderId
+                    ? Order::find($internalOrderId)
+                    : Order::where('payment_id', $session['id'] ?? '')->first();
+
+                if ($order && !$order->isPaid()) {
+                    $order->markAsPaid(
+                        'stripe',
+                        $session['payment_intent'] ?? ($session['id'] ?? ''),
+                        $session['id'] ?? '',
+                        $session
+                    );
+
+                    if ($order->notes && str_contains($order->notes, 'Upgrade from')) {
+                        $upgradeController = new UpgradeController();
+                        $upgradeController->processUpgrade($order);
+                    }
+                }
+            }
+        }
+
+        return response()->json(['status' => 'received']);
+    }
+
     public function razorpayWebhook(Request $request)
     {
         $rawBody = $request->getContent();

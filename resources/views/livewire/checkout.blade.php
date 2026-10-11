@@ -788,9 +788,44 @@
                 createPaypalOrder();
             } else if (paymentGateway === 'payu') {
                 createPayuOrder();
+            } else if (paymentGateway === 'stripe') {
+                createStripeOrder();
             } else if (paymentGateway === 'wallet') {
                 payWithWallet();
             }
+        }
+
+        function createStripeOrder() {
+            fetch('{{ route('payment.stripe.create') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    service_id: serviceId,
+                    domain: ovhDomain,
+                    tier_name: tierName,
+                    amount: amount,
+                    billing_months: billingMonths,
+                    quantity: quantity,
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    setLoading(false);
+                    alert(data.error);
+                    return;
+                }
+                window.location.href = data.checkout_url;
+            })
+            .catch(error => {
+                setLoading(false);
+                console.error('Error:', error);
+                alert('Failed to initiate Stripe payment. Please try again.');
+            });
         }
 
         function payWithWallet() {
