@@ -44,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'payment/cashfree/webhook',
             'payment/razorpay/webhook',
             'payment/paypal/webhook',
+            'payment/stripe/webhook',
             'payment/payu/callback',
             'webhook/telegram',
             'webhook/whatsapp',
