@@ -760,17 +760,21 @@ class MainActivity : Activity() {
                     if (!signaling.hostSubscribed) {
                         val s = api.status(r.code, r.agentToken)
                         if (s?.get("ok")?.asBoolean == true) {
+                            val st = s.get("status")?.asString
                             val vj = s.get("viewer_joined_at")?.asString
-                            if (vj != null) {
+                            // show while the server says 'connecting' — no age
+                            // cutoff (a >2min request still needs an answer)
+                            if (st == "connecting" && vj != null) {
                                 val joinMs = java.time.Instant.parse(vj).toEpochMilli()
-                                if (joinMs > respondedAtMs && System.currentTimeMillis() - joinMs < 120_000
-                                    && reqBox.visibility != View.VISIBLE) {
+                                if (joinMs > respondedAtMs && reqBox.visibility != View.VISIBLE) {
                                     ui {
                                         reqName.text = "Someone wants to view this device"
                                         reqBox.visibility = View.VISIBLE
                                         setStatus("Connection request…", "#f59e0b")
                                     }
                                 }
+                            } else if (st != "connecting" && reqBox.visibility == View.VISIBLE && service == null) {
+                                ui { reqBox.visibility = View.GONE }
                             }
                         }
                     }

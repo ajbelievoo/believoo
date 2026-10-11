@@ -152,6 +152,10 @@ class RemoteController extends Controller {
         }
         $member = $r->input('bconnect_member');
         if ($session->viewer_member_id === null) {
+            // new viewer epoch — flush stale queued signals both ways so a
+            // leftover 'end'/'reject' can't kill the fresh session
+            \Illuminate\Support\Facades\Cache::forget('rsig.' . $code . '.v');
+            \Illuminate\Support\Facades\Cache::forget('rsig.' . $code . '.h');
             $session->update(['viewer_member_id' => $member->id, 'status' => 'connecting', 'viewer_joined_at' => now()]);
         } elseif ($session->viewer_member_id !== $member->id && $session->requested_by !== $member->id) {
             return redirect()->route('bconnect.remote.connect')->with('error', 'This session already has a connected viewer.');
@@ -259,6 +263,10 @@ class RemoteController extends Controller {
     public function respondByCode(Request $r, string $code) {
         [$session, $role] = $this->codeParticipant($r, $code);
         if ($role !== 'host') abort(403);
+        // late/stray responds must not flip a live or dead session
+        if (in_array($session->status, ['active', 'ended', 'rejected', 'expired'], true)) {
+            return response()->json(['ok' => true, 'already' => $session->status]);
+        }
         $accept = $r->input('action') === 'accept';
         $payload = ['n' => (string) Str::random(10), 'at' => now()->toIso8601String()];
         \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))

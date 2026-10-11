@@ -94,6 +94,10 @@ class AgentApiController extends Controller
                     'ended_at' => null,
                     'expires_at' => now()->addHours(48),
                 ]);
+                // device restart = new epoch — drop queued signals from any
+                // previous session so nothing stale replays into the next one
+                \Illuminate\Support\Facades\Cache::forget($this->signalKey($existing->session_code, 'v'));
+                \Illuminate\Support\Facades\Cache::forget($this->signalKey($existing->session_code, 'h'));
                 return response()->json([
                     'ok' => true,
                     'session_code' => $existing->session_code,
@@ -289,6 +293,11 @@ class AgentApiController extends Controller
         }
 
         \Illuminate\Support\Facades\Log::info("bmysig {$code} join name=" . (string)$r->input('name','') . " auto=" . (int)!!$autoAccept);
+        // New viewer epoch — flush the HTTP signal queues both ways. Leftover
+        // 'end'/'reject'/'ice' from a previous cycle would instantly kill the
+        // fresh session (join→end ping-pong observed in production logs).
+        \Illuminate\Support\Facades\Cache::forget($this->signalKey($session->session_code, 'v'));
+        \Illuminate\Support\Facades\Cache::forget($this->signalKey($session->session_code, 'h'));
         $session->update([
             'viewer_token' => Str::random(48),
             'viewer_joined_at' => now(),
@@ -355,6 +364,11 @@ class AgentApiController extends Controller
         $session = $this->findByCode($code);
         if (!$session || !$this->checkToken($r, $session)) {
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        // already decided — a late/stray respond must not flip a live or dead
+        // session (double-click accept→reject race killed real sessions)
+        if (in_array($session->status, ['active', 'ended', 'rejected', 'expired'], true)) {
+            return response()->json(['ok' => true, 'already' => $session->status]);
         }
         $accept = $r->input('action') === 'accept';
         $payload = ['n' => (string) Str::random(10), 'at' => now()->toIso8601String()];

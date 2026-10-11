@@ -227,7 +227,9 @@ function initChannel() {
 }
 
 function showJoinRequest(name) {
-    if (!CAN_SHARE) { showMobileHostNotice(); postJson(API + '/respond', { action: 'reject' }); whisper('join-reject', { reason: 'device' }); return; }
+    // mark answered BEFORE auto-rejecting — otherwise the 3s status poll
+    // refires showJoinRequest forever and spams /respond (seen in prod logs)
+    if (!CAN_SHARE) { respondedAt = Date.now(); showMobileHostNotice(); postJson(API + '/respond', { action: 'reject' }); whisper('join-reject', { reason: 'device' }); return; }
     document.getElementById('joinName').textContent = name;
     document.getElementById('joinRequest').classList.remove('hidden');
     setStatus('Join request', 'bc-badge-amber');
@@ -243,11 +245,15 @@ function startHostPoll() {
             (sd.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) { dbg('poll sig: ' + (m.kind || '?')); onSignal(m); } });
             const st = await fetch(API + '/session-status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
             const sd2 = await st.json();
-            const jt = sd2.ok && sd2.viewer_joined_at ? Date.parse(sd2.viewer_joined_at) : 0;
-            if (jt && jt > respondedAt && (Date.now() - jt < 120000)
+            const jt = sd2.ok && sd2.status === 'connecting' && sd2.viewer_joined_at ? Date.parse(sd2.viewer_joined_at) : 0;
+            if (jt && jt > respondedAt
                 && document.getElementById('joinRequest').classList.contains('hidden') && !pc) {
                 dbg('poll join-request');
                 showJoinRequest(sd2.viewer || 'Someone');
+            }
+            if (sd2.ok && sd2.status !== 'connecting'
+                && !document.getElementById('joinRequest').classList.contains('hidden') && !pc) {
+                document.getElementById('joinRequest').classList.add('hidden');
             }
         } catch (e) {}
     }, 3000);
