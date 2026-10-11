@@ -150,6 +150,24 @@
     </div>
 </section>
 
+<!-- Video walkthrough -->
+@php $demoVideo = \App\Models\Setting::get('bmydesk_demo_video_url'); @endphp
+<section class="py-16 bg-white border-t border-slate-100">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-2xl lg:text-4xl font-extrabold text-slate-900 mb-8">See it in 2 minutes</h2>
+        <div class="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-200 aspect-video bg-slate-900">
+            @if($demoVideo)
+                <iframe src="{{ $demoVideo }}" class="absolute inset-0 w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            @else
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3">
+                    <span class="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center"><i class="fas fa-play text-2xl text-white/70"></i></span>
+                    <p class="text-sm">Walkthrough video coming soon — set <code class="bg-white/10 px-1.5 rounded">bmydesk_demo_video_url</code> in Settings to embed.</p>
+                </div>
+            @endif
+        </div>
+    </div>
+</section>
+
 <!-- Features -->
 <section id="features" class="py-20 bg-slate-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
