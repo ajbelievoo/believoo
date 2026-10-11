@@ -66,7 +66,11 @@
                 <a href="https://believoo.com" class="hover:text-brand transition">Believoo</a>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('bconnect.remote.guest') }}" class="text-sm font-bold text-brand hover:underline">Remote Access</a>
+                <span id="statusPill" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300" id="statusDot"></span><span id="statusTxt">…</span>
+                </span>
+                <button id="langBtn" class="px-2.5 py-1.5 text-xs font-bold text-slate-600 border border-slate-200 rounded-lg hover:border-brand transition" title="Switch language">EN</button>
+                <a href="{{ route('bconnect.remote.guest') }}" class="text-sm font-bold text-brand hover:underline" data-i18n="nav_remote">Remote Access</a>
                 @auth
                     <a href="{{ route('bconnect.dashboard') }}" class="px-5 py-2.5 text-sm font-bold text-white btn-gradient rounded-full transition shadow-lg shadow-rose-500/30"><i class="fas fa-th-large mr-1"></i>Dashboard</a>
                 @else
@@ -132,9 +136,17 @@
             </div>
         </div>
 
-        <div class="mt-12 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden bg-slate-900">
-            <img src="{{ $bconnectBrand['og_image'] }}" alt="Bmydesk Dashboard" class="w-full h-64 lg:h-96 object-cover opacity-90">
+        <div class="mt-12 relative rounded-2xl shadow-2xl border border-slate-200 overflow-hidden bg-slate-900">
+            <!-- Real product screenshots carousel -->
+            <div id="shotTrack" class="flex transition-transform duration-500 ease-out">
+                <img src="/images/screens/dashboard.png" alt="BMyDesk dashboard" class="w-full h-64 lg:h-96 object-cover object-top shrink-0">
+                <img src="/images/screens/tickets.png" alt="Ticket workspace" class="w-full h-64 lg:h-96 object-cover object-top shrink-0">
+                <img src="/images/screens/meetings.png" alt="Meetings" class="w-full h-64 lg:h-96 object-cover object-top shrink-0">
+                <img src="/images/screens/remote.png" alt="Remote desktop" class="w-full h-64 lg:h-96 object-cover object-top shrink-0">
+            </div>
+            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2" id="shotDots"></div>
         </div>
+        <p class="mt-3 text-xs text-slate-400">Actual product screenshots — not mockups.</p>
     </div>
 </section>
 
@@ -226,6 +238,38 @@
 </section>
 
 <!-- How It Works -->
+<!-- Comparison -->
+<section class="py-20 bg-slate-50">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-14">
+            <h2 class="text-3xl lg:text-5xl font-extrabold text-slate-900 mb-4" data-i18n="cmp_title">Why teams switch to BMyDesk</h2>
+            <p class="text-slate-600" data-i18n="cmp_sub">One subscription replaces your remote-access tool, helpdesk and meeting app.</p>
+        </div>
+        <div class="overflow-x-auto bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-100 text-left">
+                        <th class="p-4 font-semibold text-slate-500"></th>
+                        <th class="p-4 font-extrabold text-brand text-base">BMyDesk</th>
+                        <th class="p-4 font-semibold text-slate-500">AnyDesk</th>
+                        <th class="p-4 font-semibold text-slate-500">TeamViewer</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50 text-slate-700">
+                    <tr><td class="p-4 font-semibold">Remote desktop + control</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4"><i class="fas fa-check text-green-500"></i></td></tr>
+                    <tr><td class="p-4 font-semibold">Android + Windows agents</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4"><i class="fas fa-check text-green-500"></i></td></tr>
+                    <tr><td class="p-4 font-semibold">Unattended PIN access</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4"><i class="fas fa-check text-green-500"></i></td></tr>
+                    <tr><td class="p-4 font-semibold">Built-in ticketing / helpdesk</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4 text-slate-300"><i class="fas fa-minus"></i></td><td class="p-4 text-slate-300"><i class="fas fa-minus"></i></td></tr>
+                    <tr><td class="p-4 font-semibold">Video meetings + AI notes</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4 text-slate-300"><i class="fas fa-minus"></i></td><td class="p-4 text-slate-300"><i class="fas fa-minus"></i></td></tr>
+                    <tr><td class="p-4 font-semibold">Client billing &amp; invoices</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4 text-slate-300"><i class="fas fa-minus"></i></td><td class="p-4 text-slate-300"><i class="fas fa-minus"></i></td></tr>
+                    <tr><td class="p-4 font-semibold">White-label branding</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4 text-xs text-slate-500">Enterprise only</td><td class="p-4 text-xs text-slate-500">Enterprise only</td></tr>
+                    <tr><td class="p-4 font-semibold">Free tier to start</td><td class="p-4"><i class="fas fa-check text-green-500"></i></td><td class="p-4 text-xs text-slate-500">Personal use only</td><td class="p-4 text-xs text-slate-500">Personal use only</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
 <section class="py-20 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-16">
@@ -338,9 +382,42 @@
                 <summary class="font-bold text-slate-900 flex justify-between items-center">Do you support custom domains? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
                 <p class="text-slate-600 mt-4 text-sm">Yes. Enterprise plan includes custom domain mapping and white-label branding.</p>
             </details>
+            <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
+                <summary class="font-bold text-slate-900 flex justify-between items-center">How does remote access work without any app? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
+                <p class="text-slate-600 mt-4 text-sm">The viewer needs nothing — just open the code page in a browser. The host runs our lightweight Windows or Android agent which shows a permanent code.</p>
+            </details>
+            <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
+                <summary class="font-bold text-slate-900 flex justify-between items-center">Can I access a device when nobody is there? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
+                <p class="text-slate-600 mt-4 text-sm">Yes — set an unattended-access PIN on the agent. Entering the PIN on join skips the approval step entirely.</p>
+            </details>
+            <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
+                <summary class="font-bold text-slate-900 flex justify-between items-center">Where is my data hosted? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
+                <p class="text-slate-600 mt-4 text-sm">All workspace data lives on Believoo infrastructure. Remote sessions are peer-to-peer WebRTC with TURN relay fallback — we never store screen content.</p>
+            </details>
+            <details class="group bg-white rounded-2xl border border-slate-100 p-6 cursor-pointer">
+                <summary class="font-bold text-slate-900 flex justify-between items-center">Does it work behind strict firewalls? <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i></summary>
+                <p class="text-slate-600 mt-4 text-sm">Yes — sessions fall back to our TURN relay over TCP when direct peer-to-peer is blocked.</p>
+            </details>
         </div>
     </div>
 </section>
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {"@type":"Question","name":"Is Bmydesk free to start?","acceptedAnswer":{"@type":"Answer","text":"Yes. Free plan includes 2 members and basic calls. Upgrade anytime."}},
+        {"@type":"Question","name":"Can clients join meetings without an account?","acceptedAnswer":{"@type":"Answer","text":"Clients with an assigned role can join via Bmydesk. Guest links are coming soon."}},
+        {"@type":"Question","name":"Is remote desktop secure?","acceptedAnswer":{"@type":"Answer","text":"All sessions are tokenized, logged and require explicit host permission. Screen sharing is encrypted via WebRTC."}},
+        {"@type":"Question","name":"Do you support custom domains?","acceptedAnswer":{"@type":"Answer","text":"Yes. Enterprise plan includes custom domain mapping and white-label branding."}},
+        {"@type":"Question","name":"How does remote access work without any app?","acceptedAnswer":{"@type":"Answer","text":"The viewer needs nothing — just open the code page in a browser. The host runs our lightweight Windows or Android agent which shows a permanent code."}},
+        {"@type":"Question","name":"Can I access a device when nobody is there?","acceptedAnswer":{"@type":"Answer","text":"Yes — set an unattended-access PIN on the agent. Entering the PIN on join skips the approval step entirely."}},
+        {"@type":"Question","name":"Where is my data hosted?","acceptedAnswer":{"@type":"Answer","text":"All workspace data lives on Believoo infrastructure. Remote sessions are peer-to-peer WebRTC with TURN relay fallback — we never store screen content."}},
+        {"@type":"Question","name":"Does it work behind strict firewalls?","acceptedAnswer":{"@type":"Answer","text":"Yes — sessions fall back to our TURN relay over TCP when direct peer-to-peer is blocked."}}
+    ]
+}
+</script>
 
 <!-- CTA -->
 <section class="py-20 bg-slate-900 text-white">
@@ -364,7 +441,10 @@
         <div class="text-sm text-slate-500">
             {!! $bconnectBrand['footer_text'] !!}
         </div>
-        <div class="flex gap-6 text-slate-600">
+        <div class="flex gap-6 text-slate-600 flex-wrap justify-center">
+            <a href="/download/guide" class="hover:text-brand">Install Guide</a>
+            <a href="/help" class="hover:text-brand">Help Center</a>
+            <a href="/blog" class="hover:text-brand">Blog</a>
             <a href="https://believoo.com" class="hover:text-brand">Believoo.com</a>
             @auth
                 <a href="{{ route('bconnect.dashboard') }}" class="hover:text-brand">Dashboard</a>
@@ -384,6 +464,81 @@
     var el = isAndroid ? document.getElementById('dlApk') : (isWin ? document.getElementById('dlWin') : null);
     if (el) { el.classList.remove('bg-slate-800'); el.classList.add('bg-cyan-600', 'ring-2', 'ring-cyan-300'); }
     if (!isAndroid) { var q = document.getElementById('apkQr'); if (q) { q.classList.remove('hidden'); q.classList.add('flex'); } }
+})();
+
+// ── Screenshot carousel ──
+(function () {
+    const track = document.getElementById('shotTrack');
+    if (!track) return;
+    const n = track.children.length, dots = document.getElementById('shotDots');
+    let i = 0;
+    for (let k = 0; k < n; k++) {
+        const d = document.createElement('button');
+        d.className = 'w-2 h-2 rounded-full bg-white/30 transition';
+        d.onclick = () => go(k);
+        dots.appendChild(d);
+    }
+    function go(k) {
+        i = k % n;
+        track.style.transform = 'translateX(-' + (i * 100) + '%)';
+        [...dots.children].forEach((d, j) => d.className = 'w-2 h-2 rounded-full transition ' + (j === i ? 'bg-white' : 'bg-white/30'));
+    }
+    go(0); setInterval(() => go(i + 1), 4000);
+})();
+
+// ── Live status pill ──
+(function () {
+    const dot = document.getElementById('statusDot'), txt = document.getElementById('statusTxt');
+    if (!dot) return;
+    fetch('/api/v1/bmydesk/agent/version', { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) { dot.className = 'w-1.5 h-1.5 rounded-full bg-green-500'; txt.textContent = 'All systems operational'; }
+            else throw 0;
+        })
+        .catch(() => { dot.className = 'w-1.5 h-1.5 rounded-full bg-red-500'; txt.textContent = 'Degraded'; });
+})();
+
+// ── EN/HI toggle ──
+(function () {
+    const T = {
+        hi: {
+            nav_remote: 'रिमोट एक्सेस',
+            hero_title_1: 'एक ही workspace में',
+            hero_title_2: 'कॉल्स, कोड और क्लाइंट्स',
+            hero_sub: 'BMyDesk में वीडियो कॉल, रिमोट डेस्कटॉप, बग ट्रैकिंग, AI समरी, क्लाइंट बिलिंग और रियल-टाइम चैट — IT कंपनियों, डेवलपर्स और ग्लोबल क्लाइंट्स के लिए बनाया गया।',
+            cta_start: 'फ्री workspace शुरू करें',
+            cta_login: 'डैशबोर्ड लॉगिन',
+            cmp_title: 'टीमें BMyDesk पर क्यों आती हैं',
+            cmp_sub: 'एक सब्सक्रिप्शन — रिमोट टूल, हेल्पडेस्क और मीटिंग ऐप तीनों की जगह।'
+        }
+    };
+    const btn = document.getElementById('langBtn');
+    if (!btn) return;
+    const KEY = 'bmd_lang';
+    const saved = localStorage.getItem(KEY) || 'en';
+    function apply(l) {
+        btn.textContent = l === 'hi' ? 'हिं' : 'EN';
+        if (l === 'hi') {
+            const h = T.hi;
+            document.querySelectorAll('[data-i18n]').forEach(el => { if (h[el.dataset.i18n]) el.textContent = h[el.dataset.i18n]; });
+            const h1 = document.querySelector('h1');
+            if (h1 && !h1.dataset.orig) h1.dataset.orig = h1.innerHTML;
+            if (h1) h1.innerHTML = T.hi.hero_title_1 + '<br><span class="text-gradient">' + T.hi.hero_title_2 + '</span>';
+            const sub = document.querySelector('section p.max-w-2xl');
+            if (sub && !sub.dataset.orig) sub.dataset.orig = sub.textContent;
+            if (sub) sub.textContent = T.hi.hero_sub;
+        } else {
+            const h1 = document.querySelector('h1');
+            if (h1 && h1.dataset.orig) h1.innerHTML = h1.dataset.orig;
+            const sub = document.querySelector('section p.max-w-2xl');
+            if (sub && sub.dataset.orig) sub.textContent = sub.dataset.orig;
+            document.querySelectorAll('[data-i18n]').forEach(el => { if (el.dataset.origText) el.textContent = el.dataset.origText; });
+        }
+    }
+    document.querySelectorAll('[data-i18n]').forEach(el => el.dataset.origText = el.textContent);
+    btn.onclick = () => { const l = (localStorage.getItem(KEY) === 'hi') ? 'en' : 'hi'; localStorage.setItem(KEY, l); apply(l); };
+    if (saved === 'hi') apply('hi');
 })();
 </script>
 </body>

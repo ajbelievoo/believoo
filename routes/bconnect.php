@@ -22,6 +22,17 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     // Public remote-desktop access — no login needed. A guest enters a
     // device's code, the host approves, WebRTC screen share runs.
     Route::get('/remote/guest/{code?}', [\App\Http\Controllers\Bconnect\RemoteController::class, 'guestRoom'])->name('bconnect.remote.guest');
+
+    // Public content pages — install guide, help center, blog, support portal
+    Route::get('/download/guide', fn () => view('bconnect.public.install-guide'))->name('bconnect.install.guide');
+    Route::get('/help', [\App\Http\Controllers\Bconnect\PublicController::class, 'help'])->name('bconnect.help');
+    Route::get('/blog', [\App\Http\Controllers\Bconnect\PublicController::class, 'blog'])->name('bconnect.blog');
+    Route::get('/blog/{slug}', [\App\Http\Controllers\Bconnect\PublicController::class, 'post'])->name('bconnect.blog.post');
+    Route::get('/kb', [\App\Http\Controllers\Bconnect\PublicController::class, 'kb'])->name('bconnect.kb');
+    Route::get('/kb/{slug}', [\App\Http\Controllers\Bconnect\PublicController::class, 'kbArticle'])->name('bconnect.kb.article');
+    Route::get('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portal'])->name('bconnect.portal');
+    Route::post('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalSubmit'])->name('bconnect.portal.submit');
+    Route::get('/support/track', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalTrack'])->name('bconnect.portal.track');
     // Note: /downloads/* is served directly by nginx (public/downloads/) —
     // BMyDesk-Agent.apk / BMyDesk-Agent-Setup.exe are symlinks to the latest
     // builds so links never need version bumps.
