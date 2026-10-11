@@ -47,12 +47,27 @@ $channelId = $channel->id;
                 @if(!empty($m->attachments))
                 <div class="mt-2 space-y-1">
                     @foreach($m->attachments as $a)
-                    <a href="{{ Storage::url($a) }}" target="_blank" class="block text-xs text-cyan-400 hover:underline"><i class="fas fa-file mr-1"></i>{{ basename($a) }}</a>
+                        @if(preg_match('/\.(webm|ogg|mp3|wav|m4a)$/i', $a))
+                            <audio controls src="{{ Storage::url($a) }}" class="w-56 h-8"></audio>
+                        @elseif(preg_match('/\.(png|jpe?g|gif|webp)$/i', $a))
+                            <a href="{{ Storage::url($a) }}" target="_blank"><img src="{{ Storage::url($a) }}" class="rounded-lg max-w-[220px] border border-slate-700" loading="lazy"></a>
+                        @else
+                            <a href="{{ Storage::url($a) }}" target="_blank" class="block text-xs text-cyan-400 hover:underline"><i class="fas fa-file mr-1"></i>{{ basename($a) }}</a>
+                        @endif
                     @endforeach
                 </div>
                 @endif
                 <div class="flex items-center justify-between gap-2 mt-1">
-                    <div class="text-[10px] text-slate-500">{{ $m->created_at->format('H:i') }}</div>
+                    <div class="text-[10px] text-slate-500 flex items-center gap-1">
+                        {{ $m->created_at->format('H:i') }}
+                        @if($m->member->id == $memberId)
+                            @if(!empty($m->read_by) && count($m->read_by) > 0)
+                                <span class="text-cyan-400" title="Seen"><i class="fas fa-check-double"></i></span>
+                            @else
+                                <span class="text-slate-600" title="Sent"><i class="fas fa-check"></i></span>
+                            @endif
+                        @endif
+                    </div>
                     <button type="button" class="text-[10px] text-cyan-400 hover:underline reply-btn" data-id="{{ $m->id }}" data-name="{{ $m->member->user->name }}">Reply</button>
                 </div>
                 @if($m->replies->isNotEmpty())
@@ -87,7 +102,8 @@ $channelId = $channel->id;
             </div>
             <input type="file" name="attachments[]" multiple class="hidden" id="chatFiles" onchange="updateFileCount()">
             <span id="fileCount" class="text-xs text-slate-400 self-center"></span>
-            <button type="button" onclick="document.getElementById('chatFiles').click()" class="px-3 bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400"><i class="fas fa-paperclip"></i></button>
+            <button type="button" onclick="document.getElementById('chatFiles').click()" class="px-3 bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400" title="Attach files"><i class="fas fa-paperclip"></i></button>
+            <button type="button" id="micBtn" class="px-3 bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400" title="Voice message"><i class="fas fa-microphone"></i></button>
             <button type="submit" class="px-4 bg-cyan-500 text-slate-900 font-bold rounded-lg hover:bg-cyan-400"><i class="fas fa-paper-plane"></i></button>
         </div>
     </form>
@@ -124,6 +140,8 @@ function renderAttachments(attachments) {
     return '<div class="mt-2 space-y-1">' + attachments.map(a => {
         const url = a.startsWith('http') ? a : '/storage/' + a.replace(/^public\//, '');
         const name = a.split('/').pop();
+        if (/\.(webm|ogg|mp3|wav|m4a)$/i.test(a)) return `<audio controls src="${escapeHtml(url)}" class="w-56 h-8"></audio>`;
+        if (/\.(png|jpe?g|gif|webp)$/i.test(a)) return `<a href="${escapeHtml(url)}" target="_blank"><img src="${escapeHtml(url)}" class="rounded-lg max-w-[220px] border border-slate-700"></a>`;
         return `<a href="${escapeHtml(url)}" target="_blank" class="block text-xs text-cyan-400 hover:underline"><i class="fas fa-file mr-1"></i>${escapeHtml(name)}</a>`;
     }).join('') + '</div>';
 }
@@ -168,6 +186,38 @@ function updateFileCount() {
     const files = document.getElementById('chatFiles').files;
     document.getElementById('fileCount').textContent = files.length ? files.length + ' file(s)' : '';
 }
+
+// ── Voice messages — hold the mic, release to attach the recording ──
+let _recorder = null, _recChunks = [], _recStart = 0;
+const micBtn = document.getElementById('micBtn');
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        _recChunks = [];
+        _recorder = new MediaRecorder(stream);
+        _recorder.ondataavailable = e => { if (e.data.size) _recChunks.push(e.data); };
+        _recorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(_recChunks, { type: _recorder.mimeType || 'audio/webm' });
+            const file = new File([blob], 'voice-' + Date.now() + '.webm', { type: blob.type });
+            const dt = new DataTransfer();
+            [...document.getElementById('chatFiles').files].forEach(f => dt.items.add(f));
+            dt.items.add(file);
+            document.getElementById('chatFiles').files = dt.files;
+            updateFileCount();
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            micBtn.classList.remove('!bg-red-500/30', 'text-red-400');
+        };
+        _recorder.start();
+        _recStart = Date.now();
+        micBtn.innerHTML = '<i class="fas fa-stop"></i>';
+        micBtn.classList.add('!bg-red-500/30', 'text-red-400');
+    } catch (e) { alert('Microphone access denied'); }
+}
+micBtn.addEventListener('click', () => {
+    if (_recorder && _recorder.state === 'recording') _recorder.stop();
+    else startRecording();
+});
 
 async function markRead(messageId) {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
