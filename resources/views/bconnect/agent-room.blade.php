@@ -86,7 +86,7 @@ function sigNew(m) {
     seenSig.add(n); if (seenSig.size > 600) seenSig.delete(seenSig.values().next().value);
     return true;
 }
-const sigFresh = (m) => !m.at || (Date.now() - Date.parse(m.at)) < 45000; // drop stale queued signals
+const sigFresh = (m) => m.kind === 'ice' ? (!m.at || (Date.now() - Date.parse(m.at)) < 45000) : true; // only ICE ages out
 const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 function postJson(url, body) {
     return fetch(url, { method: 'POST', credentials: 'same-origin', headers: {
