@@ -18,6 +18,7 @@ class Ticket extends Model
         'due_date' => 'date',
         'estimated_hours' => 'decimal:2',
         'sla_breached' => 'boolean',
+        'tags' => 'array',
     ];
 
     public function company()

@@ -87,9 +87,12 @@ function bcToggleTheme(){
     </nav>
     <div class="p-4 border-t border-[var(--bc-border)]">
         <div class="flex items-center gap-3 mb-3">
-            <div class="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">{{ substr(Auth::user()->name,0,1) }}</div>
+            <a href="{{ route('bconnect.profile') }}" class="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm overflow-hidden shrink-0" title="Profile">
+                @php $_av = Auth::user()->avatar ?: Auth::user()->profile_photo_path; @endphp
+                @if($_av)<img src="{{ $_av }}" class="w-full h-full object-cover">@else{{ substr(Auth::user()->name,0,1) }}@endif
+            </a>
             <div class="text-sm">
-                <div class="font-medium truncate max-w-[120px]">{{ Auth::user()->name }}</div>
+                <a href="{{ route('bconnect.profile') }}" class="font-medium truncate max-w-[120px] block hover:text-cyan-400">{{ Auth::user()->name }}</a>
                 <div class="text-slate-500 text-xs">{{ ucfirst(str_replace('_', ' ', $bconnectRole ?? '')) }}</div>
             </div>
         </div>
@@ -105,6 +108,9 @@ function bcToggleTheme(){
             <h2 class="font-bold text-lg truncate">@yield('title')</h2>
         </div>
         <div class="flex items-center gap-4">
+            <button onclick="bcPaletteOpen()" class="hidden md:flex items-center gap-2 text-xs text-slate-400 hover:text-white border border-[var(--bc-border)] rounded-lg px-3 py-1.5" title="Search (Ctrl+K)">
+                <i class="fas fa-search"></i><span>Search</span><kbd class="text-[10px] bg-white/10 rounded px-1">⌘K</kbd>
+            </button>
             <a href="{{ route('bconnect.billing') }}" class="hidden sm:flex items-center gap-2 text-xs text-slate-400 hover:text-white bc-badge bc-badge-slate">
                 <i class="fas fa-crown text-cyan-400"></i>{{ ucfirst($bconnectCompany?->plan ?? 'free') }}
             </a>
@@ -118,13 +124,44 @@ function bcToggleTheme(){
             </a>
         </div>
     </header>
-    <div class="flex-1 overflow-y-auto p-4 lg:p-8">
+    <div class="flex-1 overflow-y-auto p-4 lg:p-8" id="bcMain">
+        <nav id="bcCrumbs" class="text-xs text-slate-500 mb-4 hidden sm:block"></nav>
         @if(session('success'))<div class="bc-animate mb-4 p-4 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20 flex items-center gap-2"><i class="fas fa-check-circle"></i>{{ session('success') }}</div>@endif
         @if(session('error'))<div class="bc-animate mb-4 p-4 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i>{{ session('error') }}</div>@endif
         @if(session('info'))<div class="bc-animate mb-4 p-4 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-2"><i class="fas fa-info-circle"></i>{{ session('info') }}</div>@endif
         @yield('content')
     </div>
 </main>
+
+{{-- Command palette (Ctrl+K) --}}
+<div id="bcPalette" class="fixed inset-0 z-[90] hidden items-start justify-center pt-[12vh] bg-black/60 backdrop-blur-sm" onclick="if(event.target===this)bcPaletteClose()">
+    <div class="w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl border border-[var(--bc-border)]" style="background:var(--bc-card);">
+        <div class="flex items-center gap-3 px-4 border-b border-[var(--bc-border)]">
+            <i class="fas fa-search text-slate-500 text-sm"></i>
+            <input id="bcPaletteInput" placeholder="Search tickets, projects, members, meetings, files…" class="flex-1 bg-transparent py-3.5 text-sm outline-none placeholder-slate-500" autocomplete="off">
+            <kbd class="text-[10px] text-slate-500 border border-[var(--bc-border)] rounded px-1.5 py-0.5">ESC</kbd>
+        </div>
+        <div id="bcPaletteResults" class="max-h-[50vh] overflow-y-auto p-2"></div>
+    </div>
+</div>
+
+{{-- Keyboard shortcuts overlay --}}
+<div id="bcShortcuts" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/60 backdrop-blur-sm" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div class="w-full max-w-md rounded-2xl p-6 shadow-2xl border border-[var(--bc-border)]" style="background:var(--bc-card);">
+        <h3 class="font-bold mb-4">Keyboard shortcuts</h3>
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-slate-400">Search / command palette</span><kbd class="bc-kbd">Ctrl+K</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">Go to Dashboard</span><kbd class="bc-kbd">g d</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">Go to Tickets</span><kbd class="bc-kbd">g t</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">Go to Projects</span><kbd class="bc-kbd">g p</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">Go to Meetings</span><kbd class="bc-kbd">g m</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">Go to Chat</span><kbd class="bc-kbd">g c</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">Toggle theme</span><kbd class="bc-kbd">g x</kbd></div>
+            <div class="flex justify-between"><span class="text-slate-400">This help</span><kbd class="bc-kbd">?</kbd></div>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
@@ -133,6 +170,143 @@ function toggleSidebar() {
 (function(){
     var b = document.getElementById('bcThemeBtn');
     if (b) b.innerHTML = '<i class="fas ' + (document.documentElement.classList.contains('light') ? 'fa-moon' : 'fa-sun') + '"></i>';
+})();
+
+// ── Auto breadcrumbs from URL ──
+(function(){
+    var el = document.getElementById('bcCrumbs');
+    if (!el) return;
+    var parts = location.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) { el.remove(); return; }
+    var html = '<a href="/dashboard" class="hover:text-cyan-400"><i class="fas fa-home"></i></a>';
+    var acc = '';
+    parts.forEach(function(p, i){
+        acc += '/' + p;
+        var label = p.replace(/-/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
+        if (/^\d+$/.test(p)) label = '#' + p;
+        html += ' <span class="mx-1 text-slate-600">/</span> ' + (i === parts.length-1 ? '<span class="text-slate-300">'+label+'</span>' : '<a href="'+acc+'" class="hover:text-cyan-400">'+label+'</a>');
+    });
+    el.innerHTML = html;
+})();
+
+// ── Command palette ──
+var _bcPalTimer = null;
+function bcPaletteOpen(){
+    var m = document.getElementById('bcPalette');
+    m.classList.remove('hidden'); m.classList.add('flex');
+    var i = document.getElementById('bcPaletteInput');
+    i.value = ''; i.focus();
+    bcPaletteRender(null);
+}
+function bcPaletteClose(){
+    var m = document.getElementById('bcPalette');
+    m.classList.add('hidden'); m.classList.remove('flex');
+}
+var _bcNav = [
+    {t:'Dashboard', i:'fa-home', u:'/dashboard'},
+    {t:'Projects', i:'fa-folder', u:'/projects'},
+    {t:'Meetings', i:'fa-video', u:'/meetings'},
+    {t:'Kanban', i:'fa-columns', u:'/kanban'},
+    {t:'Tickets', i:'fa-bug', u:'/tickets'},
+    {t:'Sprints', i:'fa-running', u:'/sprints'},
+    {t:'Time Tracking', i:'fa-clock', u:'/time-tracking'},
+    {t:'Billing', i:'fa-file-invoice', u:'/billing'},
+    {t:'Members', i:'fa-users', u:'/members'},
+    {t:'Chat', i:'fa-comments', u:'/chat'},
+    {t:'Files', i:'fa-folder-open', u:'/files'},
+    {t:'Remote Access', i:'fa-desktop', u:'/remote'},
+    {t:'Audit Logs', i:'fa-shield-alt', u:'/audit'},
+    {t:'My Profile', i:'fa-user', u:'/profile'},
+    {t:'Settings', i:'fa-cog', u:'/settings'},
+];
+function bcPalRow(icon, title, sub, url){
+    return '<a href="'+url+'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition">'
+        + '<span class="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-xs"><i class="fas '+icon+'"></i></span>'
+        + '<span class="flex-1 min-w-0"><span class="block text-sm font-medium truncate">'+title+'</span>'
+        + (sub ? '<span class="block text-[11px] text-slate-500">'+sub+'</span>' : '') + '</span></a>';
+}
+function bcPaletteRender(d){
+    var r = document.getElementById('bcPaletteResults');
+    var q = document.getElementById('bcPaletteInput').value.trim().toLowerCase();
+    if (!d) {
+        var items = q ? _bcNav.filter(n => n.t.toLowerCase().includes(q)) : _bcNav;
+        r.innerHTML = '<p class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Navigate</p>'
+            + items.map(n => bcPalRow(n.i, n.t, null, n.u)).join('')
+            + (q.length >= 2 ? '<p class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-2">Search all — press Enter…</p>' : '');
+        return;
+    }
+    var h = '';
+    (d.tickets||[]).forEach(x => h += bcPalRow('fa-bug', x.title, 'Ticket · '+(x.status||''), '/tickets/'+x.id));
+    (d.projects||[]).forEach(x => h += bcPalRow('fa-folder', x.name, 'Project · '+(x.status||''), '/projects/'+x.id));
+    (d.members||[]).forEach(x => h += bcPalRow('fa-user', x.name, 'Member · '+(x.role||''), '/members'));
+    (d.meetings||[]).forEach(x => h += bcPalRow('fa-video', x.title, 'Meeting · '+(x.room_id||''), '/meetings/'+x.room_id));
+    (d.files||[]).forEach(x => h += bcPalRow('fa-file', x.name, 'File', '/files'));
+    r.innerHTML = h || '<p class="px-3 py-6 text-center text-sm text-slate-500">No results for “'+q+'”</p>';
+}
+document.getElementById('bcPaletteInput').addEventListener('input', function(){
+    var q = this.value.trim();
+    bcPaletteRender(null);
+    clearTimeout(_bcPalTimer);
+    if (q.length < 2) return;
+    _bcPalTimer = setTimeout(function(){
+        fetch('/search?q=' + encodeURIComponent(q), {headers:{'Accept':'application/json'}})
+            .then(r => r.json()).then(bcPaletteRender).catch(()=>{});
+    }, 220);
+});
+document.getElementById('bcPaletteInput').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') {
+        var first = document.querySelector('#bcPaletteResults a');
+        if (first) location.href = first.href;
+    }
+});
+
+// ── Keyboard shortcuts ──
+var _bcG = false;
+document.addEventListener('keydown', function(e){
+    var tag = (e.target.tagName || '').toLowerCase();
+    var typing = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); bcPaletteOpen(); return; }
+    if (e.key === 'Escape') { bcPaletteClose(); document.getElementById('bcShortcuts').classList.add('hidden'); document.getElementById('bcShortcuts').classList.remove('flex'); return; }
+    if (typing) return;
+    if (e.key === '?') { var s = document.getElementById('bcShortcuts'); s.classList.toggle('hidden'); s.classList.toggle('flex'); return; }
+    if (_bcG) {
+        _bcG = false;
+        var map = {d:'/dashboard', t:'/tickets', p:'/projects', m:'/meetings', c:'/chat'};
+        if (e.key === 'x') { bcToggleTheme(); return; }
+        if (map[e.key]) { location.href = map[e.key]; return; }
+    }
+    if (e.key === 'g') { _bcG = true; setTimeout(function(){ _bcG = false; }, 900); }
+});
+</script>
+<style>.bc-kbd{font-family:ui-monospace,monospace;font-size:10px;background:rgba(255,255,255,.07);border:1px solid var(--bc-border);border-radius:5px;padding:2px 6px;color:var(--bc-text-muted,#94a3b8);}</style>
+
+{{-- Column customization — any table with data-colt on cells gets a Columns picker --}}
+<script>
+(function(){
+    var table = document.querySelector('table[data-coltable]');
+    if (!table) return;
+    var key = 'bconnect_cols_' + location.pathname;
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(key) || '{}'); } catch(e) {}
+    var ths = table.querySelectorAll('thead th');
+    var menu = document.createElement('div');
+    menu.className = 'flex justify-end mb-2';
+    menu.innerHTML = '<details class="relative"><summary class="bc-btn bc-btn-secondary text-xs cursor-pointer list-none"><i class="fas fa-sliders-h mr-1"></i>Columns</summary>'
+        + '<div class="absolute right-0 mt-2 w-44 rounded-lg border border-[var(--bc-border)] p-2 z-40 shadow-xl" style="background:var(--bc-card)">' 
+        + [...ths].map((th,i)=>th.dataset.colname ? '<label class="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-white/5 cursor-pointer"><input type="checkbox" data-coli="'+i+'" class="accent-cyan-500" checked>'+th.dataset.colname+'</label>' : '').join('')
+        + '</div></details>';
+    table.parentNode.insertBefore(menu, table);
+    function applyCol(i, on){
+        table.querySelectorAll('tr').forEach(r => {
+            var c = r.children[i];
+            if (c) c.style.display = on ? '' : 'none';
+        });
+    }
+    menu.querySelectorAll('input[data-coli]').forEach(cb => {
+        var i = +cb.dataset.coli;
+        if (saved[i] === false) { cb.checked = false; applyCol(i, false); }
+        cb.onchange = () => { saved[i] = cb.checked; localStorage.setItem(key, JSON.stringify(saved)); applyCol(i, cb.checked); };
+    });
 })();
 </script>
 </body>

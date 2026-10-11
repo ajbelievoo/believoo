@@ -158,8 +158,13 @@ class TicketController extends Controller {
     public function show(Request $r, Ticket $ticket) {
         if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
         $ticket->load('project', 'reporter.user', 'assignee.user', 'sprint', 'parent', 'children', 'timeEntries');
-        $comments = TicketComment::with('member.user')->where('ticket_id', $ticket->id)->latest()->get();
-        return view('bconnect.ticket', compact('ticket', 'comments'));
+        // Internal notes stay hidden from clients.
+        $isClient = $r->input('bconnect_role') === 'client';
+        $comments = TicketComment::with('member.user')->where('ticket_id', $ticket->id)
+            ->when($isClient, fn($q) => $q->where('is_internal', false))
+            ->latest()->get();
+        $canned = \DB::table('bconnect_canned_responses')->where('company_id', $ticket->company_id)->get();
+        return view('bconnect.ticket', compact('ticket', 'comments', 'canned'));
     }
 
     public function comment(Request $r, Ticket $ticket) {
@@ -169,7 +174,9 @@ class TicketController extends Controller {
         if ($r->hasFile('attachments')) {
             foreach ($r->file('attachments') as $file) $attachments[] = $file->store('bconnect/tickets', 'public');
         }
-        $comment = TicketComment::create(['ticket_id' => $ticket->id, 'member_id' => $r->input('bconnect_member')->id, 'message' => $data['message'], 'attachments' => $attachments]);
+        // Only staff can write internal notes — clients always public.
+        $internal = $r->boolean('is_internal') && $r->input('bconnect_role') !== 'client';
+        $comment = TicketComment::create(['ticket_id' => $ticket->id, 'member_id' => $r->input('bconnect_member')->id, 'message' => $data['message'], 'attachments' => $attachments, 'is_internal' => $internal]);
 
         \App\Services\BconnectSlaTracker::recordFirstResponse($ticket);
 
@@ -297,5 +304,66 @@ class TicketController extends Controller {
         }
         $ticket->delete();
         return redirect()->route('bconnect.tickets')->with('success', 'Ticket deleted');
+    }
+
+    // Bulk status/assign/delete from the list checkboxes.
+    public function bulk(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $r->validate(['ids' => 'required|array|min:1|max:200', 'ids.*' => 'integer']);
+        $q = Ticket::where('company_id', $companyId)->whereIn('id', $r->ids);
+        if ($r->action === 'delete') {
+            $count = $q->count();
+            $q->delete();
+            return back()->with('success', "$count ticket(s) deleted");
+        }
+        $data = [];
+        if ($r->status && in_array($r->status, ['open','in_progress','testing','resolved','closed'])) $data['status'] = $r->status;
+        if ($r->assignee_id) $data['assignee_id'] = $r->assignee_id;
+        if (!$data) return back()->with('error', 'Pick a status or assignee');
+        $count = $q->update($data);
+        return back()->with('success', "$count ticket(s) updated");
+    }
+
+    // Merge a duplicate ticket into this one — keeps the older record alive.
+    public function merge(Request $r, Ticket $ticket) {
+        if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
+        $r->validate(['into' => 'required|integer|different:' . $ticket->id]);
+        $into = Ticket::where('company_id', $ticket->company_id)->findOrFail($r->into);
+        // Move comments + mark merged
+        \App\Models\Bconnect\TicketComment::where('ticket_id', $ticket->id)->update(['ticket_id' => $into->id]);
+        $ticket->merged_into = $into->id;
+        $ticket->status = 'closed';
+        $ticket->save();
+        return redirect()->route('bconnect.tickets.show', $into->id)->with('success', 'Merged into #' . $into->id);
+    }
+
+    // Save tags (comma-separated) from the ticket sidebar.
+    public function tags(Request $r, Ticket $ticket) {
+        if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
+        $tags = collect(explode(',', (string) $r->tags))->map(fn($t) => trim($t))->filter()->unique()->take(10)->values()->all();
+        $ticket->tags = $tags ?: null;
+        $ticket->save();
+        return back()->with('success', 'Tags saved');
+    }
+
+    // Manage canned responses from settings.
+    public function saveCanned(Request $r) {
+        $r->validate(['title' => 'required|string|max:120', 'body' => 'required|string|max:4000']);
+        if ($r->id) {
+            \DB::table('bconnect_canned_responses')->where('id', $r->id)->where('company_id', $r->input('bconnect_company_id'))->update(['title' => $r->title, 'body' => $r->body]);
+        } else {
+            \DB::table('bconnect_canned_responses')->insert(['company_id' => $r->input('bconnect_company_id'), 'title' => $r->title, 'body' => $r->body, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        return back()->with('success', 'Canned response saved');
+    }
+
+    // CSAT rating submitted after close (portal track page / email link).
+    public function csat(Request $r, Ticket $ticket) {
+        $r->validate(['score' => 'required|integer|min:1|max:5', 'comment' => 'nullable|string|max:500']);
+        if (!in_array($ticket->status, ['resolved', 'closed'])) abort(400);
+        $ticket->csat_score = $r->score;
+        $ticket->csat_comment = $r->comment;
+        $ticket->save();
+        return back()->with('success', 'Thanks for the feedback!');
     }
 }

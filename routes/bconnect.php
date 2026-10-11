@@ -33,6 +33,7 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     Route::get('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portal'])->name('bconnect.portal');
     Route::post('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalSubmit'])->name('bconnect.portal.submit');
     Route::get('/support/track', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalTrack'])->name('bconnect.portal.track');
+    Route::post('/support/csat', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalCsat'])->name('bconnect.portal.csat');
     // Note: /downloads/* is served directly by nginx (public/downloads/) —
     // BMyDesk-Agent.apk / BMyDesk-Agent-Setup.exe are symlinks to the latest
     // builds so links never need version bumps.
@@ -77,6 +78,14 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::get('/meetings/{room}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'room'])->middleware('bconnect.permission:meetings.view')->name('bconnect.meeting.room');
     Route::get('/meetings/{room}/recording', [\App\Http\Controllers\Bconnect\MeetingController::class, 'recording'])->name('bconnect.meeting.recording');
     Route::get('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'index'])->middleware('bconnect.permission:tickets.view')->name('bconnect.tickets');
+    Route::get('/search', [\App\Http\Controllers\Bconnect\SearchController::class, 'index'])->name('bconnect.search');
+    Route::get('/profile', [\App\Http\Controllers\Bconnect\ProfileController::class, 'show'])->name('bconnect.profile');
+    Route::post('/profile', [\App\Http\Controllers\Bconnect\ProfileController::class, 'update'])->name('bconnect.profile.update');
+    Route::post('/tickets/bulk', [\App\Http\Controllers\Bconnect\TicketController::class, 'bulk'])->middleware('bconnect.permission:tickets.manage')->name('bconnect.tickets.bulk');
+    Route::post('/tickets/{ticket}/merge', [\App\Http\Controllers\Bconnect\TicketController::class, 'merge'])->middleware('bconnect.permission:tickets.manage')->name('bconnect.tickets.merge');
+    Route::post('/tickets/{ticket}/tags', [\App\Http\Controllers\Bconnect\TicketController::class, 'tags'])->name('bconnect.tickets.tags');
+    Route::post('/tickets/{ticket}/csat', [\App\Http\Controllers\Bconnect\TicketController::class, 'csat'])->name('bconnect.tickets.csat');
+    Route::post('/settings/canned', [\App\Http\Controllers\Bconnect\TicketController::class, 'saveCanned'])->name('bconnect.canned.save');
     Route::get('/tickets/{ticket}/edit', [\App\Http\Controllers\Bconnect\TicketController::class, 'edit'])->name('bconnect.tickets.edit')->middleware(['bconnect.role:company_admin|manager', 'bconnect.permission:tickets.manage']);
     Route::get('/tickets/{ticket}', [\App\Http\Controllers\Bconnect\TicketController::class, 'show'])->middleware('bconnect.permission:tickets.view')->name('bconnect.tickets.show');
     Route::get('/files', [\App\Http\Controllers\Bconnect\FileManagerController::class, 'index'])->middleware('bconnect.permission:files.view')->name('bconnect.files');

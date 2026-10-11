@@ -49,10 +49,30 @@
                     @endforeach
                 </div>
             @endif
+
+            @if(in_array($t->status, ['resolved','closed']))
+                @if($t->csat_score)
+                    <div class="mt-6 pt-6 border-t border-slate-100"><p class="text-sm text-slate-500">You rated us <span class="text-amber-500">{{ str_repeat('★', $t->csat_score) }}</span></p></div>
+                @else
+                    <div class="mt-6 pt-6 border-t border-slate-100">
+                        <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">How was our support?</h3>
+                        <form method="POST" action="{{ route('bconnect.portal.csat') }}">@csrf
+                            <input type="hidden" name="token" value="{{ $token }}">
+                            <input type="hidden" name="score" id="csatScore">
+                            <div class="flex gap-1 text-3xl mb-4" id="csatStars">
+                                @for($i=1;$i<=5;$i++)<button type="button" data-v="{{ $i }}" class="text-slate-300 hover:text-amber-400 transition">★</button>@endfor
+                            </div>
+                            <input name="comment" placeholder="Anything to add? (optional)" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm mb-3 focus:border-brand outline-none">
+                            <button class="px-6 py-2.5 bg-brand text-white font-bold rounded-xl text-sm">Submit rating</button>
+                        </form>
+                    </div>
+                @endif
+            @endif
         </div>
     @elseif($token)
         <div class="bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl p-5">No ticket found for that code — check the link you received.</div>
     @endif
 </div>
+<script>document.querySelectorAll('#csatStars button').forEach(b=>b.onclick=e=>{e.preventDefault();document.getElementById('csatScore').value=b.dataset.v;document.querySelectorAll('#csatStars button').forEach(s=>s.className='transition '+(+s.dataset.v<=+b.dataset.v?'text-amber-400':'text-slate-300'));});</script>
 </body>
 </html>

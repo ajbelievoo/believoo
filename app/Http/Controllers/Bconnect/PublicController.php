@@ -73,4 +73,15 @@ class PublicController extends Controller {
         }
         return view('bconnect.public.portal-track', ['t' => $t, 'token' => $r->token]);
     }
+
+    // Public CSAT — sealed by the ticket's portal token.
+    public function portalCsat(Request $r) {
+        $r->validate(['token' => 'required|string', 'score' => 'required|integer|min:1|max:5', 'comment' => 'nullable|string|max:500']);
+        $t = Ticket::where('public_token', $r->token)->firstOrFail();
+        if (!in_array($t->status, ['resolved', 'closed'])) abort(400);
+        $t->csat_score = $r->score;
+        $t->csat_comment = $r->comment;
+        $t->save();
+        return back()->with('success', 'Thanks for rating!');
+    }
 }

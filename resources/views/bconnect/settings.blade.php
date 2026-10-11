@@ -11,6 +11,25 @@
 </div>
 
 <div class="max-w-2xl bg-slate-900 rounded-xl border border-slate-800 p-8 mt-6">
+    <h3 class="text-lg font-semibold text-white mb-1">Canned responses</h3>
+    <p class="text-sm text-slate-400 mb-4">Quick replies insertable into ticket comments.</p>
+    <div class="space-y-2 mb-4">
+        @foreach($canned as $cr)
+            <details class="bg-slate-800/50 rounded-lg p-3">
+                <summary class="text-sm font-semibold cursor-pointer">{{ $cr->title }}</summary>
+                <p class="text-xs text-slate-400 mt-2 whitespace-pre-line">{{ $cr->body }}</p>
+            </details>
+        @endforeach
+        @if($canned->isEmpty())<p class="text-slate-500 text-sm">None yet — add your first below.</p>@endif
+    </div>
+    <form method="POST" action="{{ route('bconnect.canned.save') }}" class="space-y-3">@csrf
+        <input name="title" placeholder="Title (e.g. Greeting)" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-600 text-white text-sm">
+        <textarea name="body" placeholder="Response text…" rows="3" required class="w-full p-3 rounded-lg bg-slate-800 border border-slate-600 text-white text-sm"></textarea>
+        <button class="px-6 py-2 bg-cyan-500 text-slate-900 font-bold rounded-lg hover:bg-cyan-400 text-sm">Add canned response</button>
+    </form>
+</div>
+
+<div class="max-w-2xl bg-slate-900 rounded-xl border border-slate-800 p-8 mt-6">
     <h3 class="text-lg font-semibold text-white mb-1">Account Security</h3>
     <p class="text-sm text-slate-400 mb-4">Two-factor authentication for your login (all workspaces sharing this account).</p>
     @if(auth()->user()->twoFactorEnabled())

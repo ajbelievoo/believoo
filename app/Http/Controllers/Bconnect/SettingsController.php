@@ -7,7 +7,8 @@ use Illuminate\Http\Request;
 class SettingsController extends Controller {
     public function index(Request $r) {
         $company = Company::findOrFail($r->input('bconnect_company_id'));
-        return view('bconnect.settings', compact('company'));
+        $canned = \DB::table('bconnect_canned_responses')->where('company_id', $company->id)->get();
+        return view('bconnect.settings', compact('company', 'canned'));
     }
 
     public function update(Request $r) {

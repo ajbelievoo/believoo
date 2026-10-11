@@ -57,20 +57,40 @@ $limitLabel = $ticketLimit === null ? 'Unlimited' : $ticketLimit;
                 </select>
             </form>
         </div>
-        <table class="bc-table">
-            <thead><tr><th>Ticket</th><th>Project</th><th>Assignee</th><th>Sprint</th><th>Due</th><th>Status</th><th>Priority</th><th></th></tr></thead>
+        {{-- Bulk toolbar --}}
+        <form id="bulkBar" method="POST" action="{{ route('bconnect.tickets.bulk') }}" class="hidden mb-3 flex items-center gap-3 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">@csrf
+            <span class="text-sm font-semibold text-cyan-300"><span id="bulkCount">0</span> selected</span>
+            <select name="status" class="bc-input !w-auto text-xs">
+                <option value="">Set status…</option>
+                @foreach(['open','in_progress','testing','resolved','closed'] as $s)<option value="{{ $s }}">{{ ucfirst(str_replace('_',' ',$s)) }}</option>@endforeach
+            </select>
+            <select name="assignee_id" class="bc-input !w-auto text-xs">
+                <option value="">Assign to…</option>
+                @foreach($members as $m)<option value="{{ $m->id }}">{{ $m->user?->name }}</option>@endforeach
+            </select>
+            <button name="action" value="apply" class="bc-btn bc-btn-primary text-xs">Apply</button>
+            <button name="action" value="delete" class="bc-btn bc-btn-danger text-xs" onclick="return confirm('Delete selected tickets?')"><i class="fas fa-trash"></i></button>
+            <div id="bulkIds"></div>
+        </form>
+        <table class="bc-table" data-coltable>
+            <thead><tr><th class="w-8"><input type="checkbox" id="selAll" class="accent-cyan-500" onclick="document.querySelectorAll('.tktSel').forEach(c=>c.checked=this.checked);bulkRefresh()"></th><th data-colname="Ticket">Ticket</th><th data-colname="Project">Project</th><th data-colname="Assignee">Assignee</th><th data-colname="Due">Due</th><th data-colname="Status">Status</th><th data-colname="Priority">Priority</th><th></th></tr></thead>
             <tbody>
                 @forelse($tickets as $t)
                 <tr>
+                    <td><input type="checkbox" class="tktSel accent-cyan-500" value="{{ $t->id }}" onclick="bulkRefresh()"></td>
                     <td>
                         <a href="{{ route('bconnect.tickets.show', $t->id) }}" class="text-cyan-400 hover:underline font-medium">{{ $t->title }}</a>
+                        @if($t->source === 'portal')<span class="bc-badge bc-badge-cyan text-[10px] ml-1" title="From support portal">PORTAL</span>@endif
                         @if($t->estimated_hours)<span class="text-[10px] text-slate-500 ml-1">({{ $t->estimated_hours }}h)</span>@endif
+                        <div class="text-[10px] text-slate-500">{{ $t->project?->name ?? '' }}</div>
                     </td>
-                    <td class="text-slate-400">{{ $t->project?->name ?? '—' }}</td>
+                    <td class="text-slate-400">{{ $t->reporter_name ?? ($t->project?->name ?? '—') }}</td>
                     <td class="text-slate-400">{{ $t->assignee?->user?->name ?? '—' }}</td>
-                    <td class="text-slate-400 text-xs">{{ $t->sprint?->name ?? '—' }}</td>
-                    <td class="text-xs {{ $t->due_date && $t->due_date->isPast() && $t->status != 'closed' && $t->status != 'resolved' ? 'text-red-400' : 'text-slate-500' }}">{{ $t->due_date?->format('M d') ?? '—' }}</td>
-                    <td><span class="bc-badge bc-badge-slate">{{ ucfirst(str_replace('_', ' ', $t->status)) }}</span></td>
+                    <td class="text-xs {{ $t->due_date && $t->due_date->isPast() && !in_array($t->status,['closed','resolved']) ? 'text-red-400' : 'text-slate-500' }}">{{ $t->due_date?->format('M d') ?? '—' }}</td>
+                    <td>
+                        <span class="bc-badge bc-badge-slate">{{ ucfirst(str_replace('_', ' ', $t->status)) }}</span>
+                        @if($t->sla_breached)<span class="bc-badge bc-badge-red text-[10px]" title="SLA breached">SLA</span>@endif
+                    </td>
                     <td><span class="bc-badge {{ $t->priority == 'critical' ? 'bc-badge-red' : ($t->priority == 'high' ? 'bc-badge-amber' : 'bc-badge-slate') }}">{{ ucfirst($t->priority) }}</span></td>
                     <td>
                         <a href="{{ route('bconnect.tickets.edit', $t->id) }}" class="text-xs text-cyan-400 hover:underline">Edit</a>
@@ -82,6 +102,15 @@ $limitLabel = $ticketLimit === null ? 'Unlimited' : $ticketLimit;
             </tbody>
         </table>
         {{ $tickets->links() }}
+        <script>
+        function bulkRefresh(){
+            var ids = [...document.querySelectorAll('.tktSel:checked')].map(c=>c.value);
+            var bar = document.getElementById('bulkBar');
+            document.getElementById('bulkCount').textContent = ids.length;
+            document.getElementById('bulkIds').innerHTML = ids.map(i=>'<input type="hidden" name="ids[]" value="'+i+'">').join('');
+            bar.classList.toggle('hidden', ids.length === 0);
+        }
+        </script>
     </div>
     <div class="bc-card p-6">
         <h3 class="font-bold mb-4">New Ticket</h3>
