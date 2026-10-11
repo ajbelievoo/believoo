@@ -22,7 +22,7 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
 .code-input:focus { border-color:var(--cyan); }
 .name-input { width:100%; max-width:260px; margin:0 auto 14px; display:block; text-align:center; font-size:15px; background:#0b1424; border:1px solid var(--border); border-radius:12px; color:var(--txt); padding:10px; outline:none; }
 .name-input:focus { border-color:var(--cyan); }
-.btn { margin-top:18px; background:var(--rose); color:#fff; border:0; font-weight:700; font-size:15px; padding:12px 34px; border-radius:12px; cursor:pointer; }
+.btn { margin-top:18px; background:linear-gradient(135deg,var(--rose),#e11d48); color:#fff; border:0; font-weight:700; font-size:15px; padding:12px 34px; border-radius:12px; cursor:pointer; }
 .btn:disabled { opacity:.5; cursor:default; }
 .err { color:#f87171; font-size:13px; margin-top:12px; min-height:16px; }
 .dbg { color:#3b4a63; font-size:10px; font-family:monospace; margin-top:12px; min-height:12px; word-break:break-all; }

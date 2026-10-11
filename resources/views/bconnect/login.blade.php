@@ -7,12 +7,12 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/css/bconnect.css?v={{ filemtime(public_path('css/bconnect.css')) }}">
 <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{brand:'{{ $bconnectBrand['brand_color'] }}'}}}}</script>
-<style>body{background:#131316;}</style>
+<style>body{background:radial-gradient(circle at top right, rgba({{ $bconnectBrand['brand_rgb'] }},0.08), transparent 40%), #0b1220;}</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 <div class="w-full max-w-md p-8 bg-[#0f172a] rounded-2xl border border-[var(--bc-border)] shadow-2xl">
     <div class="text-center mb-6">
-        <img src="{{ $bconnectBrand['logo'] }}" class="h-16 w-auto max-w-[220px] mx-auto mb-4 object-contain" style="background:#fff;border-radius:12px;padding:8px 16px" alt="Bmydesk">
+        <img src="{{ $bconnectBrand['logo'] }}" class="h-16 w-auto max-w-[220px] mx-auto mb-4 object-contain" alt="Bmydesk">
         <h1 class="text-2xl font-black text-white">Welcome back</h1>
         <p class="text-slate-400 text-sm mt-1">Login to your Bmydesk workspace</p>
     </div>

@@ -54,7 +54,7 @@ function bcToggleTheme(){
 <div id="mobileOverlay" class="bc-overlay" onclick="toggleSidebar()"></div>
 <aside id="sidebar" class="bc-sidebar w-64 border-r border-[var(--bc-border)] flex flex-col h-screen z-50">
     <div class="p-4 border-b border-[var(--bc-border)]">
-        <span class="bc-logo-chip inline-flex max-w-full"><img src="{{ $bconnectBrand['logo'] }}" class="w-auto max-h-11 max-w-full object-contain object-left" alt="{{ $bconnectBrand['name'] }}"></span>
+        <img src="{{ $bconnectBrand['logo'] }}" class="w-auto max-h-11 max-w-full object-contain object-left" alt="{{ $bconnectBrand['name'] }}">
         <p class="text-[11px] text-slate-500 mt-1.5 truncate">{{ $bconnectCompany->name ?? 'Workspace' }}</p>
     </div>
     <div class="px-4 py-3">
