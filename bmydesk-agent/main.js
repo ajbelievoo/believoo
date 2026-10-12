@@ -275,6 +275,35 @@ ipcMain.handle('fs-get', async (_e, p) => {
     return { name: path.basename(target), data: fs.readFileSync(target).toString('base64'), size: st.size };
 });
 
+// ── Session watermark — a persistent click-through badge on the host's
+// screen so they can always see WHO is watching (trust + transparency) ──
+let wmWin = null;
+ipcMain.on('watermark', (_e, on, text) => {
+    try {
+        if (!on) { if (wmWin && !wmWin.isDestroyed()) wmWin.destroy(); wmWin = null; return; }
+        if (!wmWin || wmWin.isDestroyed()) {
+            const d = screen.getPrimaryDisplay();
+            wmWin = new BrowserWindow({
+                width: 380, height: 32,
+                x: Math.max(0, d.bounds.x + d.bounds.width - 390),
+                y: d.bounds.y + 8,
+                frame: false, transparent: true, alwaysOnTop: true,
+                skipTaskbar: true, focusable: false, resizable: false, hasShadow: false,
+                webPreferences: { nodeIntegration: false, contextIsolation: true },
+            });
+            wmWin.setIgnoreMouseEvents(true);
+            wmWin.setAlwaysOnTop(true, 'screen-saver');
+        }
+        const label = String(text || 'remote viewer').replace(/[<>&"']/g, '').slice(0, 60);
+        wmWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
+            '<body style="margin:0;background:transparent;overflow:hidden">' +
+            '<div style="display:inline-block;background:rgba(15,23,42,.78);border:1px solid rgba(148,163,184,.35);' +
+            'border-radius:8px;padding:6px 12px;font:12px sans-serif;color:#e2e8f0">' +
+            '🔴 BMyDesk — screen shared with <b>' + label + '</b></div></body>'));
+        wmWin.showInactive();
+    } catch (e) {}
+});
+
 // ── Laser pointer — transparent click-through dot that follows the viewer ──
 let laserWin = null, laserHideT = null;
 ipcMain.on('laser', (_e, on, x, y) => {

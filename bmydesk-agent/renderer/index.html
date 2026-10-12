@@ -97,6 +97,9 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:8px 0 2px;cursor:pointer;">
                 <input type="checkbox" id="acceptViewOnly" style="accent-color:#f43f5e;"> Accept as view-only (no remote control)
             </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:2px 0;cursor:pointer;">
+                <input type="checkbox" id="acceptTrust" style="accent-color:#22c55e;"> Always trust this device (skip approval next time)
+            </label>
             <div class="row">
                 <button class="btn btn-accept" id="acceptBtn">Accept</button>
                 <button class="btn btn-reject" id="rejectBtn">Reject</button>
@@ -173,6 +176,9 @@
     <p class="hint">Share this code with your support engineer.<br>They enter it at <b style="color:#94a3b8">bmydesk.believoo.com → Remote → Connect</b>.</p>
 
     <button class="btn btn-end hidden" id="endBtn">End Session</button>
+    <label id="lockEndWrap" class="hidden" style="display:flex;align-items:center;gap:6px;justify-content:center;font-size:11px;color:#64748b;margin-top:6px;cursor:pointer;">
+        <input type="checkbox" id="lockEndChk" style="accent-color:#f43f5e;"> 🔒 Lock this PC when the session ends
+    </label>
 
     <!-- Viewer mode: remote screen renders here -->
     <div class="viewer hidden" id="viewerPane">

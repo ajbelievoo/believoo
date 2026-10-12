@@ -72,6 +72,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/{code}/signals', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signals']);
         Route::get('/{code}/devices', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'savedDevices']);
         Route::post('/{code}/devices', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'saveDevice']);
+        Route::post('/{code}/trust', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'trust']);
+        Route::post('/{code}/untrust', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'untrust']);
+        Route::get('/{code}/trusted', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'trusted']);
         Route::delete('/{code}/devices/{id}', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'forgetDevice']);
     });
 

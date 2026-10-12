@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('agent', {
     fsList: (p) => ipcRenderer.invoke('fs-list', p),
     fsGet: (p) => ipcRenderer.invoke('fs-get', p),
     laser: (on, x, y) => ipcRenderer.send('laser', on, x, y),
+    watermark: (on, text) => ipcRenderer.send('watermark', on, text),
     privacyScreen: (on) => ipcRenderer.send('privacy-screen', !!on),
     attention: (name) => ipcRenderer.send('attention', name),
     onUpdate: (cb) => ipcRenderer.on('agent-update', (_e, d) => cb(d)),

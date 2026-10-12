@@ -189,12 +189,61 @@ class AgentApiController extends Controller
         if ($pin !== '' && !preg_match('/^[0-9]{4,12}$/', $pin)) {
             return response()->json(['ok' => false, 'error' => 'PIN must be 4-12 digits'], 422);
         }
+        // Optional time window — PIN stops working after ttl minutes.
+        $ttl = (int) $r->input('ttl_min', 0);
         \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->updateOrInsert(
             ['device_id' => $session->device_id],
             ['pin_hash' => $pin === '' ? null : \Illuminate\Support\Facades\Hash::make($pin),
+             'pin_expires_at' => $pin === '' ? null : ($ttl > 0 ? now()->addMinutes(min($ttl, 10080)) : null),
              'updated_at' => now(), 'created_at' => now()]
         );
-        return response()->json(['ok' => true, 'pin_set' => $pin !== '']);
+        return response()->json(['ok' => true, 'pin_set' => $pin !== '', 'pin_ttl_min' => $ttl > 0 ? min($ttl, 10080) : null]);
+    }
+
+    // ── Trusted viewers: host marks "always allow this device" at accept ──
+    // POST /{code}/trust {agent_token, viewer_device, viewer_name}
+    public function trust(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session) || !$session->device_id) {
+            return response()->json(['ok' => false], 403);
+        }
+        $vd = Str::limit(trim((string) $r->input('viewer_device', '')), 64, '');
+        if ($vd === '') return response()->json(['ok' => false, 'error' => 'viewer_device required'], 422);
+        \Illuminate\Support\Facades\DB::table('bconnect_agent_trust')->updateOrInsert(
+            ['host_device_id' => $session->device_id, 'viewer_device_id' => $vd],
+            ['viewer_name' => Str::limit((string) $r->input('viewer_name', ''), 80, '') ?: null,
+             'created_at' => now(), 'updated_at' => now()]
+        );
+        return response()->json(['ok' => true]);
+    }
+
+    // POST /{code}/untrust {agent_token, viewer_device?} — revoke one or all
+    public function untrust(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session) || !$session->device_id) {
+            return response()->json(['ok' => false], 403);
+        }
+        $q = \Illuminate\Support\Facades\DB::table('bconnect_agent_trust')->where('host_device_id', $session->device_id);
+        $vd = trim((string) $r->input('viewer_device', ''));
+        if ($vd !== '') $q->where('viewer_device_id', $vd);
+        $q->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    // GET /{code}/trusted — list devices this host auto-accepts
+    public function trusted(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session) || !$session->device_id) {
+            return response()->json(['ok' => false], 403);
+        }
+        $rows = \Illuminate\Support\Facades\DB::table('bconnect_agent_trust')
+            ->where('host_device_id', $session->device_id)
+            ->orderByDesc('updated_at')->limit(100)
+            ->get(['viewer_device_id', 'viewer_name', 'created_at']);
+        return response()->json(['ok' => true, 'trusted' => $rows]);
     }
 
     // ── Address book: saved devices (owner = this agent's device_id) ──
@@ -297,9 +346,13 @@ class AgentApiController extends Controller
         // Unattended access: a correct PIN skips host approval entirely.
         $autoAccept = false;
         $pin = (string) $r->input('pin', '');
+        $viewerDevice = Str::limit(trim((string) $r->input('viewer_device', '')), 64, '') ?: null;
         if ($pin !== '' && $session->device_id) {
-            $pinHash = \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')
-                ->where('device_id', $session->device_id)->value('pin_hash');
+            $dev = \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')
+                ->where('device_id', $session->device_id)->first(['pin_hash', 'pin_expires_at']);
+            // an expired PIN behaves like no PIN — normal approval flow
+            $pinHash = ($dev && (!$dev->pin_expires_at || \Carbon\Carbon::parse($dev->pin_expires_at)->isFuture()))
+                ? $dev->pin_hash : null;
             $pinKey = 'bmd-pin:' . $session->session_code . ':' . $r->ip();
             if (RateLimiter::tooManyAttempts($pinKey, 5)) {
                 return response()->json(['ok' => false, 'error' => 'too many wrong PINs — wait 10 minutes'], 429);
@@ -312,6 +365,14 @@ class AgentApiController extends Controller
                 return response()->json(['ok' => false, 'error' => 'wrong PIN'], 403);
             }
             // device has no PIN set → fall through to normal approval flow
+        }
+
+        // Trusted device: the host marked this viewer "always allow" — skip
+        // the prompt (still fully logged in the session audit trail).
+        if (!$autoAccept && $viewerDevice && $session->device_id) {
+            $autoAccept = \Illuminate\Support\Facades\DB::table('bconnect_agent_trust')
+                ->where('host_device_id', $session->device_id)
+                ->where('viewer_device_id', $viewerDevice)->exists();
         }
 
         // One viewer at a time: refuse if a viewer joined within the last 2 min
@@ -331,6 +392,8 @@ class AgentApiController extends Controller
             'viewer_joined_at' => now(),
             'viewer_name' => Str::limit((string) $r->input('name', ''), 60, '') ?: null,
             'viewer_note' => Str::limit((string) $r->input('note', ''), 140, '') ?: null,
+            'viewer_ip' => $r->ip(),
+            'viewer_device' => $viewerDevice,
             'status' => $session->status === 'waiting' ? 'connecting' : $session->status,
         ]);
 
@@ -342,6 +405,7 @@ class AgentApiController extends Controller
                 'kind' => 'join-request',
                 'name' => $session->viewer_name ?: 'Someone',
                 'note' => $session->viewer_note,
+                'vdevice' => $viewerDevice,
             ]);
         }
 
@@ -388,6 +452,7 @@ class AgentApiController extends Controller
             'status' => $session->status,
             'viewer' => $session->viewer?->user?->name ?: $session->viewer_name,
             'viewer_note' => $session->viewer_note,
+            'viewer_device' => $session->viewer_device,
             'pin_set' => $session->device_id
                 ? (bool) \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->where('device_id', $session->device_id)->value('pin_hash')
                 : false,
