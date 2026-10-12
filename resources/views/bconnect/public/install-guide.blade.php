@@ -30,11 +30,19 @@
         </div>
         <a href="/dl/agent.exe" class="inline-block px-6 py-3 bg-brand text-white font-bold rounded-xl mb-8"><i class="fas fa-download mr-2"></i>Download for Windows</a>
         <ol class="space-y-5">
-            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">1</span><div><b>Run the installer</b> — open <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">BMyDesk-Agent-Setup.exe</code>. If Windows shows "protected your PC", click <b>More info → Run anyway</b> (the app is new, the warning fades as reputation builds).</div></li>
-            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">2</span><div><b>Finish setup</b> — the agent installs and starts. A window opens showing <b>your device code</b> (e.g. <code class="bg-slate-100 px-1.5 py-0.5 rounded">XK4M2N9P</code>).</div></li>
-            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">3</span><div><b>That's it</b> — the agent sits in the system tray and survives reboots. Keep the window open or close it — the code stays live.</div></li>
-            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">4</span><div><b>Optional: unattended access</b> — set a PIN in the agent so you can connect later without anyone approving.</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">1</span><div><b>Run the installer</b> — open <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">BMyDesk-Agent-Setup-1.3.4.exe</code>. If Windows SmartScreen shows "Windows protected your PC", click <b>More info → Run anyway</b>. This warning appears for every new app until it builds download reputation — it does not mean the file is unsafe (see the verification box below).</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">2</span><div><b>Accept the License Agreement</b> — read the terms and click <b>I Agree</b>.</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">3</span><div><b>Choose the install folder</b> — keep the default <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">%LOCALAPPDATA%\Programs\BMyDesk Agent</code> or pick your own, then <b>Install</b>. No admin rights needed.</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">4</span><div><b>Finish</b> — desktop and Start Menu shortcuts are created. Leave <b>Run BMyDesk Agent</b> checked and click <b>Finish</b> — a window opens showing <b>your device code</b> (e.g. <code class="bg-slate-100 px-1.5 py-0.5 rounded">XK4M2N9P</code>).</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">5</span><div><b>That's it</b> — the agent sits in the system tray and can start with Windows (tray menu → <b>Start at login</b>). Keep the window open or close it — the code stays live.</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">6</span><div><b>Optional: unattended access</b> — set a PIN in the agent so you can connect later without anyone approving.</div></li>
         </ol>
+        <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+            <div class="font-bold text-slate-800 mb-1"><i class="fas fa-shield-halved text-green-600 mr-1"></i>Verify your download</div>
+            <p class="text-slate-600 mb-2">Only download from <code class="bg-slate-100 px-1 rounded">bmydesk.believoo.com</code>. The official v1.3.4 installer SHA-256 is:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">c9037dcb51e9de72ee8f73ae668dca9ace13d175d68f4d8d4c73c64b075f36b6</code>
+            <p class="text-slate-500 text-xs mt-2">In PowerShell: <code class="bg-slate-100 px-1 rounded">Get-FileHash BMyDesk-Agent-Setup-1.3.4.exe</code></p>
+        </div>
     </div>
 
     {{-- ANDROID --}}
@@ -49,6 +57,11 @@
             <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">2</span><div><b>Grant permissions</b> — allow <b>screen capture</b>, <b>accessibility</b> (for remote control) and <b>battery exemption</b> (so the code stays online).</div></li>
             <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">3</span><div><b>Share your code</b> — the app shows a permanent code; it re-registers automatically after reboot.</div></li>
         </ol>
+        <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+            <div class="font-bold text-slate-800 mb-1"><i class="fas fa-fingerprint text-green-600 mr-1"></i>Signed &amp; verified</div>
+            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.4 APK SHA-256:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">03000461100b0614a6ed0ce3ad1cd5eb7fd0d4ba72987eb6fc90ce709f0d83c5</code>
+        </div>
     </div>
 
     {{-- VIEWER --}}

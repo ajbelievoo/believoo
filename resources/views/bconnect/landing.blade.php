@@ -122,16 +122,26 @@
                     <button type="submit" class="px-6 py-3 font-bold text-white btn-gradient rounded-xl shadow-lg shadow-rose-500/30 whitespace-nowrap">Connect <i class="fas fa-arrow-right ml-1"></i></button>
                 </form>
                 <div class="mt-5 pt-4 border-t border-slate-700/60">
+                    @php
+                        $agentWin = \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS;
+                        $agentApk = \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_ANDROID;
+                    @endphp
                     <p class="text-[11px] text-slate-500 mb-3"><i class="fas fa-download mr-1"></i>Hosting a session? Get the agent — shows your permanent code &amp; shares your screen:</p>
                     <div class="flex flex-wrap items-center gap-2">
-                        <a href="/dl/agent.exe" download id="dlWin" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows</a>
-                        <a href="/dl/agent.apk" download id="dlApk" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android</a>
+                        <a href="/dl/agent.exe" download id="dlWin" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-windows mr-1 text-cyan-400"></i>Windows <span class="text-[10px] text-slate-500 font-normal">v{{ $agentWin }}</span></a>
+                        <a href="/dl/agent.apk" download id="dlApk" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-200 transition"><i class="fab fa-android mr-1 text-green-400"></i>Android <span class="text-[10px] text-slate-500 font-normal">v{{ $agentApk }}</span></a>
                         <div id="apkQr" class="hidden items-center gap-2 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700">
                             <img src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=https%3A%2F%2Fbmydesk.believoo.com%2Fdl%2Fagent.apk" width="72" height="72" alt="Scan to download Android agent" class="rounded">
                             <span class="text-[10px] text-slate-400 leading-tight max-w-[90px]">Scan with your phone to install the Android agent</span>
                         </div>
-                        <a href="/downloads/BMyDesk-Agent-1.3.1-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
+                        <a href="/downloads/BMyDesk-Agent-{{ $agentWin }}-win.zip" download class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-slate-400 transition"><i class="fas fa-file-archive mr-1"></i>Portable ZIP</a>
                     </div>
+                    <p class="text-[10px] text-slate-500 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span><i class="fas fa-shield-halved text-green-500 mr-1"></i>Signed release build</span>
+                        <span><i class="fas fa-lock text-slate-400 mr-1"></i>End-to-end encrypted sessions</span>
+                        <span><i class="fas fa-user-check text-slate-400 mr-1"></i>You approve every connection</span>
+                        <a href="{{ route('bconnect.install.guide') }}" class="text-cyan-400 hover:underline font-semibold"><i class="fas fa-book-open mr-1"></i>Install guide &amp; verification</a>
+                    </p>
                 </div>
             </div>
         </div>

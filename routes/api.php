@@ -49,8 +49,14 @@ Route::prefix('v1')->group(function () {
     Route::post('/webhooks/razorpay', [\App\Http\Controllers\PaymentController::class, 'razorpayWebhook'])
         ->name('api.webhooks.razorpay');
 
-    // BMyDesk desktop agent (code-based remote sessions) — public, rate-limited
-    Route::prefix('bmydesk/agent')->middleware('throttle:240,1')->group(function () {
+    // BMyDesk desktop agent (code-based remote sessions) — public, rate-limited.
+    // NOTE: WebRTC signaling is inherently bursty — an ICE-gather can emit 15+
+    // candidates in one second and the poll loop runs ~1 req/sec, and BOTH
+    // host+viewer often share one public IP (same LAN). A 240/min bucket is
+    // exhausted within seconds of a session starting, so keep the group ceiling
+    // high and rely on the per-route token checks + tight join/set-pin limits
+    // (those are the actual brute-force surfaces).
+    Route::prefix('bmydesk/agent')->middleware('throttle:3000,1')->group(function () {
         Route::post('/register', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'register']);
         Route::get('/{code}/status', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'status']);
         Route::post('/{code}/end', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'end']);
