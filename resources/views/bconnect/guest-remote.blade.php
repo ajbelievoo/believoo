@@ -311,6 +311,7 @@ function startViewerPoll() {
             if (!pc) {
                 const s = await fetch(API + '/' + CODE + '/status?agent_token=' + encodeURIComponent(VTOKEN), { headers: { 'Accept': 'application/json' } });
                 const sd = await s.json();
+                if (sd.ok && sd.host_alive === false) { gStage(gPct, 'Host went offline — ask them to reopen the app'); return; }
                 if (sd.ok && sd.status === 'rejected') onReject();
                 else if (sd.ok && (sd.status === 'ended' || sd.status === 'waiting')) onEnded(sd.status === 'waiting');
             }

@@ -995,7 +995,11 @@ class MainActivity : Activity() {
                     if (remoteViewer == null) {
                         val st = api.status(code, j.viewerToken)
                         val stv = st?.get("status")?.asString
-                        if (stv == "rejected") { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
+                        if (st?.get("host_alive")?.asBoolean == false) {
+                            ui { viewerStatus.text = "Host went offline — ask them to reopen the app" }
+                            thread { Thread.sleep(2500); ui { exitViewer() } }
+                        }
+                        else if (stv == "rejected") { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
                         else if (stv == "ended") { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
                     }
                 } catch (e: Exception) {}

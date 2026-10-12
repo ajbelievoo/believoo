@@ -12,8 +12,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.3.8';
-    const AGENT_LATEST_ANDROID = '1.3.8';
+    const AGENT_LATEST_WINDOWS = '1.3.9';
+    const AGENT_LATEST_ANDROID = '1.3.9';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -440,9 +440,13 @@ class AgentApiController extends Controller
     {
         $session = $this->findByCode($code);
         if (!$session || !$this->checkToken($r, $session)) {
-            // viewers get a limited read — enough for a ws-less accept/reject poll
+            // viewers get a limited read — enough for a ws-less accept/reject poll.
+            // host_alive lets a waiting viewer detect the host app closing
+            // mid-approval instead of polling a dead session forever.
             if ($session && $this->checkViewerToken($r, $session)) {
-                return response()->json(['ok' => true, 'status' => $session->status]);
+                return response()->json(['ok' => true, 'status' => $session->status,
+                    'host_alive' => $session->host_kind !== 'agent'
+                        || ($session->updated_at && $session->updated_at->gt(now()->subMinutes(3)))]);
             }
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
         }
