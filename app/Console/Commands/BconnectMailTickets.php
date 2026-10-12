@@ -47,6 +47,19 @@ class BconnectMailTickets extends Command
                 // Plain-text body preference
                 $text = $this->bodyText($raw, $body);
 
+                // Email threading — a reply to a ticket notification carries
+                // "[#123]" in the subject (added to outbound mail). If found
+                // and the ticket exists in this company, thread as a comment
+                // instead of spawning a duplicate ticket. Fallback: match the
+                // stripped subject (no Re:/Fwd:) against an open ticket title
+                // from the same reporter.
+                $threaded = $this->threadIntoExistingTicket($company->id, $subject, $text, $email, $name);
+                if ($threaded) {
+                    rename($f, '/www/vmail/believoo.com/support/cur/' . basename($f) . ':2,S');
+                    $count++;
+                    continue;
+                }
+
                 Ticket::create([
                     'company_id' => $company->id,
                     'title' => Str::limit($subject, 190, ''),
@@ -68,6 +81,35 @@ class BconnectMailTickets extends Command
         }
         $this->info("imported $count ticket(s)");
         return 0;
+    }
+
+    private function threadIntoExistingTicket(int $companyId, string $subject, string $text, string $email, string $name): bool
+    {
+        $ticket = null;
+        if (preg_match('/\[#(\d+)\]/', $subject, $m)) {
+            $ticket = Ticket::where('company_id', $companyId)->find((int) $m[1]);
+        }
+        if (!$ticket) {
+            $base = trim(preg_replace('/^\s*(re|fwd?|aw)\s*:\s*/i', '', $subject));
+            if ($base !== '' && strncasecmp($base, $subject, 3) !== 0) {
+                // only an actual reply/forwards — never thread on a first-touch subject
+                $ticket = Ticket::where('company_id', $companyId)
+                    ->where('reporter_email', $email)
+                    ->where('title', 'like', Str::limit($base, 190, '') . '%')
+                    ->whereNotIn('status', ['closed'])
+                    ->latest()->first();
+            }
+        }
+        if (!$ticket) return false;
+
+        \App\Models\Bconnect\TicketComment::create([
+            'ticket_id' => $ticket->id,
+            'member_id' => $ticket->reporter_id,
+            'message' => "[email reply from {$name} <{$email}>]\n\n" . Str::limit($text, 8000, ''),
+            'is_internal' => false,
+        ]);
+        if (in_array($ticket->status, ['resolved'])) $ticket->update(['status' => 'open']);
+        return true;
     }
 
     private function header(string $hdr, string $name): string
