@@ -1,0 +1,40 @@
+BMyDesk Agent — End User License Agreement
+Believoo ("we", "us") licenses this software to you under the terms below.
+By installing or using BMyDesk Agent you accept these terms.
+
+1. WHAT THIS APP DOES
+BMyDesk Agent shares this device's screen with people you give your
+session code to, and lets them view and (with your approval) control the
+device remotely. YOU choose who connects — every session starts only
+after you accept it, or after you set an unattended-access PIN yourself.
+
+2. YOUR RESPONSIBILITIES
+- Only install this agent on devices you own or administer.
+- Only share your code or PIN with people you trust. Anyone with the
+  code can request access; anyone with the PIN can connect without
+  approval.
+- You can end any session at any time from the app or the system tray.
+
+3. PRIVACY
+Screen video, audio and input are streamed peer-to-peer over WebRTC
+(DTLS-SRTP encrypted). Signaling and session metadata pass through
+bmydesk.believoo.com servers. We do not record or store screen content.
+Session events (connect/accept/end) are logged for security auditing.
+
+4. PERMISSIONS
+The app may request screen-capture and input-control permissions and may
+register to start at login (configurable in the tray menu). It does not
+install drivers or collect data beyond what is needed for sessions.
+
+5. WARRANTY & LIABILITY
+This software is provided "as is" without warranty of any kind. To the
+maximum extent permitted by law, Believoo is not liable for indirect or
+consequential damages arising from use of this software.
+
+6. TERMINATION
+Uninstall the app at any time via Windows "Add or Remove Programs".
+Sessions and registration for this device are removed when you uninstall
+or revoke access from your account.
+
+Questions? support@believoo.com — https://bmydesk.believoo.com
+Copyright (c) 2026 Believoo. All rights reserved.

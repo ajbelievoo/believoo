@@ -171,8 +171,11 @@ function postJson(url, body) {
 function whisper(evt, data) { try { channel.trigger('client-' + evt, data); } catch (e) {} }
     // strip SDP lines some libwebrtc/Chrome builds reject outright
     function cleanSdp(sdp) {
-        return String(sdp || '').split(/\r?\n/)
-            .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
+        const out = String(sdp || '').split(/\r?\n/)
+            .filter(l => l && !/^a=max-message-size/.test(l))
+            .map(l => { const m = l.match(/^a=sctp-port:(\d+)\s*$/); return m ? 'a=sctpmap:' + m[1] + ' webrtc-datachannel 1024' : l; })
+            .join('\r\n');
+        return out.endsWith('\r\n') ? out : out + '\r\n';
     }
 
 function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); return postJson(API + '/' + CODE + '/signal', Object.assign({ agent_token: VTOKEN }, msg)); }

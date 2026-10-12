@@ -12,7 +12,7 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.3.3';
+    const AGENT_LATEST_WINDOWS = '1.3.4';
     const AGENT_LATEST_ANDROID = '1.3.4';
 
     protected function findByCode(string $code): ?RemoteSession
@@ -525,9 +525,15 @@ class AgentApiController extends Controller
         foreach ($lines as $l) {
             if ($l === '') continue;
             if (strpos($l, 'a=max-message-size') === 0) continue;
+            // RFC 8841 "a=sctp-port" breaks older libwebrtc builds — rewrite to
+            // the legacy "a=sctpmap" form every stack understands.
+            if (preg_match('/^a=sctp-port:(\d+)\s*$/', $l, $m)) { $l = 'a=sctpmap:' . $m[1] . ' webrtc-datachannel 1024'; }
             $out[] = $l;
         }
-        return implode("\r\n", $out);
+        // SDP requires EVERY line (incl. the last) to end in CRLF — stripping a
+        // trailing attribute leaves the final line unterminated → "Invalid SDP
+        // line" on strict parsers (this was the real connect-killer).
+        return implode("\r\n", $out) . "\r\n";
     }
 
     // POST /api/v1/bmydesk/agent/{code}/end — agent ends its own session

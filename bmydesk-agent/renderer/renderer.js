@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.3';
+const APP_VERSION = '1.3.4';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -355,8 +355,11 @@ let offering = false;
 // Strip SDP lines that are known to break strict parsers on the OTHER side
 // (e.g. a=max-message-size — some libwebrtc builds reject it outright).
 function cleanSdp(sdp) {
-    return String(sdp || '').split(/\r?\n/)
-        .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
+    const out = String(sdp || '').split(/\r?\n/)
+        .filter(l => l && !/^a=max-message-size/.test(l))
+        .map(l => { const m = l.match(/^a=sctp-port:(\d+)\s*$/); return m ? 'a=sctpmap:' + m[1] + ' webrtc-datachannel 1024' : l; })
+        .join('\r\n');
+    return out.endsWith('\r\n') ? out : out + '\r\n'; // strict parsers need the last line terminated
 }
 
 async function setRemoteSdp(pc, type, sdp) {
@@ -364,8 +367,10 @@ async function setRemoteSdp(pc, type, sdp) {
     try { await pc.setRemoteDescription({ type, sdp: raw }); return; }
     catch (e1) {
         const cleaned = raw.replace(/\r?\n/g, '\r\n').split('\r\n')
-            .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
-        if (cleaned === raw) throw e1;
+            .filter(l => l && !/^a=max-message-size/.test(l))
+            .map(l => { const m = l.match(/^a=sctp-port:(\d+)\s*$/); return m ? 'a=sctpmap:' + m[1] + ' webrtc-datachannel 1024' : l; })
+            .join('\r\n') + '\r\n';
+        if (cleaned === raw || cleaned === raw + '\r\n') throw e1;
         hdbg('sdp retry — dropped exotic attrs');
         await pc.setRemoteDescription({ type, sdp: cleaned });
     }

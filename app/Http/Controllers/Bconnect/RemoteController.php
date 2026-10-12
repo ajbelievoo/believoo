@@ -275,10 +275,11 @@ class RemoteController extends Controller {
         $sdp = $r->input('sdp');
         if (is_string($sdp)) {
             // strip attribute lines some libwebrtc builds reject outright
-            $sdp = implode("\r\n", array_values(array_filter(
-                preg_split('/\r?\n/', $sdp),
+            $sdp = implode("\r\n", array_values(array_filter(array_map(
+                fn($l) => preg_match('/^a=sctp-port:(\d+)\s*$/', $l, $m) ? 'a=sctpmap:' . $m[1] . ' webrtc-datachannel 1024' : $l,
+                preg_split('/\r?\n/', $sdp)),
                 fn($l) => $l !== '' && strpos($l, 'a=max-message-size') !== 0
-            )));
+            ))) . "\r\n";
         }
         $payload = [
             'n' => (string) ($r->input('n') ?: Str::random(10)),
