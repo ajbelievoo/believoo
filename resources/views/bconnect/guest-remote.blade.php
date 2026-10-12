@@ -98,6 +98,9 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             <button class="endbtn" id="fsBtn" title="Fullscreen" style="background:#1e293b;color:#e2e8f0;display:none;">⛶</button>
             <button class="endbtn" id="monBtn" title="Switch remote display" style="background:#1e293b;color:#e2e8f0;display:none;">🖥</button>
             <button class="endbtn" id="rebootBtn" title="Reboot remote computer" style="background:#1e293b;color:#e2e8f0;display:none;">⏻</button>
+            <button class="endbtn" id="lockBtn" title="Lock remote computer" style="background:#1e293b;color:#e2e8f0;display:none;">🔒</button>
+            <button class="endbtn" id="laserBtn" title="Laser pointer — move mouse to point" style="background:#1e293b;color:#e2e8f0;display:none;">🔴</button>
+            <button class="endbtn" id="fsOpenBtn" title="Browse remote files" style="background:#1e293b;color:#e2e8f0;display:none;">📂</button>
             <select id="qualitySel" title="Quality" style="background:#1e293b;border:0;color:#94a3b8;font-size:11px;padding:5px;border-radius:6px;display:none;">
                 <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
             </select>
@@ -123,6 +126,13 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             </div>
         </div>
         <div id="clickHint" style="display:none">Click the screen once to enable keyboard &amp; mouse — Esc to release.</div>
+        <div id="fsPanel" style="display:none;position:absolute;right:0;top:0;bottom:0;width:280px;background:rgba(15,23,42,.96);border-left:1px solid var(--border);z-index:8;flex-direction:column;">
+            <div style="display:flex;gap:6px;padding:10px;border-bottom:1px solid var(--border);align-items:center;">
+                <button id="fsUp" title="Up one level" style="background:#1e293b;border:0;color:#e2e8f0;padding:4px 10px;border-radius:6px;cursor:pointer;">↑</button>
+                <div id="fsPath" style="flex:1;font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">…</div>
+            </div>
+            <div id="fsItems" style="flex:1;overflow-y:auto;padding:6px;font-size:13px;"></div>
+        </div>
         <div id="chatPanel" style="display:none;position:absolute;right:0;top:0;bottom:0;width:280px;background:rgba(15,23,42,.96);border-left:1px solid var(--border);z-index:8;flex-direction:column;">
             <div id="chatMsgs" style="flex:1;overflow-y:auto;padding:12px;font-size:13px;"></div>
             <div style="display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);">
@@ -333,8 +343,8 @@ async function startPeer() {
     };
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','fsBtn','monBtn','rebootBtn'].forEach(i => $(i).style.display = 'inline-block'); };
-    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','fsBtn','monBtn','rebootBtn','chatPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','fsBtn','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn'].forEach(i => $(i).style.display = 'inline-block'); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','fsBtn','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn','chatPanel','fsPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onmessage = e => {
         try { const m = JSON.parse(e.data); if (m.t === 'pong') { $('latBadge').style.display = 'inline-block'; $('latVal').textContent = Math.round(performance.now() - m.ts); } } catch (x) {}
@@ -422,6 +432,7 @@ async function onCtlMessage(e) {
             else if (m.t === 'file-cancel') { rxFile = null; setProg(null); addChat('System', 'Transfer cancelled by peer', false); }
             else if (m.t === 'cmd-out') addChat('Host ▸', m.out || '(no output)', false);
             else if (m.t === 'view-only') addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
+            else if (m.t === 'fs-list') renderFsList(m);
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
             setProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%');
