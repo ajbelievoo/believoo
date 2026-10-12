@@ -500,6 +500,14 @@ class MainActivity : Activity() {
             text = "⌨"; textSize = 11f
             setOnClickListener { typeDialog() }
         })
+        // shortcut chords — modifier flag travels on the key event itself
+        mapOf("Alt+Tab" to ("Tab" to "alt"), "Alt+F4" to ("F4" to "alt"),
+              "Ctrl+A" to ("KeyA" to "ctrl"), "Win+D" to ("KeyD" to "meta")).forEach { (lbl, p) ->
+            keysRow.addView(Button(this).apply {
+                text = lbl; textSize = 10f
+                setOnClickListener { sendKeyMod(p.first, p.second) }
+            })
+        }
         viewerPane.addView(keysRow, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM))
@@ -651,6 +659,13 @@ class MainActivity : Activity() {
     private fun sendKey(code: String) {
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", true) })
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", false) })
+    }
+
+    // key with a held modifier — Alt+Tab, Ctrl+A, Win+D etc.
+    private fun sendKeyMod(code: String, mod: String) {
+        for (down in listOf(true, false)) remoteViewer?.sendInput(JsonObject().apply {
+            addProperty("t", "key"); addProperty("code", code); addProperty("down", down); addProperty(mod, true)
+        })
     }
 
     // simple char→DOM-code map; shift-aware for capitals + common symbols

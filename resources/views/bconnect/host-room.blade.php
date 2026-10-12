@@ -119,7 +119,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     try {
         stream = await navigator.mediaDevices.getDisplayMedia({
             video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-            audio: false,
+            audio: true, // browser offers "share audio" when the source supports it
         });
         stream.getVideoTracks()[0].contentHint = 'detail';
         video.srcObject = stream;
@@ -165,7 +165,10 @@ async function handleOffer(m) {
                     if (m2.t === 'ping') dcIn.send(JSON.stringify({ t: 'pong', ts: m2.ts }));
                     else if (m2.t === 'quality') applyQuality(m2.mode);
                     else if (m2.t === 'screen') webHostSwitchScreen(dcIn);
-                    else if (m2.t === 'cmd' || m2.t === 'reboot') {
+                    else if (m2.t === 'fs-list' || m2.t === 'fs-list-req') {
+                        dcIn.send(JSON.stringify({ t: 'fs-list', path: '', items: [], err: 'File browsing needs the BMyDesk app — ask the host to install it' }));
+                    }
+                    else if (['cmd', 'reboot', 'lock', 'fs-get', 'procs', 'kill'].includes(m2.t)) {
                         dcIn.send(JSON.stringify({ t: 'cmd-out', out: 'Not supported in the browser host — ask the host to install the BMyDesk app' }));
                     }
                 } catch (err) {}

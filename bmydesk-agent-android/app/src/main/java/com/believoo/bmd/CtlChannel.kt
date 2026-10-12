@@ -57,10 +57,16 @@ class CtlChannel(private val gson: Gson = Gson()) {
                 "cmd-out" -> sink?.onChat("Host ▸", m.get("out")?.asString ?: "(no output)")
                 "view-only" -> sink?.onChat("System", if (m.get("on")?.asBoolean == true)
                     "Host locked remote input (view-only mode)" else "Host re-enabled remote input")
-                // host-side actions — Android can't exec shell/reboot/switch displays
-                "cmd", "reboot", "screen" -> send(JsonObject().apply {
+                // host-side actions — Android can't exec shell/reboot/browse files
+                "cmd", "reboot", "screen", "lock", "fs-get", "procs", "kill" -> send(JsonObject().apply {
                     addProperty("t", "cmd-out")
                     addProperty("out", "'${m.get("t")?.asString}' is not supported on this host")
+                })
+                "fs-list", "fs-list-req" -> send(JsonObject().apply {
+                    addProperty("t", "fs-list")
+                    addProperty("path", "")
+                    add("items", com.google.gson.JsonArray())
+                    addProperty("err", "File browsing is not supported on this host")
                 })
             }
         } else if (rxName != null) {

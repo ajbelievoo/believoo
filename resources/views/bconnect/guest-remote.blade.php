@@ -460,6 +460,11 @@ $('chatSend').onclick = () => {
     if (t.startsWith('/cmd ')) {
         const c = t.slice(5).trim();
         if (c) { ctlSend({ t: 'cmd', cmd: c }); addChat('Me ▸', c, true); }
+    } else if (t === '/ps') {
+        ctlSend({ t: 'procs' }); addChat('Me ▸', 'tasklist', true);
+    } else if (t.startsWith('/kill ')) {
+        const a = t.slice(6).trim();
+        if (a) { ctlSend({ t: 'kill', arg: a }); addChat('Me ▸', 'kill ' + a, true); }
     } else {
         ctlSend({ t: 'chat', from: $('nameInput').value.trim() || 'Guest', text: t });
         addChat('Me', t, true);
@@ -475,6 +480,59 @@ $('fsBtn').onclick = () => {
 };
 $('monBtn').onclick = () => ctlSend({ t: 'screen' });
 $('rebootBtn').onclick = () => { if (confirm('Reboot the REMOTE computer now?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'reboot' }); };
+$('lockBtn').onclick = () => { if (confirm('Lock the REMOTE computer?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'lock' }); };
+$('laserBtn').onclick = () => {
+    laserOn = !laserOn;
+    $('laserBtn').style.background = laserOn ? '#f43f5e' : '#1e293b';
+    if (!laserOn) sendInput({ t: 'laser', off: true });
+};
+
+// ── Remote file explorer ──
+let fsCurPath = '';
+function fsJoin(dir, name) {
+    if (!dir) return name;
+    return (dir.endsWith('\\') || dir.endsWith('/')) ? dir + name
+        : dir + (dir.includes('\\') ? '\\' : '/') + name;
+}
+function fsUpPath(p) {
+    const m = String(p || '').replace(/[\\/]+$/, '');
+    const idx = Math.max(m.lastIndexOf('\\'), m.lastIndexOf('/'));
+    return idx > 0 ? m.slice(0, idx) : (idx === 0 ? m.slice(0, 1) : '');
+}
+function fsFmt(s) { return s > 1048576 ? (s / 1048576).toFixed(1) + 'M' : s > 1024 ? (s / 1024).toFixed(0) + 'K' : s + 'B'; }
+$('fsOpenBtn').onclick = () => {
+    const p = $('fsPanel');
+    if (p.style.display === 'none' || !p.style.display) {
+        p.style.display = 'flex';
+        $('fsItems').innerHTML = '<div style="color:#64748b;padding:10px;">Loading…</div>';
+        ctlSend({ t: 'fs-list-req', path: fsCurPath });
+    } else p.style.display = 'none';
+};
+$('fsUp').onclick = () => ctlSend({ t: 'fs-list-req', path: fsUpPath(fsCurPath) });
+function renderFsList(m) {
+    $('fsPanel').style.display = 'flex';
+    fsCurPath = m.path || '';
+    $('fsPath').textContent = m.path || '(drives)';
+    $('fsPath').title = m.path || '';
+    const box = $('fsItems'); box.innerHTML = '';
+    if (m.err) { const d = document.createElement('div'); d.style.cssText = 'color:#f43f5e;padding:10px;'; d.textContent = m.err; box.appendChild(d); return; }
+    if (!m.items || !m.items.length) { box.innerHTML = '<div style="color:#64748b;padding:10px;">Empty folder</div>'; return; }
+    m.items.forEach(it => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:5px 8px;border-radius:6px;cursor:pointer;color:#cbd5e1;display:flex;gap:6px;align-items:center;';
+        row.onmouseenter = () => row.style.background = '#1e293b';
+        row.onmouseleave = () => row.style.background = '';
+        row.appendChild(document.createTextNode(it.d ? '📁 ' : '📄 '));
+        const lbl = document.createElement('span');
+        lbl.textContent = it.n;
+        lbl.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;';
+        row.appendChild(lbl);
+        if (!it.d) { const sz = document.createElement('span'); sz.textContent = fsFmt(it.s); sz.style.cssText = 'color:#475569;font-size:10px;'; row.appendChild(sz); }
+        row.title = it.d ? 'Open folder' : 'Download to this device';
+        row.onclick = () => ctlSend({ t: it.d ? 'fs-list-req' : 'fs-get', path: fsJoin(fsCurPath, it.n) });
+        box.appendChild(row);
+    });
+}
 
 // ── Stats overlay (rtt/fps/bitrate) + quality bars + session timer ──
 let stTimer = null, stBytes = 0, stAt = 0, sessStart = 0, sessT = null, autoDropped = false;
@@ -597,14 +655,46 @@ document.addEventListener('keydown', async e => {
 function sendInput(o) { if (dc && dc.readyState === 'open') { try { dc.send(JSON.stringify(o)); } catch (e) {} } }
 const video = $('remoteVideo');
 let lastMove = 0;
+// Zoom/pan — Ctrl+wheel zooms at the cursor, middle-drag pans when zoomed,
+// double-click resets. Coordinates stay right: they come from the transformed
+// bounding rect. 🔴 toggles laser-pointer mode (moves the host's on-screen dot).
+let zoom = { s: 1, x: 0, y: 0 }, laserOn = false, panning = false, panX = 0, panY = 0;
+function applyZoom() {
+    video.style.transformOrigin = '0 0';
+    video.style.transform = zoom.s === 1 ? '' : `translate(${zoom.x}px,${zoom.y}px) scale(${zoom.s})`;
+}
 video.addEventListener('mousemove', e => {
+    if (panning) { zoom.x += e.clientX - panX; zoom.y += e.clientY - panY; panX = e.clientX; panY = e.clientY; applyZoom(); return; }
     const now = performance.now(); if (now - lastMove < 33) return; lastMove = now;
     const r = video.getBoundingClientRect();
-    sendInput({ t: 'move', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    sendInput(laserOn ? { t: 'laser', x, y } : { t: 'move', x, y });
 });
-video.addEventListener('mousedown', e => { e.preventDefault(); sendInput({ t: 'down', b: e.button }); });
-video.addEventListener('mouseup', e => sendInput({ t: 'up', b: e.button }));
-video.addEventListener('wheel', e => { e.preventDefault(); sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
+video.addEventListener('mousedown', e => {
+    e.preventDefault();
+    if (e.button === 1 && zoom.s > 1) { panning = true; panX = e.clientX; panY = e.clientY; return; }
+    if (!laserOn) sendInput({ t: 'down', b: e.button });
+});
+video.addEventListener('mouseup', e => {
+    if (e.button === 1 && panning) { panning = false; return; }
+    if (!laserOn) sendInput({ t: 'up', b: e.button });
+});
+video.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (e.ctrlKey) { // zoom at cursor instead of remote scroll
+        const r = video.getBoundingClientRect();
+        const ox = r.left - zoom.x, oy = r.top - zoom.y;
+        const cx = e.clientX - ox, cy = e.clientY - oy;
+        const ns = Math.min(4, Math.max(1, zoom.s * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+        const f = ns / zoom.s;
+        zoom.x = cx - (cx - zoom.x) * f; zoom.y = cy - (cy - zoom.y) * f; zoom.s = ns;
+        if (zoom.s === 1) { zoom.x = 0; zoom.y = 0; }
+        applyZoom();
+        return;
+    }
+    sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY });
+}, { passive: false });
+video.addEventListener('dblclick', () => { if (zoom.s !== 1) { zoom = { s: 1, x: 0, y: 0 }; applyZoom(); } });
 video.addEventListener('keydown', e => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
 video.addEventListener('keyup', e => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
 let touchMoved = false, touchStartMs = 0, twoFinger = false, lastPinchY = 0, lpTimer = null;

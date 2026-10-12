@@ -23,6 +23,9 @@
             <button id="recBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Record session"><i class="fas fa-circle mr-1"></i></button>
             <button id="monBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Switch remote display"><i class="fas fa-desktop mr-1"></i></button>
             <button id="rebootBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Reboot remote computer"><i class="fas fa-power-off mr-1"></i></button>
+            <button id="lockBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Lock remote computer"><i class="fas fa-lock mr-1"></i></button>
+            <button id="laserBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Laser pointer"><i class="fas fa-location-arrow mr-1"></i></button>
+            <button id="fsOpenBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Browse remote files"><i class="fas fa-folder-open mr-1"></i></button>
             <select id="qualitySel" title="Quality" class="bc-btn bc-btn-secondary text-sm hidden" style="padding:4px 8px;">
                 <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
             </select>
@@ -47,6 +50,13 @@
                     <div id="waitPct" class="text-[11px] text-slate-500 tabular-nums">0%</div>
                 </div>
             </div>
+        </div>
+        <div id="fsPanel" class="absolute right-0 top-0 bottom-0 w-72 bg-[var(--bc-card,#0f172a)]/95 border-l border-[var(--bc-border)] z-20 hidden flex-col">
+            <div class="flex gap-2 p-2 border-b border-[var(--bc-border)] items-center">
+                <button id="fsUp" title="Up one level" class="bc-btn bc-btn-secondary text-xs px-2">↑</button>
+                <div id="fsPath" class="flex-1 text-[11px] text-slate-500 truncate">…</div>
+            </div>
+            <div id="fsItems" class="flex-1 overflow-y-auto p-2 text-sm"></div>
         </div>
         <div id="chatPanel" class="absolute right-0 top-0 bottom-0 w-72 bg-[var(--bc-card,#0f172a)]/95 border-l border-[var(--bc-border)] z-20 hidden flex-col">
             <div id="chatMsgs" class="flex-1 overflow-y-auto p-3 text-sm"></div>
@@ -228,8 +238,8 @@ async function startPeer() {
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn'].forEach(i => $(i).classList.remove('hidden')); };
-    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','chatPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn'].forEach(i => $(i).classList.remove('hidden')); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn','chatPanel','fsPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onopen = () => { if (CAN_CONTROL) document.getElementById('inputBadge').classList.remove('hidden'); };
     dc.onclose = () => document.getElementById('inputBadge').classList.add('hidden');
@@ -329,6 +339,7 @@ async function onCtlMessage(e) {
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
             else if (m.t === 'cmd-out') addChat('Host ▸', m.out || '(no output)', false);
             else if (m.t === 'view-only') addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
+            else if (m.t === 'fs-list') renderFsList(m);
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
             if (rxFile.got >= rxFile.size) {
@@ -355,6 +366,11 @@ $('chatSend').onclick = () => {
     if (t.startsWith('/cmd ')) {
         const c = t.slice(5).trim();
         if (c) { ctlSend({ t: 'cmd', cmd: c }); addChat('Me ▸', c, true); }
+    } else if (t === '/ps') {
+        ctlSend({ t: 'procs' }); addChat('Me ▸', 'tasklist', true);
+    } else if (t.startsWith('/kill ')) {
+        const a = t.slice(6).trim();
+        if (a) { ctlSend({ t: 'kill', arg: a }); addChat('Me ▸', 'kill ' + a, true); }
     } else {
         ctlSend({ t: 'chat', from: VIEWER, text: t });
         addChat('Me', t, true);
@@ -365,6 +381,57 @@ $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chat
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
 $('monBtn').onclick = () => ctlSend({ t: 'screen' });
 $('rebootBtn').onclick = () => { if (confirm('Reboot the REMOTE computer now?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'reboot' }); };
+$('lockBtn').onclick = () => { if (confirm('Lock the REMOTE computer?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'lock' }); };
+$('laserBtn').onclick = () => {
+    laserOn = !laserOn;
+    $('laserBtn').classList.toggle('bc-btn-danger', laserOn);
+    if (!laserOn) sendInput({ t: 'laser', off: true });
+};
+
+// ── Remote file explorer ──
+let fsCurPath = '';
+function fsJoin(dir, name) {
+    if (!dir) return name;
+    return (dir.endsWith('\\') || dir.endsWith('/')) ? dir + name
+        : dir + (dir.includes('\\') ? '\\' : '/') + name;
+}
+function fsUpPath(p) {
+    const m = String(p || '').replace(/[\\/]+$/, '');
+    const idx = Math.max(m.lastIndexOf('\\'), m.lastIndexOf('/'));
+    return idx > 0 ? m.slice(0, idx) : (idx === 0 ? m.slice(0, 1) : '');
+}
+function fsFmt(s) { return s > 1048576 ? (s / 1048576).toFixed(1) + 'M' : s > 1024 ? (s / 1024).toFixed(0) + 'K' : s + 'B'; }
+$('fsOpenBtn').onclick = () => {
+    const p = $('fsPanel');
+    if (p.classList.contains('hidden')) {
+        p.classList.remove('hidden'); p.classList.add('flex');
+        $('fsItems').innerHTML = '<div class="text-slate-500 p-3">Loading…</div>';
+        ctlSend({ t: 'fs-list-req', path: fsCurPath });
+    } else { p.classList.add('hidden'); p.classList.remove('flex'); }
+};
+$('fsUp').onclick = () => ctlSend({ t: 'fs-list-req', path: fsUpPath(fsCurPath) });
+function renderFsList(m) {
+    const p = $('fsPanel');
+    p.classList.remove('hidden'); p.classList.add('flex');
+    fsCurPath = m.path || '';
+    $('fsPath').textContent = m.path || '(drives)';
+    $('fsPath').title = m.path || '';
+    const box = $('fsItems'); box.innerHTML = '';
+    if (m.err) { const d = document.createElement('div'); d.className = 'text-red-400 p-3'; d.textContent = m.err; box.appendChild(d); return; }
+    if (!m.items || !m.items.length) { box.innerHTML = '<div class="text-slate-500 p-3">Empty folder</div>'; return; }
+    m.items.forEach(it => {
+        const row = document.createElement('div');
+        row.className = 'px-2 py-1 rounded hover:bg-slate-700 cursor-pointer text-slate-300 flex items-center gap-2 truncate';
+        row.appendChild(document.createTextNode(it.d ? '📁 ' : '📄 '));
+        const lbl = document.createElement('span');
+        lbl.textContent = it.n; lbl.className = 'truncate flex-1';
+        row.appendChild(lbl);
+        if (!it.d) { const sz = document.createElement('span'); sz.textContent = fsFmt(it.s); sz.className = 'text-slate-500 text-[10px]'; row.appendChild(sz); }
+        row.title = it.d ? 'Open folder' : 'Download to this device';
+        row.onclick = () => ctlSend({ t: it.d ? 'fs-list-req' : 'fs-get', path: fsJoin(fsCurPath, it.n) });
+        box.appendChild(row);
+    });
+}
 
 let stTimer = null, stBytes = 0, stAt = 0, sessStart = 0, sessT = null, autoDropped = false;
 function startSessionTimer() {
@@ -486,17 +553,47 @@ function sendInput(obj) {
 }
 
 let lastMove = 0;
+// Zoom/pan — Ctrl+wheel zooms at cursor, middle-drag pans when zoomed,
+// double-click resets to fit. Works in view-only sessions too (coords come
+// from the transformed rect, so remote input stays accurate while zoomed).
+let zoom = { s: 1, x: 0, y: 0 }, laserOn = false, panning = false, panX = 0, panY = 0;
+function applyZoom() {
+    video.style.transformOrigin = '0 0';
+    video.style.transform = zoom.s === 1 ? '' : `translate(${zoom.x}px,${zoom.y}px) scale(${zoom.s})`;
+}
+video.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const r = video.getBoundingClientRect();
+    const ox = r.left - zoom.x, oy = r.top - zoom.y;
+    const cx = e.clientX - ox, cy = e.clientY - oy;
+    const ns = Math.min(4, Math.max(1, zoom.s * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+    const f = ns / zoom.s;
+    zoom.x = cx - (cx - zoom.x) * f; zoom.y = cy - (cy - zoom.y) * f; zoom.s = ns;
+    if (zoom.s === 1) { zoom.x = 0; zoom.y = 0; }
+    applyZoom();
+}, { passive: false });
+video.addEventListener('dblclick', () => { if (zoom.s !== 1) { zoom = { s: 1, x: 0, y: 0 }; applyZoom(); } });
 if (CAN_CONTROL) {
     video.addEventListener('mousemove', (e) => {
+        if (panning) { zoom.x += e.clientX - panX; zoom.y += e.clientY - panY; panX = e.clientX; panY = e.clientY; applyZoom(); return; }
         const now = performance.now();
         if (now - lastMove < 33) return; // ~30fps
         lastMove = now;
         const r = video.getBoundingClientRect();
-        sendInput({ t: 'move', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        sendInput(laserOn ? { t: 'laser', x, y } : { t: 'move', x, y });
     });
-    video.addEventListener('mousedown', (e) => { e.preventDefault(); sendInput({ t: 'down', b: e.button }); });
-    video.addEventListener('mouseup', (e) => sendInput({ t: 'up', b: e.button }));
-    video.addEventListener('wheel', (e) => { e.preventDefault(); sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
+    video.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (e.button === 1 && zoom.s > 1) { panning = true; panX = e.clientX; panY = e.clientY; return; }
+        if (!laserOn) sendInput({ t: 'down', b: e.button });
+    });
+    video.addEventListener('mouseup', (e) => {
+        if (e.button === 1 && panning) { panning = false; return; }
+        if (!laserOn) sendInput({ t: 'up', b: e.button });
+    });
+    video.addEventListener('wheel', (e) => { e.preventDefault(); if (!e.ctrlKey) sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
     video.addEventListener('keydown', (e) => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
     video.addEventListener('keyup', (e) => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
 

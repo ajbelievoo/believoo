@@ -334,11 +334,17 @@ async function pickScreen() {
 async function captureScreen(sourceId) {
     try { await window.agent.selectScreenSource(sourceId); } catch (e) {}
     const attempts = [
+        // video + system-audio loopback — the legacy desktop path is the only
+        // one that can carry Windows audio; try it first, silent fallback after
+        () => navigator.mediaDevices.getUserMedia({
+            audio: { mandatory: { chromeMediaSource: 'desktop' } },
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
+        }),
         // modern path — setDisplayMediaRequestHandler in main supplies the source
         () => navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: false }),
         // retry without constraints — some drivers reject frameRate
         () => navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }),
-        // legacy desktop-capture path (older Electron)
+        // legacy desktop-capture path, video only
         () => navigator.mediaDevices.getUserMedia({
             audio: false,
             video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
@@ -406,7 +412,11 @@ async function handleOffer(m) {
         pc = new RTCPeerConnection(pcConfig);
         pc.onicecandidate = (e) => { if (e.candidate) hostSignal({ kind: 'ice', candidate: e.candidate }); };
         pc.onconnectionstatechange = () => {
-            if (pc.connectionState === 'connected') setStatus('Viewer connected — streaming', 'on');
+            if (pc.connectionState === 'connected') {
+                setStatus('Viewer connected — streaming', 'on');
+                // always-visible system notice — the host should never miss a session
+                try { window.agent?.attention(null, 'A remote viewer is connected — your screen is being shared'); } catch (e) {}
+            }
             if (pc.connectionState === 'disconnected') setStatus('Viewer connection unstable…', 'wait');
             if (['failed', 'closed'].includes(pc.connectionState)) { teardown('Viewer lost — ready for new connection'); }
         };

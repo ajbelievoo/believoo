@@ -168,12 +168,12 @@ app.on('before-quit', () => { isQuitting = true; });
 // needs a service/driver — tracked separately.
 let privacyWins = [];
 // Viewer knocked — flash taskbar + bring the window up so the host notices
-ipcMain.on('attention', (_e, name) => {
+ipcMain.on('attention', (_e, name, body) => {
     try {
-        if (win && !win.isDestroyed()) { win.show(); win.flashFrame(true); win.focus(); }
+        if (win && !win.isDestroyed()) { win.show(); win.flashFrame(true); if (!body) win.focus(); }
         new (require('electron').Notification)({
-            title: 'BMyDesk — connection request',
-            body: (name || 'Someone') + ' wants to view your screen',
+            title: body ? 'BMyDesk — session active' : 'BMyDesk — connection request',
+            body: body || ((name || 'Someone') + ' wants to view your screen'),
         }).show();
     } catch (e) {}
 });
