@@ -101,6 +101,7 @@ class CtlChannel(private val gson: Gson = Gson()) {
     })
     fun sendScreen() = send(JsonObject().apply { addProperty("t", "screen") })
     fun sendReboot() = send(JsonObject().apply { addProperty("t", "reboot") })
+    fun sendQuality(mode: String) = send(JsonObject().apply { addProperty("t", "quality"); addProperty("mode", mode) })
 
     fun sendFile(name: String, data: ByteArray, chunk: Int = 16384) {
         val d = dc ?: return

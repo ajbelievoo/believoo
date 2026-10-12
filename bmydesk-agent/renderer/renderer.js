@@ -992,8 +992,10 @@ function startViewerPoll() {
         // keep the waiting state alive — show elapsed time so the client
         // knows the host still has to press Accept.
         if (vProgPct < 60 && vJoinedAt) {
+            const waited = Math.round((Date.now() - vJoinedAt) / 1000);
             vStage(vProgPct < 30 ? 30 : vProgPct,
-                'Waiting for host approval… (' + Math.round((Date.now() - vJoinedAt) / 1000) + 's)');
+                'Waiting for host approval… (' + waited + 's)' +
+                (waited > 90 ? ' — host may be away; their app must be open' : ''));
         }
         try {
             const r = await fetch(`${API}/${vJoinedCode}/signals`, {

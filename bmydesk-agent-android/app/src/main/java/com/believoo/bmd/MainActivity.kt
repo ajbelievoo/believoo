@@ -212,6 +212,24 @@ class MainActivity : Activity() {
     }
 
     // ── UI ─────────────────────────────────────────────────────────
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    // Brand button — rounded, flat, no Material gray. Replaces stock Button()
+    // everywhere so the app looks designed, not default.
+    private fun mbtn(label: String, color: Int, size: Float = 13f, onClick: () -> Unit): Button =
+        Button(this).apply {
+            text = label; textSize = size; isAllCaps = false
+            setTextColor(Color.WHITE); stateListAnimator = null
+            background = GradientDrawable().apply { setColor(color); cornerRadius = dp(14).toFloat() }
+            minHeight = 0; minimumHeight = 0
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            setOnClickListener { onClick() }
+        }
+
+    private fun lpGap(v: Int = 10) = LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+    ).apply { marginStart = dp(v) }
+
     private fun buildUi() {
         val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
         val dark = prefs.getBoolean("dark", true)
@@ -292,14 +310,8 @@ class MainActivity : Activity() {
         }
         reqBox.addView(reqName)
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        btnRow.addView(Button(this).apply {
-            text = "Accept"
-            setOnClickListener { acceptRequest() }
-        })
-        btnRow.addView(Button(this).apply {
-            text = "Reject"; setTextColor(Color.WHITE)
-            setOnClickListener { rejectRequest() }
-        })
+        btnRow.addView(mbtn("✓ Accept", Color.parseColor("#16a34a")) { acceptRequest() })
+        btnRow.addView(mbtn("✕ Reject", Color.parseColor("#475569")) { rejectRequest() }, lpGap())
         reqBox.addView(btnRow)
         card.addView(reqBox)
         col.addView(card)
@@ -330,10 +342,7 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
         }
         row.addView(remoteCodeInput)
-        row.addView(Button(this).apply {
-            text = "Connect"
-            setOnClickListener { connectRemote() }
-        })
+        row.addView(mbtn("Connect ➜", Color.parseColor("#e11d48")) { connectRemote() }, lpGap())
         remoteCard.addView(row)
         remoteNoteInput = android.widget.EditText(this).apply {
             hint = "Purpose (optional) — shown on their accept prompt"
@@ -381,12 +390,9 @@ class MainActivity : Activity() {
                 setPadding(20, 10, 20, 10)
                 background = GradientDrawable().apply { setColor(if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")); cornerRadius = 14f }
             }
-            val loginBtn = Button(this).apply { text = "Sign in" }
-            val googleBtn = Button(this).apply {
-                text = "Sign in with Google"
-                setOnClickListener {
-                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/auth/google?agent=1")))
-                }
+            val loginBtn = mbtn("Sign in", Color.parseColor("#e11d48")) {}
+            val googleBtn = mbtn("Sign in with Google", Color.parseColor("#334155")) {
+                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/auth/google?agent=1")))
             }
             acct.addView(googleBtn)
             acct.addView(emailIn); acct.addView(passIn); acct.addView(loginBtn)
@@ -428,23 +434,19 @@ class MainActivity : Activity() {
             }
         })
 
-        endBtn = Button(this).apply {
-            text = "End session"; visibility = View.GONE
-            setOnClickListener { endSession() }
-        }
-        col.addView(endBtn)
+        endBtn = mbtn("End session", Color.parseColor("#dc2626")) { endSession() }
+        endBtn.visibility = View.GONE
+        col.addView(endBtn, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(16) })
 
         // in-session tools: chat + file send (visible while a viewer is connected)
         sessRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
             visibility = View.GONE; setPadding(0, 12, 0, 0)
         }
-        sessRow.addView(Button(this).apply {
-            text = "💬 Chat"; setOnClickListener { toggleChat() }
-        })
-        sessRow.addView(Button(this).apply {
-            text = "📎 Send file"; setOnClickListener { pickFile() }
-        })
+        sessRow.addView(mbtn("💬 Chat", Color.parseColor("#1e293b"), 12f) { toggleChat() })
+        sessRow.addView(mbtn("📎 Send file", Color.parseColor("#1e293b"), 12f) { pickFile() }, lpGap())
         col.addView(sessRow)
 
         // ── Fullscreen viewer pane (remote screen + touch control) ──
@@ -468,18 +470,25 @@ class MainActivity : Activity() {
         vLeft.addView(vProgress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 6 })
         vBar.addView(vLeft, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         vSessRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
-        vSessRow.addView(Button(this).apply { text = "💬"; setOnClickListener { toggleChat() } })
-        vSessRow.addView(Button(this).apply { text = "📎"; setOnClickListener { pickFile() } })
-        vSessRow.addView(Button(this).apply { text = "⌨"; setOnClickListener { keysRow.visibility = if (keysRow.visibility == View.VISIBLE) View.GONE else View.VISIBLE } })
-        vSessRow.addView(Button(this).apply { text = "🖥"; setOnClickListener { activeCtl()?.sendScreen() } })
-        vSessRow.addView(Button(this).apply { text = "⏻"; setOnClickListener {
+        vSessRow.addView(mbtn("💬", Color.parseColor("#1e293b"), 12f) { toggleChat() })
+        vSessRow.addView(mbtn("📎", Color.parseColor("#1e293b"), 12f) { pickFile() }, lpGap(6))
+        vSessRow.addView(mbtn("⌨", Color.parseColor("#1e293b"), 12f) { keysRow.visibility = if (keysRow.visibility == View.VISIBLE) View.GONE else View.VISIBLE }, lpGap(6))
+        vSessRow.addView(mbtn("🖥", Color.parseColor("#1e293b"), 12f) { activeCtl()?.sendScreen() }, lpGap(6))
+        vSessRow.addView(mbtn("⏻", Color.parseColor("#1e293b"), 12f) {
             android.app.AlertDialog.Builder(this@MainActivity)
                 .setMessage("Reboot the REMOTE computer? The host user will be asked to confirm.")
                 .setPositiveButton("Reboot") { _, _ -> activeCtl()?.sendReboot() }
                 .setNegativeButton("Cancel", null).show()
-        } })
+        }, lpGap(6))
+        // quality toggle — cycles Auto → SD → HD; on slow nets SD is smoother
+        vQualityBtn = mbtn("Auto", Color.parseColor("#1e293b"), 12f) {
+            vQuality = when (vQuality) { "auto" -> "sd"; "sd" -> "hd"; else -> "auto" }
+            vQualityBtn.text = vQuality.replaceFirstChar { it.uppercase() }
+            remoteViewer?.ctl?.sendQuality(vQuality)
+        }
+        vSessRow.addView(vQualityBtn, lpGap(6))
         vBar.addView(vSessRow)
-        vBar.addView(Button(this).apply { text = "Disconnect"; setOnClickListener { exitViewer() } })
+        vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { exitViewer() }, lpGap(8))
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP))
@@ -491,24 +500,20 @@ class MainActivity : Activity() {
         mapOf("Esc" to "Escape", "Tab" to "Tab", "Ctrl" to "ControlLeft", "Alt" to "AltLeft",
               "◀" to "ArrowLeft", "▲" to "ArrowUp", "▼" to "ArrowDown", "▶" to "ArrowRight",
               "Del" to "Delete", "Home" to "Home", "Win" to "MetaLeft").forEach { (lbl, code) ->
-            keysRow.addView(Button(this).apply {
-                text = lbl; textSize = 11f
-                setOnClickListener { sendKey(code) }
-            })
+            keysRow.addView(mbtn(lbl, Color.parseColor("#1e293b"), 11f) { sendKey(code) }, lpGap(4))
         }
-        keysRow.addView(Button(this).apply {
-            text = "⌨"; textSize = 11f
-            setOnClickListener { typeDialog() }
-        })
+        keysRow.addView(mbtn("⌨", Color.parseColor("#1e293b"), 11f) { typeDialog() }, lpGap(4))
         // shortcut chords — modifier flag travels on the key event itself
         mapOf("Alt+Tab" to ("Tab" to "alt"), "Alt+F4" to ("F4" to "alt"),
               "Ctrl+A" to ("KeyA" to "ctrl"), "Win+D" to ("KeyD" to "meta")).forEach { (lbl, p) ->
-            keysRow.addView(Button(this).apply {
-                text = lbl; textSize = 10f
-                setOnClickListener { sendKeyMod(p.first, p.second) }
-            })
+            keysRow.addView(mbtn(lbl, Color.parseColor("#334155"), 10f) { sendKeyMod(p.first, p.second) }, lpGap(4))
         }
-        viewerPane.addView(keysRow, android.widget.FrameLayout.LayoutParams(
+        // keys row overflows phone width — wrap in a horizontal scroller
+        val keysScroll = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(keysRow)
+        }
+        viewerPane.addView(keysScroll, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM))
         frame.addView(viewerPane)
@@ -531,7 +536,7 @@ class MainActivity : Activity() {
             setOnEditorActionListener { _, _, _ -> sendChat(); true }
         }
         chatRow.addView(chatInput)
-        chatRow.addView(Button(this).apply { text = "Send"; setOnClickListener { sendChat() } })
+        chatRow.addView(mbtn("Send", Color.parseColor("#e11d48"), 12f) { sendChat() }, lpGap(6))
         chatPanel.addView(chatRow)
         val chatH = (150 * resources.displayMetrics.density).toInt()
         frame.addView(chatPanel, android.widget.FrameLayout.LayoutParams(
@@ -548,6 +553,8 @@ class MainActivity : Activity() {
 
     private lateinit var vSessRow: LinearLayout
     private lateinit var keysRow: LinearLayout
+    private lateinit var vQualityBtn: Button
+    private var vQuality = "auto"
 
     // ── Session tools: chat / file / clipboard (host + viewer share these) ──
     private fun activeCtl(): CtlChannel? =
@@ -979,8 +986,11 @@ class MainActivity : Activity() {
                 try {
                     // keep the waiting state alive — elapsed seconds tell the
                     // client the host still has to press Accept.
-                    if (vProgPct in 1 until 60 && vJoinedAtMs > 0)
-                        vStage(vProgPct, "Waiting for host approval… ${(System.currentTimeMillis() - vJoinedAtMs) / 1000}s")
+                    if (vProgPct in 1 until 60 && vJoinedAtMs > 0) {
+                        val waited = (System.currentTimeMillis() - vJoinedAtMs) / 1000
+                        vStage(vProgPct, "Waiting for host approval… ${waited}s" +
+                            if (waited > 90) " — host may be away; their app must be open" else "")
+                    }
                     api.drainSignals(code, j.viewerToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleViewerSignal(j, p) }
                     if (remoteViewer == null) {
                         val st = api.status(code, j.viewerToken)
@@ -1093,7 +1103,12 @@ class MainActivity : Activity() {
                 }
                 override fun onPeerDisconnected() = viewerReconnect(self)
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
-                    remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, null)
+                    remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, object : org.webrtc.RendererCommon.RendererEvents {
+                        override fun onFirstFrameRendered() {}
+                        override fun onFrameResolutionChanged(w: Int, h: Int, rot: Int) {
+                            vidW = w; vidH = h; vidRot = rot
+                        }
+                    })
                     remoteSurface!!.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     track.addSink(remoteSurface)
                     bindViewerTouch()
@@ -1102,7 +1117,10 @@ class MainActivity : Activity() {
                 override fun onError(message: String) = ui { viewerStatus.text = message }
             }
             ctl.sink = object : CtlChannel.Sink {
-                override fun onCtlOpen() = ui { vSessRow.visibility = View.VISIBLE; startClipSync() }
+                override fun onCtlOpen() = ui {
+                    vSessRow.visibility = View.VISIBLE; startClipSync()
+                    if (vQuality != "auto") remoteViewer?.ctl?.sendQuality(vQuality)
+                }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
@@ -1114,11 +1132,39 @@ class MainActivity : Activity() {
     // Touch → input events (same JSON protocol as the web/Electron viewer)
     // + 2-finger pinch = local zoom, drag while zoomed = pan, double-tap resets.
     private var touchMoved = false
+    private var dragging = false
+    private var downX = 0f; private var downY = 0f
     private var lastMove = 0L
     private var vScale = 1f
     private var panX = 0f; private var panY = 0f
     private var lastTX = 0f; private var lastTY = 0f
+    // remote frame dims — the video is letterboxed (aspect-fit) inside the
+    // view, so raw view coords must be mapped through the visible video rect
+    private var vidW = 0; private var vidH = 0; private var vidRot = 0
+
+    /** Map a touch point on the view → normalized coords inside the remote frame. */
+    private fun mapTouch(vw: Float, vh: Float, x: Float, y: Float): Pair<Float, Float>? {
+        val fw = if (vidRot == 90 || vidRot == 270) vidH.toFloat() else vidW.toFloat()
+        val fh = if (vidRot == 90 || vidRot == 270) vidW.toFloat() else vidH.toFloat()
+        if (fw <= 0f || fh <= 0f) return null // no frame yet — fall back to view coords
+        val scale = minOf(vw / fw, vh / fh)
+        val dw = fw * scale; val dh = fh * scale
+        val ox = (vw - dw) / 2f; val oy = (vh - dh) / 2f
+        val nx = ((x - ox) / dw).coerceIn(0f, 1f)
+        val ny = ((y - oy) / dh).coerceIn(0f, 1f)
+        return Pair(nx, ny)
+    }
+
+    private fun sendMouse(t: String, x: Float, y: Float, b: Int = 0) {
+        val v = remoteSurface ?: return
+        val p = mapTouch(v.width.toFloat(), v.height.toFloat(), x, y) ?: Pair(x / v.width, y / v.height)
+        remoteViewer?.sendInput(JsonObject().apply {
+            addProperty("t", t); addProperty("x", p.first); addProperty("y", p.second); addProperty("b", b)
+        })
+    }
+
     private fun bindViewerTouch() {
+        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop * 2f
         val scaleDet = android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(d: android.view.ScaleGestureDetector): Boolean {
                 vScale = (vScale * d.scaleFactor).coerceIn(1f, 5f)
@@ -1133,38 +1179,58 @@ class MainActivity : Activity() {
                 remoteSurface?.let { it.scaleX = 1f; it.scaleY = 1f; it.translationX = 0f; it.translationY = 0f }
                 return true
             }
+            override fun onLongPress(e: android.view.MotionEvent) {
+                if (touchMoved) return // not a stationary press
+                // long-press = right click (context menus on the remote desktop)
+                sendMouse("move", e.x, e.y)
+                sendMouse("down", e.x, e.y, 2)
+                sendMouse("up", e.x, e.y, 2)
+            }
         })
         remoteSurface?.setOnTouchListener { _, ev ->
             scaleDet.onTouchEvent(ev); tapDet.onTouchEvent(ev)
-            if (ev.pointerCount >= 2) { touchMoved = true; return@setOnTouchListener true } // pinch = not input
-            val w = remoteSurface!!.width.toFloat().coerceAtLeast(1f)
-            val h = remoteSurface!!.height.toFloat().coerceAtLeast(1f)
+            if (ev.pointerCount >= 2) {
+                // pinch starts mid-gesture — release any held remote button
+                if (dragging) { sendMouse("up", ev.x, ev.y); dragging = false }
+                touchMoved = true
+                return@setOnTouchListener true
+            }
             when (ev.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> { touchMoved = false; lastTX = ev.x; lastTY = ev.y }
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    touchMoved = false; dragging = false
+                    downX = ev.x; downY = ev.y; lastTX = ev.x; lastTY = ev.y
+                }
                 android.view.MotionEvent.ACTION_MOVE -> {
+                    val moved = kotlin.math.hypot(ev.x - downX, ev.y - downY) > slop
                     if (vScale > 1.01f) { // zoomed → pan locally instead of remote-drag
                         panX += ev.x - lastTX; panY += ev.y - lastTY; lastTX = ev.x; lastTY = ev.y
                         clampPan()
                         remoteSurface?.let { it.translationX = panX; it.translationY = panY }
                         touchMoved = true
                     } else {
-                        touchMoved = true
-                        val now = android.os.SystemClock.elapsedRealtime()
-                        if (now - lastMove >= 33) {
-                            lastMove = now
-                            remoteViewer?.sendInput(JsonObject().apply {
-                                addProperty("t", "move"); addProperty("x", ev.x / w); addProperty("y", ev.y / h)
-                            })
+                        if (moved) touchMoved = true
+                        if (touchMoved && !dragging) { // drag starts here — press the button
+                            dragging = true
+                            sendMouse("down", ev.x, ev.y)
+                        }
+                        if (dragging || !touchMoved) {
+                            val now = android.os.SystemClock.elapsedRealtime()
+                            if (now - lastMove >= 33) {
+                                lastMove = now
+                                sendMouse("move", ev.x, ev.y)
+                            }
                         }
                     }
                 }
                 android.view.MotionEvent.ACTION_UP -> {
-                    if (!touchMoved) { // tap = left click
-                        remoteViewer?.sendInput(JsonObject().apply {
-                            addProperty("t", "move"); addProperty("x", ev.x / w); addProperty("y", ev.y / h)
-                        })
-                        remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "down"); addProperty("b", 0) })
-                        remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "up"); addProperty("b", 0) })
+                    if (dragging) {
+                        sendMouse("move", ev.x, ev.y)
+                        sendMouse("up", ev.x, ev.y)
+                        dragging = false
+                    } else if (!touchMoved) { // clean tap = left click
+                        sendMouse("move", ev.x, ev.y)
+                        sendMouse("down", ev.x, ev.y)
+                        sendMouse("up", ev.x, ev.y)
                     }
                 }
             }
@@ -1184,7 +1250,8 @@ class MainActivity : Activity() {
         remoteViewer?.stop(); remoteViewer = null
         signaling.disconnectViewer()
         runCatching { remoteSurface?.release() }
-        vScale = 1f; panX = 0f; panY = 0f; keysRow.visibility = View.GONE
+        vScale = 1f; panX = 0f; panY = 0f; vidW = 0; vidH = 0; vidRot = 0
+        keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
         vProgReset()

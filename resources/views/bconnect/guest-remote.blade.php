@@ -300,8 +300,11 @@ function startViewerPoll() {
         try {
             // keep the waiting state alive — elapsed seconds tell the client
             // the host still has to press Accept.
-            if (gPct && gPct < 60 && gJoinedAt)
-                gStage(gPct, 'Waiting for host approval… (' + Math.round((Date.now() - gJoinedAt) / 1000) + 's)');
+            if (gPct && gPct < 60 && gJoinedAt) {
+                const waited = Math.round((Date.now() - gJoinedAt) / 1000);
+                gStage(gPct, 'Waiting for host approval… (' + waited + 's)' +
+                    (waited > 90 ? ' — host may be away; their app must be open' : ''));
+            }
             const r = await fetch(API + '/' + CODE + '/signals?agent_token=' + encodeURIComponent(VTOKEN), { headers: { 'Accept': 'application/json' } });
             const d = await r.json();
             (d.signals || []).forEach(m => { if (sigNew(m) && sigFresh(m)) { dbg('poll:' + (m.kind || '?')); dispatchSignal(m); } });

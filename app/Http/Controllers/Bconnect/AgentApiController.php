@@ -343,6 +343,14 @@ class AgentApiController extends Controller
                 'viewer_token' => null, 'viewer_joined_at' => null, 'viewer_name' => null, 'viewer_note' => null]);
         }
 
+        // A live agent host heartbeats via /status every few seconds — a stale
+        // heartbeat on a 'waiting' session means the app was closed/crashed.
+        // Refuse immediately instead of letting the viewer wait forever.
+        if ($session->host_kind === 'agent'
+            && (!$session->updated_at || $session->updated_at->lt(now()->subMinutes(3)))) {
+            return response()->json(['ok' => false, 'error' => 'host offline — ask them to open the BMyDesk Agent'], 404);
+        }
+
         // Unattended access: a correct PIN skips host approval entirely.
         $autoAccept = false;
         $pin = (string) $r->input('pin', '');
