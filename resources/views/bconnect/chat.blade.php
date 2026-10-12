@@ -10,13 +10,17 @@ $channelId = $channel->id;
 <div class="h-[calc(100vh-140px)] flex flex-col">
     <div class="bg-slate-900 rounded-t-xl border border-slate-800 p-4 border-b-0 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-            <h3 class="font-bold"><i class="fas fa-comments mr-2 text-cyan-400"></i>{{ isset($project) ? $project->name : $ticket->title }}</h3>
+            <h3 class="font-bold"><i class="fas {{ $channelType === 'channel' ? 'fa-hashtag' : 'fa-comments' }} mr-2 text-cyan-400"></i>{{ $channelTitle }}</h3>
             <p class="text-xs text-slate-400 flex items-center gap-2">
                 <span id="typingIndicator" class="hidden text-cyan-400"><i class="fas fa-pencil-alt"></i> <span id="typingName"></span> is typing...</span>
                 <span>Real-time workspace chat with @mentions, replies & files</span>
             </p>
         </div>
         <div class="flex items-center gap-2">
+            <form method="POST" action="{{ route('bconnect.meetings.store') }}" class="inline">@csrf
+                <input type="hidden" name="title" value="{{ $channelTitle }} — call">
+                <button title="Start a voice/video call" class="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 text-sm rounded-lg hover:bg-emerald-500/30 transition"><i class="fas fa-video mr-1"></i>Call</button>
+            </form>
             @if($unreadCount > 0)
             <span class="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full">{{ $unreadCount }} unread</span>
             @endif
@@ -61,6 +65,7 @@ $channelId = $channel->id;
                 <div class="flex items-center justify-between gap-2 mt-1">
                     <div class="text-[10px] text-slate-500 flex items-center gap-1">
                         {{ $m->created_at->format('H:i') }}
+                        @if($m->edited_at)<span title="Edited">(edited)</span>@endif
                         @if($m->member->id == $memberId)
                             @if(!empty($m->read_by) && count($m->read_by) > 0)
                                 <span class="text-cyan-400" title="Seen"><i class="fas fa-check-double"></i></span>
@@ -69,7 +74,13 @@ $channelId = $channel->id;
                             @endif
                         @endif
                     </div>
-                    <button type="button" class="text-[10px] text-cyan-400 hover:underline reply-btn" data-id="{{ $m->id }}" data-name="{{ $m->member->user->name }}">Reply</button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="text-[10px] text-cyan-400 hover:underline reply-btn" data-id="{{ $m->id }}" data-name="{{ $m->member->user->name }}">Reply</button>
+                        @if($m->member->id == $memberId)
+                        <button type="button" class="text-[10px] text-slate-500 hover:text-cyan-300 edit-btn" data-id="{{ $m->id }}" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button type="button" class="text-[10px] text-slate-500 hover:text-red-400 del-btn" data-id="{{ $m->id }}" title="Delete"><i class="fas fa-trash"></i></button>
+                        @endif
+                    </div>
                 </div>
                 @if($m->replies->isNotEmpty())
                 <div class="mt-2 pl-3 border-l-2 border-slate-700 space-y-2">
@@ -104,9 +115,11 @@ $channelId = $channel->id;
             <input type="file" name="attachments[]" multiple class="hidden" id="chatFiles" onchange="updateFileCount()">
             <span id="fileCount" class="text-xs text-slate-400 self-center"></span>
             <button type="button" onclick="document.getElementById('chatFiles').click()" class="px-3 bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400" title="Attach files"><i class="fas fa-paperclip"></i></button>
+            <button type="button" id="emojiBtn" class="px-3 bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400" title="Emoji"><i class="fas fa-face-smile"></i></button>
             <button type="button" id="micBtn" class="px-3 bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400" title="Voice message"><i class="fas fa-microphone"></i></button>
             <button type="submit" class="px-4 bg-cyan-500 text-slate-900 font-bold rounded-lg hover:bg-cyan-400"><i class="fas fa-paper-plane"></i></button>
         </div>
+        <div id="emojiPanel" class="hidden absolute bottom-full right-2 mb-2 bg-slate-800 border border-slate-700 rounded-xl shadow-xl p-2 grid grid-cols-8 gap-1 w-72 z-20"></div>
     </form>
 </div>
 
@@ -156,13 +169,46 @@ function appendMessage(data, prepend = false) {
     div.dataset.id = data.id;
     const replyLine = data.parent_id ? `<div class="text-[10px] text-slate-500 mb-1">Replied to #${data.parent_id}</div>` : '';
     const messageText = data.message ? `<div class="text-sm message-text">${linkifyMentions(data.message)}</div>` : '';
-    div.innerHTML = `<div class="max-w-md ${isSelf ? 'bg-cyan-500/20 text-cyan-100' : 'bg-slate-800 text-slate-300'} rounded-xl p-3"><div class="text-xs font-bold mb-1">${escapeHtml(data.member.name)}</div>${replyLine}${messageText}${renderAttachments(data.attachments)}<div class="flex items-center justify-between gap-2 mt-1"><div class="text-[10px] text-slate-500">${data.created_at}</div><button type="button" class="text-[10px] text-cyan-400 hover:underline reply-btn" data-id="${data.id}" data-name="${escapeHtml(data.member.name)}">Reply</button></div></div>`;
+    const editDel = isSelf ? `<button type="button" class="text-[10px] text-slate-500 hover:text-cyan-300 edit-btn" data-id="${data.id}" title="Edit"><i class="fas fa-pen"></i></button><button type="button" class="text-[10px] text-slate-500 hover:text-red-400 del-btn" data-id="${data.id}" title="Delete"><i class="fas fa-trash"></i></button>` : '';
+    const edited = data.edited_at ? '<span title="Edited">(edited)</span>' : '';
+    div.innerHTML = `<div class="max-w-md ${isSelf ? 'bg-cyan-500/20 text-cyan-100' : 'bg-slate-800 text-slate-300'} rounded-xl p-3"><div class="text-xs font-bold mb-1">${escapeHtml(data.member.name)}</div>${replyLine}${messageText}${renderAttachments(data.attachments)}<div class="flex items-center justify-between gap-2 mt-1"><div class="text-[10px] text-slate-500">${data.created_at} ${edited}</div><div class="flex items-center gap-2"><button type="button" class="text-[10px] text-cyan-400 hover:underline reply-btn" data-id="${data.id}" data-name="${escapeHtml(data.member.name)}">Reply</button>${editDel}</div></div></div>`;
     if (prepend) chatBox.prepend(div);
     else chatBox.appendChild(div);
     chatBox.scrollTop = chatBox.scrollHeight;
     bindReplyButtons();
+    bindEditDelete();
     if (!isSelf) markRead(data.id);
 }
+
+function bindEditDelete() {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.onclick = () => {
+            const wrap = btn.closest('.chat-msg');
+            const textEl = wrap.querySelector('.message-text');
+            const current = textEl ? textEl.innerText.trim() : '';
+            const next = prompt('Edit message', current);
+            if (next === null || next.trim() === current) return;
+            fetch(`/chat/messages/${btn.dataset.id}/edit`, {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: JSON.stringify({ message: next.trim() })
+            }).then(r => r.json()).then(d => {
+                if (d.success && textEl) { textEl.innerHTML = linkifyMentions(d.message); wrap.querySelector('.text-\\[10px\\]')?.insertAdjacentHTML('beforeend', ' (edited)'); }
+            });
+        };
+    });
+    document.querySelectorAll('.del-btn').forEach(btn => {
+        btn.onclick = () => {
+            if (!confirm('Delete this message?')) return;
+            fetch(`/chat/messages/${btn.dataset.id}/delete`, {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'}
+            }).then(r => r.json()).then(d => { if (d.success) btn.closest('.chat-msg').remove(); });
+        };
+    });
+}
+bindEditDelete();
 
 function bindReplyButtons() {
     document.querySelectorAll('.reply-btn').forEach(btn => {
@@ -187,6 +233,18 @@ function updateFileCount() {
     const files = document.getElementById('chatFiles').files;
     document.getElementById('fileCount').textContent = files.length ? files.length + ' file(s)' : '';
 }
+
+// ── Emoji picker ──
+const EMOJIS = '😀 😄 😁 😂 🤣 😊 😍 😘 😎 🤔 😅 😢 😡 👍 👎 ❤️ 🎉 🔥 ✨ 👏 🙏 💯 ✅ ❌ ⚡ 🚀 💡 📌 📎 🗂️ ⏰'.split(' ');
+const emojiPanel = document.getElementById('emojiPanel');
+emojiPanel.innerHTML = EMOJIS.map(e => `<button type="button" class="text-xl p-1 hover:bg-slate-700 rounded">${e}</button>`).join('');
+emojiPanel.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const pos = chatInput.selectionStart || chatInput.value.length;
+    chatInput.value = chatInput.value.slice(0, pos) + b.textContent + chatInput.value.slice(pos);
+    chatInput.focus();
+});
+document.getElementById('emojiBtn').onclick = e => { e.stopPropagation(); emojiPanel.classList.toggle('hidden'); };
+document.addEventListener('click', e => { if (!emojiPanel.contains(e.target)) emojiPanel.classList.add('hidden'); });
 
 // ── Voice messages — hold the mic, release to attach the recording ──
 let _recorder = null, _recChunks = [], _recStart = 0;
@@ -305,7 +363,8 @@ searchForm.addEventListener('submit', async (e) => {
 });
 
 // Echo / polling
-const channelName = `company.{{ request()->input('bconnect_company_id') }}.chat.${channelType === 'project' ? 'Project' : 'Ticket'}.${channelId}`;
+const channelModel = channelType === 'project' ? 'Project' : (channelType === 'ticket' ? 'Ticket' : 'ChatChannel');
+const channelName = `company.{{ request()->input('bconnect_company_id') }}.chat.${channelModel}.${channelId}`;
 const pollUrl = `/chat/poll?channel_type=${channelType}&channel_id=${channelId}`;
 let lastMessageId = Math.max(...Array.from(document.querySelectorAll('.chat-msg')).map(el => parseInt(el.dataset.id) || 0));
 let pollInterval = null;

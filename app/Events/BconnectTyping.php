@@ -23,7 +23,7 @@ class BconnectTyping implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new Channel('company.' . $this->companyId . '.chat.' . ucfirst($this->channelType) . '.' . $this->channelId),
+            new Channel('company.' . $this->companyId . '.chat.' . ($this->channelType === 'channel' ? 'ChatChannel' : ucfirst($this->channelType)) . '.' . $this->channelId),
         ];
     }
 

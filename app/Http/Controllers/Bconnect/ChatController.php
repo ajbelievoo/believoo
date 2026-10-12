@@ -190,6 +190,7 @@ class ChatController extends Controller {
             'member_id' => $msg->member_id,
             'parent_id' => $msg->parent_id,
             'mentions' => $mentions,
+            'edited_at' => null,
             'created_at' => $msg->created_at->format('H:i'),
         ];
 
@@ -272,6 +273,7 @@ class ChatController extends Controller {
             'member' => ['name' => $m->member->user->name],
             'parent_id' => $m->parent_id,
             'mentions' => $m->mentions ?? [],
+            'edited_at' => $m->edited_at,
             'created_at' => $m->created_at->format('H:i'),
             'replies' => $m->replies->map(fn ($reply) => [
                 'id' => $reply->id,

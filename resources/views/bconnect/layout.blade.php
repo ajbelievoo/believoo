@@ -71,6 +71,7 @@ function bcToggleTheme(){
         <a href="{{ route('bconnect.dashboard') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.dashboard') ? 'active' : '' }}"><i class="fas fa-home"></i>Dashboard</a>
         <a href="{{ route('bconnect.projects.index') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.projects.*') ? 'active' : '' }}"><i class="fas fa-folder"></i>Projects</a>
         <a href="{{ route('bconnect.meetings') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.meeting*') ? 'active' : '' }}"><i class="fas fa-video"></i>Meetings</a>
+        <a href="{{ route('bconnect.chat') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.chat*') ? 'active' : '' }}"><i class="fas fa-hashtag"></i>Channels</a>
         <a href="{{ route('bconnect.kanban') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.kanban*') || request()->routeIs('bconnect.projects.kanban') ? 'active' : '' }}"><i class="fas fa-columns"></i>Kanban</a>
         <a href="{{ route('bconnect.tickets') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.tickets*') ? 'active' : '' }}"><i class="fas fa-bug"></i>Tickets</a>
         <a href="{{ route('bconnect.sprints.index') }}" class="bc-sidebar-link {{ request()->routeIs('bconnect.sprints*') || request()->routeIs('bconnect.projects.sprints') ? 'active' : '' }}"><i class="fas fa-running"></i>Sprints</a>
