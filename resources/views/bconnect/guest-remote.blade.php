@@ -69,6 +69,10 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <input class="code-input" id="codeInput" maxlength="8" placeholder="CODE" autocomplete="off" spellcheck="false" value="{{ $prefillCode ?? '' }}">
         <input class="name-input" id="noteInput" maxlength="120" placeholder="Purpose — e.g. fixing printer (optional)" style="margin-top:10px">
         <input class="name-input" id="pinInput" maxlength="12" inputmode="numeric" placeholder="PIN — only for unattended devices" style="margin-top:10px;font-family:monospace;letter-spacing:3px">
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;text-align:left;font-size:12px;color:#94a3b8;cursor:pointer;">
+            <input type="checkbox" id="consentCk" style="margin-top:2px;accent-color:#22d3ee;">
+            <span>I understand the remote user may see and control this device's screen during the session, and the session may be logged by the workspace.</span>
+        </label>
         <br>
         <button class="btn" id="joinBtn">Connect</button>
         <div id="recentRow" style="margin-top:12px;display:none;text-align:center;"></div>
@@ -79,6 +83,20 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         @else
             <a class="login-link" href="{{ route('bconnect.login') }}">Have a BMyDesk account? Sign in for the full workspace →</a>
         @endauth
+    </div>
+</div>
+
+<div class="wrap hidden" id="csatCard">
+    <div class="card">
+        <h1>How was the session?</h1>
+        <p class="hint">Your rating helps improve BMyDesk.</p>
+        <div id="starRow" style="font-size:34px;letter-spacing:6px;cursor:pointer;margin:14px 0;user-select:none;">
+            <span data-s="1">☆</span><span data-s="2">☆</span><span data-s="3">☆</span><span data-s="4">☆</span><span data-s="5">☆</span>
+        </div>
+        <input class="name-input" id="csatText" maxlength="500" placeholder="Anything to add? (optional)">
+        <br>
+        <button class="btn" id="csatSend">Submit rating</button>
+        <a href="#" id="csatSkip" style="display:block;margin-top:12px;color:#475569;font-size:12px;text-decoration:none;">Skip</a>
     </div>
 </div>
 
@@ -113,6 +131,7 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
     <div class="stage-video">
         <video id="remoteVideo" autoplay playsinline tabindex="0"></video>
         <div id="statOverlay" style="position:absolute;top:52px;left:10px;font-size:10px;color:rgba(226,232,240,.85);background:rgba(15,23,42,.65);padding:2px 8px;border-radius:6px;display:none;pointer-events:none;"></div>
+        <div id="watermark" style="position:absolute;bottom:12px;right:14px;font-size:10px;color:rgba(226,232,240,.4);font-family:monospace;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.6);"></div>
         <div class="overlay" id="waitOverlay">
             <div>
                 <div class="spin"></div>
@@ -211,14 +230,21 @@ async function sendOfferRobust(sdp) {
     dbg('offer sent in ' + parts.length + ' parts');
 }
 
+// Stable viewer identity — hosts can mark it "always trust this device"
+function vdev() {
+    let d = localStorage.getItem('bmd_vdev');
+    if (!d) { d = 'web-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); localStorage.setItem('bmd_vdev', d); }
+    return d;
+}
 async function join() {
     const code = $('codeInput').value.trim().toUpperCase();
     if (!/^[A-Z0-9]{6,10}$/.test(code)) { $('joinErr').textContent = 'Enter the code shown on the remote device.'; return; }
+    if (!$('consentCk').checked) { $('joinErr').textContent = 'Please tick the consent box first — remote control needs your OK.'; return; }
     $('joinBtn').disabled = true; $('joinErr').textContent = '';
     dbg('joining ' + code);
     const r = await fetch(API + '/' + code + '/join', { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ name: $('nameInput').value.trim() || 'Guest', note: $('noteInput').value.trim() || undefined, pin: $('pinInput').value.trim() || undefined }) }).catch(() => null);
+        body: JSON.stringify({ name: $('nameInput').value.trim() || 'Guest', note: $('noteInput').value.trim() || undefined, pin: $('pinInput').value.trim() || undefined, viewer_device: vdev() }) }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     if (!d.ok) {
         $('joinErr').textContent = d.error || 'Could not reach the device.';
@@ -228,6 +254,7 @@ async function join() {
     saveRecent(code);
     if (d.auto_accepted) { setBadge('accepted'); setTimeout(() => { gStage(60, 'Accepted — starting stream…'); startPeer(); }, 400); }
     CODE = code; VTOKEN = d.viewer_token; channelName = d.channel;
+    $('watermark').textContent = 'BMyDesk • ' + CODE + ' • ' + ($('nameInput').value.trim() || 'Guest');
     window.__ice = d.ice_servers || [{ urls: 'stun:stun.l.google.com:19302' }];
     $('hostLabel').textContent = d.host_label || 'Remote device';
     $('codeEcho').textContent = code;
@@ -257,7 +284,7 @@ function initChannel() {
     channel.bind('pusher:subscription_succeeded', () => {
         dbg('subscribed');
         gStage(45, 'Waiting for host approval…');
-        whisper('join-request', { name: $('nameInput').value.trim() || 'Guest', note: $('noteInput').value.trim() || undefined });
+        whisper('join-request', { name: $('nameInput').value.trim() || 'Guest', note: $('noteInput').value.trim() || undefined, vdevice: vdev() });
         dbg('join-request sent');
     });
     channel.bind('pusher:subscription_error', () => { dbg('sub error (poll fallback active)'); gStage(Math.max(gPct, 30), 'Connecting over relay…'); });
@@ -311,6 +338,8 @@ function onEnded(backToJoin) {
         $('waitTitle').textContent = 'Session ended'; $('waitSub').textContent = 'The host ended this session.';
         $('waitProgWrap').style.display = 'none';
         $('waitOverlay').classList.remove('hidden');
+        // let them read the message for a beat, then ask for a rating
+        setTimeout(() => { $('waitOverlay').classList.add('hidden'); showCsat(); }, 1600);
     }
 }
 
@@ -768,8 +797,34 @@ $('joinBtn').addEventListener('click', join);
 $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
 $('endBtn').addEventListener('click', async () => {
     sendSignal({ kind: 'end' }); cleanup();
-    $('stage').classList.add('hidden'); $('joinCard').classList.remove('hidden'); $('joinBtn').disabled = false;
+    showCsat();
 });
+
+// ── Post-session CSAT ──
+let csatStars = 0;
+function showCsat() {
+    $('stage').classList.add('hidden');
+    if (csatStars || !VTOKEN) { $('joinCard').classList.remove('hidden'); $('joinBtn').disabled = false; return; }
+    $('csatCard').classList.remove('hidden');
+}
+function endCsat() {
+    $('csatCard').classList.add('hidden');
+    $('joinCard').classList.remove('hidden'); $('joinBtn').disabled = false;
+}
+$('starRow').querySelectorAll('span').forEach(el => el.onclick = () => {
+    csatStars = parseInt(el.dataset.s);
+    $('starRow').querySelectorAll('span').forEach(s => s.textContent = parseInt(s.dataset.s) <= csatStars ? '★' : '☆');
+    $('starRow').style.color = '#fbbf24';
+});
+$('csatSend').onclick = async () => {
+    if (!csatStars) { endCsat(); return; }
+    try {
+        await fetch(API + '/' + CODE + '/rate', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ agent_token: VTOKEN, rating: csatStars, feedback: $('csatText').value.trim() || undefined }) });
+    } catch (e) {}
+    endCsat();
+};
+$('csatSkip').onclick = (e) => { e.preventDefault(); endCsat(); };
 window.addEventListener('beforeunload', () => {
     try { fetch(API + '/' + CODE + '/signal', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'end', agent_token: VTOKEN, n: nonce() }) }); } catch (e) {}

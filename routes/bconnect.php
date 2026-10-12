@@ -164,6 +164,7 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
         Route::post('/remote/{session}/respond', [\App\Http\Controllers\Bconnect\RemoteController::class, 'respond'])->name('bconnect.remote.respond');
         Route::post('/remote/{session}/start', [\App\Http\Controllers\Bconnect\RemoteController::class, 'start'])->name('bconnect.remote.start');
         Route::post('/remote/{session}/end', [\App\Http\Controllers\Bconnect\RemoteController::class, 'end'])->name('bconnect.remote.end');
+        Route::post('/remote/{session}/to-ticket', [\App\Http\Controllers\Bconnect\RemoteController::class, 'sessionToTicket'])->name('bconnect.remote.to-ticket');
     });
 
     // Company admin only

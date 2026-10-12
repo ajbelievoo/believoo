@@ -632,6 +632,25 @@ class AgentApiController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    // POST /{code}/rate — viewer-side CSAT after a session; only the actual
+    // viewer token may rate their own session (prevents host self-rating).
+    public function guestRate(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkViewerToken($r, $session)) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        $data = $r->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'feedback' => 'nullable|string|max:500',
+        ]);
+        $session->update([
+            'guest_rating' => $data['rating'],
+            'guest_feedback' => $data['feedback'] ?? null,
+        ]);
+        return response()->json(['ok' => true]);
+    }
+
     // POST /api/v1/bmydesk/agent/broadcast-auth — Reverb private-channel auth for the agent.
     // Agents aren't logged-in users, so we sign the socket ourselves instead of Broadcast::auth.
     public function broadcastAuth(Request $r)

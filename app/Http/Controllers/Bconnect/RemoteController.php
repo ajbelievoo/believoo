@@ -50,7 +50,42 @@ class RemoteController extends Controller {
                 return $d;
             });
 
-        return view('bconnect.remote', compact('sessions', 'members', 'savedDevices'));
+        $sessionTickets = \App\Models\Bconnect\Ticket::whereIn('remote_session_id', $sessions->pluck('id'))
+            ->pluck('id', 'remote_session_id');
+
+        return view('bconnect.remote', compact('sessions', 'members', 'savedDevices', 'sessionTickets'));
+    }
+
+    // POST /remote/{session}/to-ticket — spin a support ticket out of a remote
+    // session: agent sees this in history and clicks "→ Ticket" to file what
+    // the session was about. Links both ways via remote_session_id.
+    public function sessionToTicket(Request $r, RemoteSession $session) {
+        $this->ensureRemote($r->input('bconnect_company_id'));
+        if ($session->company_id != $r->input('bconnect_company_id')) abort(403);
+        $member = $r->input('bconnect_member');
+
+        $dur = $session->started_at && $session->ended_at
+            ? max(0, $session->started_at->diffInMinutes($session->ended_at)) . ' min'
+            : '—';
+        $desc = "Remote session {$session->session_code}\n"
+            . "Host: " . ($session->host_label ?? '—') . " ({$session->host_kind})\n"
+            . "Viewer: " . ($session->viewer?->user?->name ?? 'guest') . "\n"
+            . "Duration: {$dur}\n"
+            . "Started: " . ($session->started_at?->toDateTimeString() ?? '—') . "\n"
+            . ($session->viewer_note ? "Viewer note: {$session->viewer_note}\n" : '')
+            . ($session->guest_rating ? "Guest rating: {$session->guest_rating}/5" . ($session->guest_feedback ? " — {$session->guest_feedback}" : '') . "\n" : '');
+
+        $ticket = \App\Models\Bconnect\Ticket::create([
+            'company_id' => $session->company_id,
+            'reporter_id' => $member->id,
+            'title' => 'Remote session ' . $session->session_code . ' — ' . ($session->host_label ?? 'device'),
+            'description' => $desc,
+            'type' => 'support',
+            'status' => 'open',
+            'priority' => 'medium',
+            'remote_session_id' => $session->id,
+        ]);
+        return redirect()->route('bconnect.tickets.show', $ticket->id)->with('success', 'Ticket created from session ' . $session->session_code);
     }
 
     // Save a device code to this member's address book.

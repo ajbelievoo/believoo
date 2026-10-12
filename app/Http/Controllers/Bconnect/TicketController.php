@@ -164,7 +164,8 @@ class TicketController extends Controller {
             ->when($isClient, fn($q) => $q->where('is_internal', false))
             ->latest()->get();
         $canned = \DB::table('bconnect_canned_responses')->where('company_id', $ticket->company_id)->get();
-        return view('bconnect.ticket', compact('ticket', 'comments', 'canned'));
+        $role = $r->input('bconnect_role');
+        return view('bconnect.ticket', compact('ticket', 'comments', 'canned', 'role'));
     }
 
     public function comment(Request $r, Ticket $ticket) {
@@ -312,7 +313,16 @@ class TicketController extends Controller {
         $r->validate(['ids' => 'required|array|min:1|max:200', 'ids.*' => 'integer']);
         $q = Ticket::where('company_id', $companyId)->whereIn('id', $r->ids);
         if ($r->action === 'delete') {
-            $count = $q->count();
+            // purge stored files too — DB-only delete leaves orphaned blobs in R2
+            $doomed = $q->get(['id', 'attachments']);
+            $commentFiles = \App\Models\Bconnect\TicketComment::whereIn('ticket_id', $doomed->pluck('id'))->pluck('attachments');
+            foreach ($doomed as $t) {
+                foreach ((array) ($t->attachments ?? []) as $path) Storage::disk('public')->delete($path);
+            }
+            foreach ($commentFiles as $atts) {
+                foreach ((array) ($atts ?? []) as $path) Storage::disk('public')->delete($path);
+            }
+            $count = $doomed->count();
             $q->delete();
             return back()->with('success', "$count ticket(s) deleted");
         }
@@ -329,8 +339,11 @@ class TicketController extends Controller {
         if ($ticket->company_id != $r->input('bconnect_company_id')) abort(403);
         $r->validate(['into' => 'required|integer|different:' . $ticket->id]);
         $into = Ticket::where('company_id', $ticket->company_id)->findOrFail($r->into);
-        // Move comments + mark merged
+        // Move comments + attachments + mark merged
         \App\Models\Bconnect\TicketComment::where('ticket_id', $ticket->id)->update(['ticket_id' => $into->id]);
+        $atts = array_merge((array) ($into->attachments ?? []), (array) ($ticket->attachments ?? []));
+        $into->attachments = array_values(array_unique($atts)) ?: null;
+        $into->save();
         $ticket->merged_into = $into->id;
         $ticket->status = 'closed';
         $ticket->save();
@@ -366,6 +379,9 @@ class TicketController extends Controller {
     public function csat(Request $r, Ticket $ticket) {
         $r->validate(['score' => 'required|integer|min:1|max:5', 'comment' => 'nullable|string|max:500']);
         if (!in_array($ticket->status, ['resolved', 'closed'])) abort(400);
+        // only the person who filed the ticket may rate the resolution —
+        // otherwise any member could spam scores on others' tickets.
+        if ($ticket->reporter_id && $ticket->reporter_id != $r->input('bconnect_member')->id) abort(403);
         $ticket->csat_score = $r->score;
         $ticket->csat_comment = $r->comment;
         $ticket->save();

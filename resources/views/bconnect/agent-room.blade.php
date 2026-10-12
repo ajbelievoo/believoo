@@ -554,6 +554,12 @@ function sendInput(obj) {
     }
 }
 
+// Stable viewer identity — hosts can mark it "always trust this device"
+function vdev() {
+    let d = localStorage.getItem('bmd_vdev');
+    if (!d) { d = 'web-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); localStorage.setItem('bmd_vdev', d); }
+    return d;
+}
 let lastMove = 0;
 // Zoom/pan — Ctrl+wheel zooms at cursor, middle-drag pans when zoomed,
 // double-click resets to fit. Works in view-only sessions too (coords come
@@ -664,9 +670,9 @@ function initChannel() {
         setStatus('Requesting access…', 'text-amber-400');
         dbg('channel subscribed');
         wStage(45, 'Waiting for host approval…');
-        whisper('join-request', { name: VIEWER });
+        whisper('join-request', { name: VIEWER, vdevice: vdev() });
         // queue the request too — a dead host ws must not hide the prompt
-        sendSignal({ kind: 'join-request', name: VIEWER });
+        sendSignal({ kind: 'join-request', name: VIEWER, vdevice: vdev() });
         dbg('join-request sent');
     });
     channel.bind('pusher:subscription_error', () => {

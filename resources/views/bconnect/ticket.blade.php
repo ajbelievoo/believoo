@@ -88,7 +88,9 @@
                 <textarea name="message" id="cmtBody" rows="2" placeholder="Write a comment..." class="w-full p-3 rounded-lg bg-slate-800 border border-slate-600 text-white"></textarea>
                 <input type="file" name="attachments[]" multiple class="block text-sm text-slate-400 mt-2">
                 <div class="flex items-center justify-between mt-2">
+                    @if($role !== 'client')
                     <label class="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" name="is_internal" value="1" class="accent-amber-500"><i class="fas fa-lock"></i>Internal note (hidden from portal)</label>
+                    @endif
                     <button type="submit" class="px-4 py-2 bg-cyan-500 text-slate-900 font-bold rounded-lg hover:bg-cyan-400">Post Comment</button>
                 </div>
             </form>
@@ -146,8 +148,8 @@
             </form>
         </div>
 
-        {{-- CSAT — shown to the reporter once resolved/closed --}}
-        @if(in_array($ticket->status, ['resolved','closed']) && !$ticket->csat_score)
+        {{-- CSAT — only the person who filed the ticket rates the resolution --}}
+        @if(in_array($ticket->status, ['resolved','closed']) && !$ticket->csat_score && $ticket->reporter_id == $bconnectMember->id)
         <div class="bg-slate-900 rounded-xl border border-slate-800 p-5">
             <h4 class="font-bold mb-2">Rate the support</h4>
             <form method="POST" action="{{ route('bconnect.tickets.csat', $ticket->id) }}">@csrf

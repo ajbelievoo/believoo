@@ -223,7 +223,7 @@ function startStatusPoll() {
                 && $('reqBox').classList.contains('hidden') && !pc) {
                 showJoinReq((d.viewer || 'Someone') +
                     (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : ''),
-                    d.viewer_note);
+                    d.viewer_note, d.viewer_device);
             }
             // viewer gave up / server moved past it — hide a stale prompt
             if (d.status !== 'connecting' && $('reqBox') && !$('reqBox').classList.contains('hidden') && !pc) {
@@ -243,11 +243,15 @@ function stopStatusPoll() { if (statusPoller) { clearInterval(statusPoller); sta
 
 // One place that surfaces "someone wants in" — used by the ws whisper, the
 // HTTP drain ('join-request' queued server-side), and the /status poll.
-function showJoinReq(name, note) {
-    $('reqName').textContent = name || 'Someone';
+let reqViewerDev = null, lastReqName = '';
+function showJoinReq(name, note, vdevice) {
+    lastReqName = name || 'Someone';
+    reqViewerDev = vdevice || null;
+    $('reqName').textContent = lastReqName;
     const ne = $('reqNote');
     if (ne) { ne.style.display = note ? 'block' : 'none'; ne.textContent = note ? '“' + note + '”' : ''; }
     const vo = $('acceptViewOnly'); if (vo) vo.checked = false; // fresh choice per request
+    const tr = $('acceptTrust'); if (tr) { tr.checked = false; tr.parentElement.style.display = vdevice ? '' : 'none'; }
     $('reqBox').classList.remove('hidden');
     window.agent.attention(name);
     setStatus('Connection request…', 'wait');
@@ -299,7 +303,7 @@ function connectChannel() {
         setTimeout(connectChannel, 5000);
     });
 
-    ch.bind('client-join-request', (m) => showJoinReq(m.name, m.note));
+    ch.bind('client-join-request', (m) => showJoinReq(m.name, m.note, m.vdevice));
 
     ch.bind('client-signal', (m) => { if (sigNew(m)) dispatchHostSignal(m); });
     ch.bind('client-end', (m) => { if (sigNew(m)) teardown('Viewer disconnected'); });
@@ -308,7 +312,7 @@ function connectChannel() {
 // one dispatcher for host signals — same handling whether they arrive by
 // ws broadcast or the HTTP fallback queue.
 function dispatchHostSignal(m) {
-    if (m.kind === 'join-request') showJoinReq(m.name, m.note);
+    if (m.kind === 'join-request') showJoinReq(m.name, m.note, m.vdevice);
     else if (m.kind === 'offer') handleOffer(m);
     else if (m.kind === 'ice' && m.candidate) {
         if (pc && pc.remoteDescription) pc.addIceCandidate(m.candidate).catch(() => {});
@@ -444,6 +448,7 @@ async function handleOffer(m) {
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
         iceQueue = [];
         $('endBtn').classList.remove('hidden');
+        $('lockEndWrap')?.classList.remove('hidden');
         setStatus('Streaming screen…', 'on');
         startClipSync();
     } catch (e) {
@@ -491,6 +496,8 @@ function wireCtl(ch) {
         ['monBtn', 'rebootBtn', 'fsBtn', 'lockBtn', 'laserBtn', 'fsOpenBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? '' : 'none'; });
         ['viewOnlyBtn', 'hostMonBtn', 'fsToggleBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? 'none' : ''; });
         if (!v && viewOnly) ctlSend({ t: 'view-only', on: true }); // host accepted view-only
+        // persistent on-screen badge — the host always sees who is watching
+        if (!v) { try { window.agent?.watermark(true, lastReqName || 'remote viewer'); } catch (e) {} }
     };
     ctl.onclose = () => { $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden'); };
 }
@@ -829,6 +836,11 @@ function teardown(msg) {
     viewOnly = false; $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#1e293b');
     $('fsPanel')?.classList.add('hidden');
     try { window.agent?.laser(false, 0, 0); } catch (e) {}
+    try { window.agent?.watermark(false); } catch (e) {}
+    // optional hardening — lock the workstation when the session ends
+    if (localStorage.getItem('bmd_lock_on_end') === '1' && $('endBtn') && !$('endBtn').classList.contains('hidden')) {
+        setTimeout(() => { try { window.agent?.sysLock(); } catch (e) {} }, 1000);
+    }
     curSourceId = null;
     ctl = null; rxFile = null;
     $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
@@ -836,6 +848,7 @@ function teardown(msg) {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     $('reqBox').classList.add('hidden');
     $('endBtn').classList.add('hidden');
+    $('lockEndWrap')?.classList.add('hidden');
     setStatus(msg || 'Ready — share your code', 'wait');
 }
 
@@ -853,9 +866,19 @@ $('acceptBtn').onclick = () => {
     $('reqBox').classList.add('hidden'); respondedAt = Date.now();
     viewOnly = !!$('acceptViewOnly')?.checked;
     if (viewOnly) $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#f43f5e');
+    if ($('acceptTrust')?.checked && reqViewerDev && session) {
+        // remember this viewer — future joins auto-accept (revocable via /untrust)
+        try { fetch(API + '/' + session.session_code + '/trust', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ agent_token: session.agent_token, viewer_device: reqViewerDev, viewer_name: lastReqName }),
+        }); } catch (e) {}
+        addChat('System', 'Trusted ' + lastReqName + ' — will auto-accept next time', false);
+    }
     respond('accept'); setStatus(viewOnly ? 'Accepted (view-only) — waiting for stream…' : 'Accepted — waiting for stream…', 'on');
 };
 $('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); respondedAt = Date.now(); respond('reject'); setStatus('Request rejected', 'wait'); };
+// persist the "lock PC when session ends" host preference
+(() => { const c = $('lockEndChk'); if (c) { c.checked = localStorage.getItem('bmd_lock_on_end') === '1'; c.onchange = () => localStorage.setItem('bmd_lock_on_end', c.checked ? '1' : '0'); } })();
 $('endBtn').onclick = async () => {
     hostSignal({ kind: 'end' });
     try { await fetch(API + '/' + session.session_code + '/end', { method: 'POST', headers: { 'Authorization': 'Bearer ' + session.agent_token } }); } catch (e) {}
@@ -921,6 +944,7 @@ async function connectToPartner() {
                 name: localStorage.getItem('bmydesk_member_name') || require_os_name(),
                 note: ($('remoteNote') && $('remoteNote').value.trim()) || undefined,
                 pin: ($('remotePin') && $('remotePin').value.trim()) || undefined,
+                viewer_device: deviceId(),
             }),
         });
         const d = await r.json().catch(() => null);
@@ -1004,7 +1028,7 @@ function bindViewerChannel(vc, subTimeout) {
         if (subTimeout) clearTimeout(subTimeout);
         vDbg('subscribed');
         vStage(45, 'Waiting for host approval…');
-        vc.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)', note: ($('remoteNote') && $('remoteNote').value.trim()) || undefined });
+        vc.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)', note: ($('remoteNote') && $('remoteNote').value.trim()) || undefined, vdevice: deviceId() });
         vDbg('join-request sent');
         // keep the HTTP poll as a safety net even when ws is alive — signals
         // sent by an HTTP-only host still land via the queue.

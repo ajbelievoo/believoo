@@ -661,6 +661,11 @@ class MainActivity : Activity() {
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", false) })
     }
 
+    // Stable per-device id — hosts can mark this phone "always trust"
+    private fun viewerDeviceId(): String =
+        android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+            ?.let { "and-$it" } ?: ""
+
     // key with a held modifier — Alt+Tab, Ctrl+A, Win+D etc.
     private fun sendKeyMod(code: String, mod: String) {
         for (down in listOf(true, false)) remoteViewer?.sendInput(JsonObject().apply {
@@ -1017,6 +1022,7 @@ class MainActivity : Activity() {
                     remotePinInput.text.toString().trim().ifBlank { null },
                     (android.os.Build.MODEL ?: "Android") + " (app)",
                     remoteNoteInput.text.toString().trim().ifBlank { null },
+                    viewerDeviceId(),
                 )
                 vJoin = j
                 vJoinedAtMs = System.currentTimeMillis()
@@ -1032,6 +1038,7 @@ class MainActivity : Activity() {
                     override fun onSubscribed() {
                         signaling.sendViewer("join-request", JsonObject().apply {
                             addProperty("name", (android.os.Build.MODEL ?: "Android") + " (app)")
+                            addProperty("vdevice", viewerDeviceId())
                             remoteNoteInput.text.toString().trim().takeIf { it.isNotBlank() }?.let { addProperty("note", it) }
                         })
                         vStage(45, "Waiting for host approval…")

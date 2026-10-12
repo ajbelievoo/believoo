@@ -94,7 +94,11 @@
                         @elseif($s->status == 'pending' && $s->target_id == request()->input('bconnect_member')->id)
                         <form method="POST" action="{{ route('bconnect.remote.respond', $s->id) }}" class="inline">@csrf<input type="hidden" name="status" value="active"><button class="bc-btn bc-btn-primary text-xs py-1 px-2">Accept</button></form>
                         @else
-                        <span class="text-slate-500 text-xs">—</span>
+                        @if(isset($sessionTickets[$s->id]))
+                        <a href="{{ route('bconnect.tickets.show', $sessionTickets[$s->id]) }}" class="bc-btn text-xs py-1 px-2">Ticket #{{ $sessionTickets[$s->id] }}</a>
+                        @else
+                        <form method="POST" action="{{ route('bconnect.remote.to-ticket', $s->id) }}" class="inline">@csrf<button class="bc-btn text-xs py-1 px-2" title="Create a support ticket from this session">→ Ticket</button></form>
+                        @endif
                         @endif
                     </td>
                 </tr>
