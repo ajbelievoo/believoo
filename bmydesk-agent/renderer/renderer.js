@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.6';
+const APP_VERSION = '1.3.7';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -247,6 +247,7 @@ function showJoinReq(name, note) {
     $('reqName').textContent = name || 'Someone';
     const ne = $('reqNote');
     if (ne) { ne.style.display = note ? 'block' : 'none'; ne.textContent = note ? '“' + note + '”' : ''; }
+    const vo = $('acceptViewOnly'); if (vo) vo.checked = false; // fresh choice per request
     $('reqBox').classList.remove('hidden');
     window.agent.attention(name);
     setStatus('Connection request…', 'wait');
@@ -826,6 +827,8 @@ function teardown(msg) {
     resetPrivacy();
     stopClipSync();
     viewOnly = false; $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#1e293b');
+    $('fsPanel')?.classList.add('hidden');
+    try { window.agent?.laser(false, 0, 0); } catch (e) {}
     curSourceId = null;
     ctl = null; rxFile = null;
     $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
