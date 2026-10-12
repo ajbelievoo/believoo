@@ -52,7 +52,7 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     // filename so bumps never break the link.
     Route::get('/dl/agent-portable.zip', function () {
         $f = 'BMyDesk Agent-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '-win.zip';
-        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
+        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . rawurlencode($f));
     })->name('bconnect.dl.zip');
 });
 
