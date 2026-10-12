@@ -126,7 +126,7 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <div id="chatPanel" style="display:none;position:absolute;right:0;top:0;bottom:0;width:280px;background:rgba(15,23,42,.96);border-left:1px solid var(--border);z-index:8;flex-direction:column;">
             <div id="chatMsgs" style="flex:1;overflow-y:auto;padding:12px;font-size:13px;"></div>
             <div style="display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);">
-                <input id="chatInput" placeholder="Message…" style="flex:1;background:#0b1424;border:1px solid var(--border);color:var(--txt);padding:8px 10px;border-radius:8px;font-size:13px;outline:none;">
+                <input id="chatInput" placeholder="Message… or /cmd hostname" style="flex:1;background:#0b1424;border:1px solid var(--border);color:var(--txt);padding:8px 10px;border-radius:8px;font-size:13px;outline:none;">
                 <button id="chatSend" style="background:var(--rose);border:0;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;">Send</button>
             </div>
         </div>

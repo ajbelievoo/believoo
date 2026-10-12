@@ -254,10 +254,12 @@ class AgentApiController extends Controller
     // viewer token; the host still has to accept the join-request.
     public function join(Request $r, string $code)
     {
-        // Brute-force guard: 20 join attempts / min / IP (covers code guessing)
-        // and 5 wrong PINs / 10 min / code+IP (covers PIN grinding).
+        // Brute-force guard: 60 join attempts / min / IP. The app legitimately
+        // retries join during reconnect loops — 8-char codes can't be brute
+        // forced at this rate regardless (~2.8e12 space). PIN grinding has its
+        // own tighter limiter below.
         $joinKey = 'bmd-join:' . $r->ip();
-        if (RateLimiter::tooManyAttempts($joinKey, 20)) {
+        if (RateLimiter::tooManyAttempts($joinKey, 60)) {
             return response()->json(['ok' => false, 'error' => 'too many attempts — wait a minute'], 429);
         }
         RateLimiter::hit($joinKey, 60);

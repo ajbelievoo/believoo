@@ -235,6 +235,73 @@ ipcMain.handle('sys-reboot', () => {
     exec(cmd, () => {});
     return true;
 });
+ipcMain.handle('sys-lock', () => {
+    const plat = process.platform;
+    const cmd = plat === 'win32' ? 'rundll32.exe user32.dll,LockWorkStation'
+        : plat === 'darwin' ? 'pmset displaysleepnow'
+        : 'loginctl lock-session';
+    exec(cmd, () => {});
+    return true;
+});
+
+// ── Remote file explorer (viewer browses host's filesystem over ctl) ──
+ipcMain.handle('fs-list', async (_e, p) => {
+    const dir = String(p || '').trim();
+    try {
+        if (process.platform === 'win32' && !dir) {
+            const drives = [];
+            for (const c of 'CDEFGHIJKLMNOPQRSTUVWXYZAB') {
+                const d = c + ':\\';
+                try { if (fs.existsSync(d)) drives.push({ n: d, d: true, s: 0 }); } catch (e) {}
+            }
+            return { path: '', items: drives };
+        }
+        const target = dir ? path.resolve(dir) : app.getPath('home');
+        const ents = await fs.promises.readdir(target, { withFileTypes: true });
+        const items = ents.slice(0, 2000).map(e => {
+            let s = 0;
+            if (e.isFile()) { try { s = fs.statSync(path.join(target, e.name)).size; } catch (x) {} }
+            return { n: e.name, d: e.isDirectory(), s };
+        });
+        items.sort((a, b) => (b.d - a.d) || a.n.localeCompare(b.n));
+        return { path: target, items };
+    } catch (e) { return { path: dir, items: [], err: e.message }; }
+});
+ipcMain.handle('fs-get', async (_e, p) => {
+    const target = path.resolve(String(p || ''));
+    const st = fs.statSync(target);
+    if (!st.isFile()) throw new Error('not a file');
+    if (st.size > 30 * 1024 * 1024) throw new Error('file too large (30 MB max)');
+    return { name: path.basename(target), data: fs.readFileSync(target).toString('base64'), size: st.size };
+});
+
+// ── Laser pointer — transparent click-through dot that follows the viewer ──
+let laserWin = null, laserHideT = null;
+ipcMain.on('laser', (_e, on, x, y) => {
+    try {
+        if (!laserWin || laserWin.isDestroyed()) {
+            laserWin = new BrowserWindow({
+                width: 60, height: 60, frame: false, transparent: true,
+                alwaysOnTop: true, skipTaskbar: true, focusable: false,
+                resizable: false, hasShadow: false,
+                webPreferences: { nodeIntegration: false, contextIsolation: true },
+            });
+            laserWin.setIgnoreMouseEvents(true);
+            laserWin.setAlwaysOnTop(true, 'screen-saver');
+            laserWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
+                '<body style="margin:0;background:transparent;overflow:hidden">' +
+                '<div style="width:22px;height:22px;margin:19px;border-radius:50%;' +
+                'background:rgba(244,63,94,.85);box-shadow:0 0 16px 5px rgba(244,63,94,.65)"></div></body>'));
+        }
+        if (on) {
+            const d = screen.getPrimaryDisplay();
+            laserWin.setPosition(Math.round(Number(x) * d.size.width) - 30, Math.round(Number(y) * d.size.height) - 30);
+            if (!laserWin.isVisible()) laserWin.showInactive();
+            if (laserHideT) clearTimeout(laserHideT);
+            laserHideT = setTimeout(() => { try { laserWin.hide(); } catch (e) {} }, 1500);
+        } else if (laserWin) laserWin.hide();
+    } catch (e) {}
+});
 
 ipcMain.handle('get-display-size', async () => {
     const d = screen.getPrimaryDisplay();

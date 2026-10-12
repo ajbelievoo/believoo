@@ -51,7 +51,7 @@
         <div id="chatPanel" class="absolute right-0 top-0 bottom-0 w-72 bg-[var(--bc-card,#0f172a)]/95 border-l border-[var(--bc-border)] z-20 hidden flex-col">
             <div id="chatMsgs" class="flex-1 overflow-y-auto p-3 text-sm"></div>
             <div class="flex gap-2 p-2 border-t border-[var(--bc-border)]">
-                <input id="chatInput" placeholder="Message…" class="flex-1 bg-slate-800 border border-[var(--bc-border)] text-slate-200 px-3 py-2 rounded-lg text-sm outline-none">
+                <input id="chatInput" placeholder="Message… or /cmd hostname" class="flex-1 bg-slate-800 border border-[var(--bc-border)] text-slate-200 px-3 py-2 rounded-lg text-sm outline-none">
                 <button id="chatSend" class="bc-btn bc-btn-primary text-sm">Send</button>
             </div>
         </div>

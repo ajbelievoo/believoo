@@ -63,9 +63,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/broadcast-auth', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'broadcastAuth']);
         Route::get('/version', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'version']);
         Route::post('/login', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'login']);
-        // join is the session-code brute-force surface — keep it much tighter
-        // than the signal-poll routes (legit polls are frequent; joins are not).
-        Route::post('/{code}/join', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'join'])->middleware('throttle:30,1');
+        // join brute-force protection lives in the controller's own
+        // RateLimiter (60/min/IP) — a second route throttle just double-counts.
+        Route::post('/{code}/join', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'join']);
         Route::post('/{code}/respond', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'respond']);
         Route::post('/{code}/set-pin', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'setPin'])->middleware('throttle:20,1');
         Route::post('/{code}/signal', [\App\Http\Controllers\Bconnect\AgentApiController::class, 'signal']);

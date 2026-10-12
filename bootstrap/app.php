@@ -29,8 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'log.admin' => \App\Http\Middleware\LogAdminActions::class,
         ]);
 
-        // API rate limiting
-        $middleware->throttleApi('60,1');
+        // API rate limiting — named limiter so high-chatter routes (BMyDesk
+        // agent WebRTC signaling: 1-sec polls + ICE bursts) can be exempted
+        // in the limiter definition rather than fighting a blanket cap.
+        $middleware->throttleApi('api');
 
         // Currency detection middleware for web routes + IP blocking
         $middleware->web(append: [

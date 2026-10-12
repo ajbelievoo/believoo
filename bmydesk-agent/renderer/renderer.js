@@ -417,6 +417,7 @@ async function handleOffer(m) {
                 try {
                     const msg = JSON.parse(ev.data);
                     if (msg.t === 'ping') { dcIn.send(JSON.stringify({ t: 'pong', ts: msg.ts })); return; }
+                    if (msg.t === 'laser') { try { window.agent?.laser(!msg.off, msg.x, msg.y); } catch (x) {} return; }
                     if (viewOnly) return; // host locked remote input
                     window.agent.sendInput(msg); // inject into host OS
                 } catch (err) {}
@@ -476,8 +477,9 @@ function wireCtl(ch) {
         $('sessBar')?.classList.remove('hidden');
         // mode-specific buttons: viewers get control buttons, hosts get safety toggles
         const v = isViewing();
-        ['monBtn', 'rebootBtn', 'fsBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? '' : 'none'; });
-        ['viewOnlyBtn', 'hostMonBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? 'none' : ''; });
+        ['monBtn', 'rebootBtn', 'fsBtn', 'lockBtn', 'laserBtn', 'fsOpenBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? '' : 'none'; });
+        ['viewOnlyBtn', 'hostMonBtn', 'fsToggleBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? 'none' : ''; });
+        if (!v && viewOnly) ctlSend({ t: 'view-only', on: true }); // host accepted view-only
     };
     ctl.onclose = () => { $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden'); };
 }
@@ -494,10 +496,17 @@ async function onCtlMessage(e) {
             else if (m.t === 'file-cancel') { rxFile = null; fileProg(null); addChat('System', 'Transfer cancelled by peer', false); }
             else if (m.t === 'cmd-out') { addChat('Host ▸', m.out || '(no output)', false); }
             else if (m.t === 'view-only') { addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false); }
+            else if (m.t === 'fs-list') { renderFsList(m); }
+            else if (m.t === 'laser') { try { window.agent?.laser(!m.off, m.x, m.y); } catch (x) {} }
             // host-side actions — ignored while WE are the viewer
             else if (m.t === 'cmd' && !isViewing()) { handleRemoteCmd(m.cmd); }
             else if (m.t === 'screen' && !isViewing()) { switchMonitor(); }
             else if (m.t === 'reboot' && !isViewing()) { remoteReboot(); }
+            else if (m.t === 'lock' && !isViewing()) { remoteLock(); }
+            else if (m.t === 'fs-list-req' && !isViewing()) { handleFsList(m.path); }
+            else if (m.t === 'fs-get' && !isViewing()) { handleFsGet(m.path); }
+            else if (m.t === 'procs' && !isViewing()) { handleProcs(); }
+            else if (m.t === 'kill' && !isViewing()) { handleKill(m.arg); }
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
             fileProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%', true);
@@ -590,6 +599,53 @@ async function remoteReboot() {
     setTimeout(() => window.agent.sysReboot(), 800);
 }
 
+async function remoteLock() {
+    if (!window.agent?.sysLock) return;
+    if (!confirm('The remote viewer asked to LOCK this computer.\n\nAllow it?')) {
+        ctlSend({ t: 'cmd-out', out: 'Lock denied by host user' });
+        return;
+    }
+    ctlSend({ t: 'cmd-out', out: 'Locking this workstation…' });
+    setTimeout(() => window.agent.sysLock(), 600);
+}
+
+// ── Remote file explorer — viewer browses this host over ctl ──
+let fsOn = true; // host can cut browse access mid-session via the 📁 toggle
+async function handleFsList(p) {
+    if (!window.agent?.fsList || !fsOn) {
+        ctlSend({ t: 'fs-list', path: String(p || ''), items: [], err: 'File browsing is not available on this host' });
+        return;
+    }
+    try { const r = await window.agent.fsList(p); ctlSend({ t: 'fs-list', path: r.path, items: r.items, err: r.err }); }
+    catch (e) { ctlSend({ t: 'fs-list', path: String(p || ''), items: [], err: e.message }); }
+}
+async function handleFsGet(p) {
+    if (!window.agent?.fsGet || !fsOn) { ctlSend({ t: 'cmd-out', out: 'File browsing is not available on this host' }); return; }
+    try {
+        const f = await window.agent.fsGet(p);
+        hdbg('fs-get ' + p); // audit trail in the host log
+        addChat('System', 'Sent: ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB)', false);
+        sendFile(b64ToBuf(f.data), f.name);
+    } catch (e) { ctlSend({ t: 'cmd-out', out: 'Could not read ' + p + ' — ' + e.message }); }
+}
+
+// ── Process tools — /ps and /kill <pid|name> ──
+async function handleProcs() {
+    const win = (window.agent?.platform || '').includes('win');
+    const out = await window.agent.execCmd(win ? 'tasklist /fo table' : 'ps aux --sort=-%mem | head -50').catch(e => 'error: ' + e.message);
+    ctlSend({ t: 'cmd-out', out: out || '(no processes found)' });
+}
+async function handleKill(arg) {
+    const a = String(arg || '').trim();
+    if (!a) { ctlSend({ t: 'cmd-out', out: 'usage: /kill <pid|name>' }); return; }
+    const win = (window.agent?.platform || '').includes('win');
+    const cmd = win
+        ? (/^\d+$/.test(a) ? 'taskkill /PID ' + a + ' /F' : 'taskkill /IM "' + a.replace(/"/g, '') + '" /F')
+        : (/^\d+$/.test(a) ? 'kill -9 ' + a : 'pkill -f "' + a.replace(/"/g, '') + '"');
+    const out = await window.agent.execCmd(cmd).catch(e => 'error: ' + e.message);
+    ctlSend({ t: 'cmd-out', out: out || 'Process ' + a + ' killed' });
+}
+
 // Viewer 🖥 / host 🖥 — capture the next display and swap it onto the video sender
 async function switchMonitor() {
     if (!window.agent?.getScreenSources || !pc || !stream) return;
@@ -628,6 +684,11 @@ function sendChat() {
     if (t.startsWith('/cmd ')) {
         const c = t.slice(5).trim();
         if (c) { ctlSend({ t: 'cmd', cmd: c }); addChat('Me ▸', c, true); }
+    } else if (t === '/ps') {
+        ctlSend({ t: 'procs' }); addChat('Me ▸', 'tasklist', true);
+    } else if (t.startsWith('/kill ')) {
+        const a = t.slice(6).trim();
+        if (a) { ctlSend({ t: 'kill', arg: a }); addChat('Me ▸', 'kill ' + a, true); }
     } else {
         ctlSend({ t: 'chat', from: (localStorage.getItem('bmydesk_member_name') || 'Me'), text: t });
         addChat('Me', t, true);
@@ -642,6 +703,7 @@ $('fsBtn').onclick = () => {
 };
 $('monBtn').onclick = () => ctlSend({ t: 'screen' });
 $('rebootBtn').onclick = () => { if (confirm('Reboot the REMOTE computer now?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'reboot' }); };
+$('lockBtn').onclick = () => { if (confirm('Lock the REMOTE computer?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'lock' }); };
 $('hostMonBtn').onclick = () => switchMonitor();
 $('viewOnlyBtn').onclick = () => {
     viewOnly = !viewOnly;
@@ -649,6 +711,64 @@ $('viewOnlyBtn').onclick = () => {
     ctlSend({ t: 'view-only', on: viewOnly });
     addChat('System', viewOnly ? 'Remote input blocked (view-only)' : 'Remote input re-enabled', false);
 };
+$('fsToggleBtn').onclick = () => {
+    fsOn = !fsOn;
+    $('fsToggleBtn').style.background = fsOn ? '#22c55e' : '#1e293b';
+    addChat('System', fsOn ? 'File browsing enabled' : 'File browsing disabled', false);
+};
+
+// ── Remote file explorer — browse the host's drive right from the session ──
+let fsCurPath = '';
+function joinPath(dir, name) {
+    if (!dir) return name;
+    return (dir.endsWith('\\') || dir.endsWith('/')) ? dir + name
+        : dir + (dir.includes('\\') ? '\\' : '/') + name;
+}
+function fsUpPath(p) {
+    const m = String(p || '').replace(/[\\/]+$/, '');
+    const idx = Math.max(m.lastIndexOf('\\'), m.lastIndexOf('/'));
+    return idx > 0 ? m.slice(0, idx) : (idx === 0 ? m.slice(0, 1) : '');
+}
+function fmtSize(s) { return s > 1048576 ? (s / 1048576).toFixed(1) + 'M' : s > 1024 ? (s / 1024).toFixed(0) + 'K' : s + 'B'; }
+$('fsOpenBtn').onclick = () => {
+    const p = $('fsPanel');
+    if (p.classList.contains('hidden')) {
+        p.classList.remove('hidden');
+        $('fsItems').innerHTML = '<div style="color:#64748b;padding:8px;">Loading…</div>';
+        ctlSend({ t: 'fs-list-req', path: fsCurPath });
+    } else p.classList.add('hidden');
+};
+$('fsClose').onclick = () => $('fsPanel').classList.add('hidden');
+$('fsUp').onclick = () => ctlSend({ t: 'fs-list-req', path: fsUpPath(fsCurPath) });
+function renderFsList(m) {
+    const p = $('fsPanel');
+    if (p) p.classList.remove('hidden');
+    fsCurPath = m.path || '';
+    $('fsPath').textContent = m.path || '(drives)';
+    $('fsPath').title = m.path || '';
+    const box = $('fsItems'); box.innerHTML = '';
+    if (m.err) { box.innerHTML = '<div style="color:#f43f5e;padding:8px;"></div>'; box.lastChild.textContent = m.err; return; }
+    if (!m.items || !m.items.length) { box.innerHTML = '<div style="color:#64748b;padding:8px;">Empty folder</div>'; return; }
+    m.items.forEach(it => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:4px 6px;border-radius:6px;cursor:pointer;color:#cbd5e1;display:flex;gap:6px;align-items:center;';
+        row.onmouseenter = () => row.style.background = '#1e293b';
+        row.onmouseleave = () => row.style.background = '';
+        row.appendChild(document.createTextNode((it.d ? '📁 ' : '📄 ')));
+        const lbl = document.createElement('span');
+        lbl.textContent = it.n;
+        lbl.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;';
+        row.appendChild(lbl);
+        if (!it.d) {
+            const sz = document.createElement('span');
+            sz.textContent = fmtSize(it.s); sz.style.cssText = 'color:#475569;font-size:10px;';
+            row.appendChild(sz);
+        }
+        row.title = it.d ? 'Open folder' : 'Download to this device';
+        row.onclick = () => ctlSend({ t: it.d ? 'fs-list-req' : 'fs-get', path: joinPath(fsCurPath, it.n) });
+        box.appendChild(row);
+    });
+}
 
 // 🙈 privacy — blank this machine's screens while being viewed (host-side only)
 let privacyOn = false;
@@ -716,7 +836,12 @@ function respond(action) {
         body: JSON.stringify({ action }),
     }).catch(() => {});
 }
-$('acceptBtn').onclick = () => { $('reqBox').classList.add('hidden'); respondedAt = Date.now(); respond('accept'); setStatus('Accepted — waiting for stream…', 'on'); };
+$('acceptBtn').onclick = () => {
+    $('reqBox').classList.add('hidden'); respondedAt = Date.now();
+    viewOnly = !!$('acceptViewOnly')?.checked;
+    if (viewOnly) $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#f43f5e');
+    respond('accept'); setStatus(viewOnly ? 'Accepted (view-only) — waiting for stream…' : 'Accepted — waiting for stream…', 'on');
+};
 $('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); respondedAt = Date.now(); respond('reject'); setStatus('Request rejected', 'wait'); };
 $('endBtn').onclick = async () => {
     hostSignal({ kind: 'end' });
@@ -957,19 +1082,59 @@ async function viewerReoffer() {
     } catch (e) { console.error('reoffer', e); }
 }
 
+// Zoom/pan — Ctrl+wheel zooms at the cursor, middle-drag pans when zoomed,
+// double-click resets to fit. Input coords stay correct because they are
+// computed from getBoundingClientRect (which includes the transform).
+let zoom = { s: 1, x: 0, y: 0 }, laserOn = false;
+function applyZoom() {
+    const v = $('remoteVideo');
+    v.style.transformOrigin = '0 0';
+    v.style.transform = zoom.s === 1 ? '' : `translate(${zoom.x}px,${zoom.y}px) scale(${zoom.s})`;
+}
+function zoomAt(v, dy, cx0, cy0) {
+    const r = v.getBoundingClientRect(); // already transformed
+    const ox = r.left - zoom.x, oy = r.top - zoom.y; // untransformed origin
+    const cx = cx0 - ox, cy = cy0 - oy;
+    const ns = Math.min(4, Math.max(1, zoom.s * (dy < 0 ? 1.2 : 1 / 1.2)));
+    const f = ns / zoom.s;
+    zoom.x = cx - (cx - zoom.x) * f; zoom.y = cy - (cy - zoom.y) * f; zoom.s = ns;
+    if (zoom.s === 1) { zoom.x = 0; zoom.y = 0; }
+    applyZoom();
+}
+function resetZoom() { zoom = { s: 1, x: 0, y: 0 }; applyZoom(); }
+$('laserBtn').onclick = () => {
+    laserOn = !laserOn;
+    $('laserBtn').style.background = laserOn ? '#f43f5e' : '#1e293b';
+    if (!laserOn && vDc?.readyState === 'open') { try { vDc.send(JSON.stringify({ t: 'laser', off: true })); } catch (e) {} }
+};
+
 // Input capture on the remote video → host's DataChannel handler
 function bindViewerInput() {
     const v = $('remoteVideo');
     const send = (o) => { if (vDc && vDc.readyState === 'open') { try { vDc.send(JSON.stringify(o)); vLastInput = Date.now(); } catch (e) {} } };
-    let last = 0;
+    let last = 0, panning = false, panX = 0, panY = 0;
     v.addEventListener('mousemove', (e) => {
+        if (panning) { zoom.x += e.clientX - panX; zoom.y += e.clientY - panY; panX = e.clientX; panY = e.clientY; applyZoom(); return; }
         const n = performance.now(); if (n - last < 33) return; last = n;
         const r = v.getBoundingClientRect();
-        send({ t: 'move', x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        send(laserOn ? { t: 'laser', x, y } : { t: 'move', x, y });
     });
-    v.addEventListener('mousedown', (e) => { e.preventDefault(); send({ t: 'down', b: e.button }); });
-    v.addEventListener('mouseup', (e) => send({ t: 'up', b: e.button }));
-    v.addEventListener('wheel', (e) => { e.preventDefault(); send({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
+    v.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (e.button === 1 && zoom.s > 1) { panning = true; panX = e.clientX; panY = e.clientY; return; }
+        if (!laserOn) send({ t: 'down', b: e.button });
+    });
+    v.addEventListener('mouseup', (e) => {
+        if (e.button === 1 && panning) { panning = false; return; }
+        if (!laserOn) send({ t: 'up', b: e.button });
+    });
+    v.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.ctrlKey) { zoomAt(v, e.deltaY, e.clientX, e.clientY); return; }
+        send({ t: 'wheel', dx: e.deltaX, dy: e.deltaY });
+    }, { passive: false });
+    v.addEventListener('dblclick', () => { if (zoom.s !== 1) resetZoom(); });
     v.addEventListener('contextmenu', (e) => e.preventDefault());
     v.tabIndex = 0;
     v.addEventListener('keydown', (e) => { e.preventDefault(); send({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
@@ -987,6 +1152,9 @@ function exitViewer(delay = 0) {
         vReconnectTries = 0; vAutoDropped = false;
         if (vDiscTimer) { clearTimeout(vDiscTimer); vDiscTimer = null; }
         ctl = null; rxFile = null; $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
+        $('fsPanel')?.classList.add('hidden');
+        laserOn = false; $('laserBtn') && ($('laserBtn').style.background = '#1e293b');
+        resetZoom();
         $('viewerPane').classList.add('hidden');
         $('remoteVideo').srcObject = null;
         window.agent.setViewMode(false);

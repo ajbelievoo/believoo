@@ -516,7 +516,7 @@ class MainActivity : Activity() {
         chatPanel.addView(chatScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         val chatRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         chatInput = android.widget.EditText(this).apply {
-            hint = "Message…"; setTextColor(Color.WHITE); textSize = 13f
+            hint = "Message… or /cmd hostname"; setTextColor(Color.WHITE); textSize = 13f
             setHintTextColor(Color.parseColor("#64748b")); setPadding(14, 8, 14, 8)
             background = GradientDrawable().apply { setColor(Color.parseColor("#1e293b")); cornerRadius = 14f }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

@@ -94,6 +94,9 @@
         <div class="req hidden" id="reqBox">
             <div style="font-size:13px;"><b id="reqName">Someone</b> wants to view &amp; control this device</div>
             <div id="reqNote" style="font-size:11px;color:#94a3b8;margin-top:4px;display:none;"></div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:8px 0 2px;cursor:pointer;">
+                <input type="checkbox" id="acceptViewOnly" style="accent-color:#f43f5e;"> Accept as view-only (no remote control)
+            </label>
             <div class="row">
                 <button class="btn btn-accept" id="acceptBtn">Accept</button>
                 <button class="btn btn-reject" id="rejectBtn">Reject</button>
@@ -130,10 +133,22 @@
         <button id="fsBtn" title="Fullscreen" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">⛶</button>
         <button id="monBtn" title="Switch remote display" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🖥</button>
         <button id="rebootBtn" title="Reboot remote computer" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">⏻</button>
+        <button id="lockBtn" title="Lock remote computer" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🔒</button>
+        <button id="laserBtn" title="Laser pointer — move mouse to point (click again to control)" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🔴</button>
+        <button id="fsOpenBtn" title="Browse remote files" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">📂</button>
         <button id="hostMonBtn" title="Switch my shared display" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:none;">🖥</button>
         <button id="viewOnlyBtn" title="View only — block remote input" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:none;">👁</button>
+        <button id="fsToggleBtn" title="Allow viewer to browse my files" style="background:#22c55e;border:0;color:#0f172a;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:none;">📁</button>
     </div>
     <div id="fileProg" class="hidden" style="position:fixed;top:44px;right:10px;z-index:60;font-size:11px;background:#0f172a;padding:5px 10px;border-radius:8px;border:1px solid #1e293b;"></div>
+    <div id="fsPanel" class="hidden" style="position:fixed;top:50px;right:10px;width:290px;max-height:62vh;background:#0f172a;border:1px solid #1e293b;border-radius:10px;z-index:55;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.5);">
+        <div style="display:flex;gap:6px;padding:8px;border-bottom:1px solid #1e293b;align-items:center;">
+            <button id="fsUp" title="Up one level" style="background:#1e293b;border:0;color:#e2e8f0;padding:3px 9px;border-radius:6px;cursor:pointer;font-size:12px;">↑</button>
+            <div id="fsPath" title="" style="flex:1;font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">…</div>
+            <button id="fsClose" style="background:none;border:0;color:#64748b;cursor:pointer;font-size:14px;">✕</button>
+        </div>
+        <div id="fsItems" style="flex:1;overflow-y:auto;padding:6px;font-size:12px;"></div>
+    </div>
     <div id="chatPanel" class="hidden" style="position:fixed;bottom:0;left:0;right:0;background:#0f172a;border-top:1px solid #1e293b;padding:8px;z-index:50;">
         <div id="chatMsgs" style="max-height:110px;overflow-y:auto;font-size:12px;margin-bottom:6px;color:#e2e8f0;"></div>
         <div style="display:flex;gap:6px;">

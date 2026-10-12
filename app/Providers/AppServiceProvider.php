@@ -37,6 +37,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Global API limiter — BMyDesk agent signaling is exempt because an
+        // active session legitimately produces 100+ req/min (1s signal polls,
+        // ICE candidate bursts, SDP retransmits) and host+viewer often share
+        // one public IP. Abuse is still capped by the per-route throttles and
+        // the in-controller join/PIN limiters on the agent API itself.
+        \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
+            if ($request->is('api/v1/bmydesk/agent/*')) {
+                return \Illuminate\Cache\RateLimiting\Limit::none();
+            }
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)
+                ->by($request->user()?->id ?: $request->ip());
+        });
+
         try {
             if (\Schema::hasTable('settings')) {
                 $settings = \App\Models\Setting::all()->pluck('value', 'key')->toArray();

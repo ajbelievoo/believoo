@@ -39,8 +39,8 @@
         </ol>
         <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
             <div class="font-bold text-slate-800 mb-1"><i class="fas fa-shield-halved text-green-600 mr-1"></i>Verify your download</div>
-            <p class="text-slate-600 mb-2">Only download from <code class="bg-slate-100 px-1 rounded">bmydesk.believoo.com</code>. The official v1.3.5 installer SHA-256 is:</p>
-            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">f18e9e226f1550f883bd6ff1d506b6aa4d19a6f1a01638be88f40ac2dcb25db4</code>
+            <p class="text-slate-600 mb-2">Only download from <code class="bg-slate-100 px-1 rounded">bmydesk.believoo.com</code>. The official v1.3.6 installer SHA-256 is:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">b58ed12a9b411e0bc7ebb555d3b093596685cf07ee7686a388b66a548b1e9273</code>
             <p class="text-slate-500 text-xs mt-2">In PowerShell: <code class="bg-slate-100 px-1 rounded">Get-FileHash BMyDesk-Agent-Setup-1.3.5.exe</code></p>
         </div>
     </div>
@@ -59,8 +59,8 @@
         </ol>
         <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
             <div class="font-bold text-slate-800 mb-1"><i class="fas fa-fingerprint text-green-600 mr-1"></i>Signed &amp; verified</div>
-            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.5 APK SHA-256:</p>
-            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">1a117b92a267fcedb4eca7d76b9b275718961bd87569b54ef3e32dabdf5103c4</code>
+            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.6 APK SHA-256:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">7cd3de461ae9084d4a25aeb50f43d0538e748e538094ab09bfac1f455f7ea348</code>
         </div>
     </div>
 
