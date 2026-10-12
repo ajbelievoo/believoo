@@ -11,6 +11,7 @@ class Company extends Model {
         'trial_ends_at' => 'datetime',
         'grace_period_until' => 'datetime',
         'next_invoice_at' => 'datetime',
+        'remote_policies' => 'array',
     ];
     public function members() { return $this->hasMany(Member::class, 'company_id'); }
     public function projects() { return $this->hasMany(Project::class, 'company_id'); }

@@ -10,7 +10,7 @@ class RemoteAdminController extends Controller {
     public function fleet(Request $r) {
         $companyId = $r->input('bconnect_company_id');
         $devices = DB::table('bconnect_agent_devices')
-            ->where(function ($q) use ($companyId) { $q->where('company_id', $companyId)->orWhereNull('company_id'); })
+            ->where('company_id', $companyId)
             ->latest('last_seen_at')->get()->map(function ($d) {
                 $d->online = $d->last_seen_at && \Illuminate\Support\Carbon::parse($d->last_seen_at)->gt(now()->subMinutes(3));
                 $d->session = DB::table('bconnect_remote_sessions')->where('device_id', $d->device_id)->where('host_kind', 'agent')->latest('id')->first(['session_code', 'status']);

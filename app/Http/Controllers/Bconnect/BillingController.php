@@ -552,6 +552,8 @@ class BillingController extends Controller
         $companyId = $r->input('bconnect_company_id');
         // Un-billed remote sessions grouped by viewer/member
         $sessions = \DB::table('bconnect_remote_sessions')
+            ->where('company_id', $companyId)
+            ->whereNotNull('viewer_member_id')
             ->whereNotNull('ended_at')
             ->whereNull('invoiced_at')
             ->select('viewer_member_id', \DB::raw('COUNT(*) as sessions'), \DB::raw('SUM(TIMESTAMPDIFF(SECOND, started_at, ended_at)) as secs'))
@@ -568,6 +570,7 @@ class BillingController extends Controller
             'member_id' => 'required|integer',
         ]);
         $rows = \DB::table('bconnect_remote_sessions')
+            ->where('company_id', $companyId)
             ->whereNotNull('ended_at')->whereNull('invoiced_at')
             ->where('viewer_member_id', $data['member_id'])
             ->get(['id', 'started_at', 'ended_at']);

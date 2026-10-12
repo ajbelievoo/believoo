@@ -56,6 +56,7 @@ class PublicController extends Controller {
             'title' => $r->subject,
             'description' => "From: {$r->name} <{$r->email}>\n\n" . $r->message,
             'status' => 'open',
+            'type' => 'support',
             'priority' => $r->priority === 'high' ? 'high' : 'normal',
             'source' => 'portal',
             'public_token' => $token,

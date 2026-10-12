@@ -357,6 +357,11 @@ class TicketController extends Controller {
         return back()->with('success', 'Canned response saved');
     }
 
+    public function deleteCanned(Request $r, $id) {
+        \DB::table('bconnect_canned_responses')->where('id', $id)->where('company_id', $r->input('bconnect_company_id'))->delete();
+        return back()->with('success', 'Canned response deleted');
+    }
+
     // CSAT rating submitted after close (portal track page / email link).
     public function csat(Request $r, Ticket $ticket) {
         $r->validate(['score' => 'required|integer|min:1|max:5', 'comment' => 'nullable|string|max:500']);

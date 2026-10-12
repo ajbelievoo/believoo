@@ -16,9 +16,21 @@ class SeoController extends Controller {
             ['loc' => 'https://bmydesk.believoo.com/login', 'priority' => '0.5', 'changefreq' => 'monthly'],
             ['loc' => 'https://bmydesk.believoo.com/register', 'priority' => '0.8', 'changefreq' => 'monthly'],
             ['loc' => 'https://bmydesk.believoo.com/remote/agent', 'priority' => '0.6', 'changefreq' => 'monthly'],
+            ['loc' => 'https://bmydesk.believoo.com/remote/guest', 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['loc' => 'https://bmydesk.believoo.com/support', 'priority' => '0.7', 'changefreq' => 'weekly'],
+            ['loc' => 'https://bmydesk.believoo.com/support/portal', 'priority' => '0.7', 'changefreq' => 'weekly'],
+            ['loc' => 'https://bmydesk.believoo.com/help', 'priority' => '0.7', 'changefreq' => 'weekly'],
+            ['loc' => 'https://bmydesk.believoo.com/blog', 'priority' => '0.6', 'changefreq' => 'weekly'],
+            ['loc' => 'https://bmydesk.believoo.com/download/guide', 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['loc' => 'https://believoo.com/status', 'priority' => '0.6', 'changefreq' => 'daily'],
         ];
+        // published KB articles + blog posts
+        foreach (\DB::table('bconnect_kb_articles')->where('published', true)->get() as $a) {
+            $urls[] = ['loc' => 'https://bmydesk.believoo.com/kb/' . $a->slug, 'priority' => '0.6', 'changefreq' => 'monthly'];
+        }
+        foreach (\DB::table('bconnect_blog_posts')->where('published', true)->get() as $p) {
+            $urls[] = ['loc' => 'https://bmydesk.believoo.com/blog/' . $p->slug, 'priority' => '0.6', 'changefreq' => 'monthly'];
+        }
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
         foreach ($urls as $u) {

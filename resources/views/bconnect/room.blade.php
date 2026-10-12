@@ -281,7 +281,7 @@ if (isHost) {
 
 // ── Leave tracking ──
 window.addEventListener('beforeunload', () => {
-    navigator.sendBeacon(`/meetings/${room}/leave`, new Blob([JSON.stringify({})], {type:'application/json'}));
+    navigator.sendBeacon(`/meetings/${room}/leave?_token=${encodeURIComponent(csrfTok())}`, new Blob([JSON.stringify({})], {type:'application/json'}));
 });
 document.getElementById('endMeetingBtn')?.addEventListener('click', () => {
     fetch(`/meetings/${room}/leave`, {method:'POST', headers:{'X-CSRF-TOKEN':csrfTok()}}).catch(()=>{});

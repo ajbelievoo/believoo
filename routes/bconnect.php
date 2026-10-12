@@ -31,7 +31,7 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     Route::get('/kb', [\App\Http\Controllers\Bconnect\PublicController::class, 'kb'])->name('bconnect.kb');
     Route::get('/kb/{slug}', [\App\Http\Controllers\Bconnect\PublicController::class, 'kbArticle'])->name('bconnect.kb.article');
     Route::get('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portal'])->name('bconnect.portal');
-    Route::post('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalSubmit'])->name('bconnect.portal.submit');
+    Route::post('/support/portal', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalSubmit'])->middleware('throttle:10,1')->name('bconnect.portal.submit');
     Route::get('/support/track', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalTrack'])->name('bconnect.portal.track');
     Route::post('/support/csat', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalCsat'])->name('bconnect.portal.csat');
     // Note: /downloads/* is served directly by nginx (public/downloads/) —
@@ -84,7 +84,7 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::post('/meetings/{room}/deny/{pid}', [\App\Http\Controllers\Bconnect\MeetingController::class, 'deny'])->name('bconnect.meeting.deny');
     Route::post('/meetings/{room}/leave', [\App\Http\Controllers\Bconnect\MeetingController::class, 'leave'])->name('bconnect.meeting.leave');
     Route::get('/meetings/{room}/attendance', [\App\Http\Controllers\Bconnect\MeetingController::class, 'attendance'])->name('bconnect.meeting.attendance');
-    Route::get('/meetings/{room}.ics', [\App\Http\Controllers\Bconnect\MeetingController::class, 'ics'])->name('bconnect.meeting.ics');
+    Route::get('/meetings/{room}/ics', [\App\Http\Controllers\Bconnect\MeetingController::class, 'ics'])->name('bconnect.meeting.ics');
     Route::post('/meetings/{room}/share-file', [\App\Http\Controllers\Bconnect\MeetingController::class, 'shareFile'])->name('bconnect.meeting.sharefile');
     Route::get('/tickets', [\App\Http\Controllers\Bconnect\TicketController::class, 'index'])->middleware('bconnect.permission:tickets.view')->name('bconnect.tickets');
     Route::get('/search', [\App\Http\Controllers\Bconnect\SearchController::class, 'index'])->name('bconnect.search');
@@ -95,6 +95,7 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::post('/tickets/{ticket}/tags', [\App\Http\Controllers\Bconnect\TicketController::class, 'tags'])->name('bconnect.tickets.tags');
     Route::post('/tickets/{ticket}/csat', [\App\Http\Controllers\Bconnect\TicketController::class, 'csat'])->name('bconnect.tickets.csat');
     Route::post('/settings/canned', [\App\Http\Controllers\Bconnect\TicketController::class, 'saveCanned'])->name('bconnect.canned.save');
+    Route::delete('/settings/canned/{id}', [\App\Http\Controllers\Bconnect\TicketController::class, 'deleteCanned'])->name('bconnect.canned.delete');
     Route::get('/tickets/{ticket}/edit', [\App\Http\Controllers\Bconnect\TicketController::class, 'edit'])->name('bconnect.tickets.edit')->middleware(['bconnect.role:company_admin|manager', 'bconnect.permission:tickets.manage']);
     Route::get('/tickets/{ticket}', [\App\Http\Controllers\Bconnect\TicketController::class, 'show'])->middleware('bconnect.permission:tickets.view')->name('bconnect.tickets.show');
     Route::get('/files', [\App\Http\Controllers\Bconnect\FileManagerController::class, 'index'])->middleware('bconnect.permission:files.view')->name('bconnect.files');

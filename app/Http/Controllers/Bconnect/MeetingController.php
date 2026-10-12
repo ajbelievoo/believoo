@@ -44,7 +44,7 @@ class MeetingController extends Controller {
             'scheduled_at' => $data['scheduled_at'] ?? now(),
             'started_at' => $data['scheduled_at'] ? null : now(),
             'duration_minutes' => $data['duration_minutes'] ?? null,
-            'password' => $data['password'] ?: null,
+            'password' => $data['password'] ? \Illuminate\Support\Facades\Hash::make($data['password']) : null,
             'waiting_room' => !empty($data['waiting_room']),
             'recurrence' => $data['recurrence'] ?? null,
         ]);
@@ -107,7 +107,14 @@ class MeetingController extends Controller {
 
     public function checkPassword(Request $r, $room) {
         $meeting = Meeting::where('company_id', $r->input('bconnect_company_id'))->where('room_id', $room)->firstOrFail();
-        if ($meeting->password && hash_equals($meeting->password, (string) $r->password)) {
+        $ok = $meeting->password && (
+            \Illuminate\Support\Facades\Hash::check((string) $r->password, $meeting->password)
+            || hash_equals($meeting->password, (string) $r->password) // legacy plaintext rows
+        );
+        if ($ok) {
+            if (hash_equals($meeting->password, (string) $r->password)) {
+                $meeting->update(['password' => \Illuminate\Support\Facades\Hash::make($r->password)]);
+            }
             session(["meeting_pw_ok_{$meeting->id}" => true]);
             return response()->json(['ok' => true]);
         }

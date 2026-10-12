@@ -40,7 +40,7 @@ $meetingUsage = \App\Models\Bconnect\Meeting::where('company_id', request()->inp
                     <td class="whitespace-nowrap">
                         <a href="{{ route('bconnect.meeting.room', $m->room_id) }}" target="_blank" class="bc-btn bc-btn-primary py-1 px-2 text-xs">{{ $m->ended_at ? 'View' : 'Join' }}</a>
                         <a href="{{ route('bconnect.meeting.ics', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1" title="Add to calendar (.ics)"><i class="fas fa-calendar-plus"></i></a>
-                        <a href="{{ route('bconnect.meeting.attendance', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1" title="Attendance"><i class="fas fa-clipboard-user"></i></a>
+                        <a href="{{ route('bconnect.meeting.attendance', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1" title="Attendance"><i class="fas fa-clipboard-list"></i></a>
                         @if($m->ended_at)
                         <a href="{{ route('bconnect.meeting.notes', $m->room_id) }}" class="bc-btn bc-btn-secondary py-1 px-2 text-xs ml-1">Notes</a>
                         @endif
