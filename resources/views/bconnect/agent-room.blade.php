@@ -8,6 +8,7 @@
             <p class="text-xs text-slate-400">
                 Code: <code class="text-slate-300">{{ $session->session_code }}</code>
                 • <span id="connStatus" class="text-amber-400">Waiting for host approval…</span>
+                <span id="encBadge" class="hidden text-slate-500" title="End-to-end encrypted (DTLS)">• 🔒</span>
                 <span id="latencyBadge" class="hidden text-slate-500">• <span id="latencyVal">—</span> ms</span>
                 <span id="qualBadge" class="hidden text-slate-500" title="Connection quality"></span>
                 <span id="timeBadge" class="hidden text-slate-500 tabular-nums">• 00:00</span>
@@ -217,6 +218,7 @@ async function startPeer() {
         if (CAN_CONTROL) document.getElementById('clickHint').classList.remove('hidden');
         setStatus('Connected', 'text-green-400');
         connected = true;
+        document.getElementById('encBadge').classList.remove('hidden');
         if (streamTimeout) clearTimeout(streamTimeout);
         startPing();
     };

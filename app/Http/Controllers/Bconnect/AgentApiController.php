@@ -264,6 +264,13 @@ class AgentApiController extends Controller
         }
         RateLimiter::hit($joinKey, 60);
 
+        // Per-device guard: a leaked code shouldn't mean a swarm of join prompts.
+        $codeKey = 'bmd-joincode:' . strtoupper($code);
+        if (RateLimiter::tooManyAttempts($codeKey, 20)) {
+            return response()->json(['ok' => false, 'error' => 'this device is receiving too many requests — wait a minute'], 429);
+        }
+        RateLimiter::hit($codeKey, 60);
+
         $session = $this->findByCode($code);
         if (!$session) {
             return response()->json(['ok' => false, 'error' => 'invalid or expired code'], 404);

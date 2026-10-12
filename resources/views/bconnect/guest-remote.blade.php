@@ -87,6 +87,7 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <div class="lbl"><span id="hostLabel">Remote device</span> <code style="color:var(--cyan)" id="codeEcho"></code></div>
         <div style="display:flex;gap:8px;align-items:center;">
             <span class="badge" id="connBadge">connecting</span>
+            <span class="badge" id="encBadge" title="End-to-end encrypted (DTLS)" style="display:none;">🔒</span>
             <span class="badge" id="qualBadge" title="Connection quality" style="display:none;letter-spacing:2px;">▂▄▆█</span>
             <span class="badge" id="timeBadge" style="display:none;font-variant-numeric:tabular-nums;">00:00</span>
             <span class="badge" id="latBadge" style="display:none"><span id="latVal">—</span> ms</span>
@@ -325,7 +326,7 @@ async function startPeer() {
         startSessionTimer();
         $('waitOverlay').classList.add('hidden');
         $('clickHint').style.display = 'block';
-        setBadge('connected', true); connected = true;
+        setBadge('connected', true); connected = true; $('encBadge').style.display = 'inline-block';
         if (streamTimeout) clearTimeout(streamTimeout);
         startPing();
     };
