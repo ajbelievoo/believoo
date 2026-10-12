@@ -14,9 +14,25 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            chain.proceed(chain.request().newBuilder().header("Accept", "application/json").build())
+        }
         .build()
     private val gson = Gson()
     private val json = "application/json".toMediaType()
+
+    /** Parses the response body as a JsonObject or returns null — a null means
+     *  the server/proxy answered with a non-JSON body (HTML error page, edge
+     *  block, etc.) which must not be fed to Gson unchecked. */
+    private fun bodyObj(res: okhttp3.Response): JsonObject? =
+        runCatching { gson.fromJson(res.body?.string().orEmpty(), JsonObject::class.java) }.getOrNull()
+
+    private fun errorOf(obj: JsonObject, fallback: String, code: Int): RuntimeException =
+        RuntimeException(
+            obj.get("error")?.takeIf { !it.isJsonNull }?.asString
+                ?: obj.get("message")?.takeIf { !it.isJsonNull }?.asString
+                ?: "$fallback (HTTP $code)"
+        )
 
     data class Registration(
         val code: String,
@@ -35,8 +51,9 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
             .toRequestBody(json)
         val req = Request.Builder().url("$base/register").post(body).build()
         http.newCall(req).execute().use { res ->
-            val obj = gson.fromJson(res.body!!.string(), JsonObject::class.java)
-            if (!obj.get("ok").asBoolean) throw RuntimeException(obj.get("error")?.asString ?: "register failed")
+            val obj = bodyObj(res)
+                ?: throw RuntimeException("Invalid server response (HTTP ${res.code})")
+            if (obj.get("ok")?.asBoolean != true) throw errorOf(obj, "register failed", res.code)
             return Registration(
                 code = obj.get("session_code").asString,
                 agentToken = obj.get("agent_token").asString,
@@ -64,8 +81,9 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         val body = gson.toJson(mapOf("email" to email, "password" to password)).toRequestBody(json)
         val req = Request.Builder().url("$base/login").post(body).build()
         http.newCall(req).execute().use { res ->
-            val obj = gson.fromJson(res.body!!.string(), JsonObject::class.java)
-            if (!obj.get("ok").asBoolean) throw RuntimeException(obj.get("error")?.asString ?: "login failed")
+            val obj = bodyObj(res)
+                ?: throw RuntimeException("Invalid server response (HTTP ${res.code})")
+            if (obj.get("ok")?.asBoolean != true) throw errorOf(obj, "login failed", res.code)
             return LoginResult(obj.get("name").asString, obj.get("company")?.asString, obj.get("member_token").asString)
         }
     }
@@ -85,8 +103,9 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         val req = Request.Builder().url("$base/$code/join")
             .post(gson.toJson(body).toRequestBody(json)).build()
         http.newCall(req).execute().use { res ->
-            val obj = gson.fromJson(res.body!!.string(), JsonObject::class.java)
-            if (!obj.get("ok").asBoolean) throw RuntimeException(obj.get("error")?.asString ?: "join failed")
+            val obj = bodyObj(res)
+                ?: throw RuntimeException("Invalid server response (HTTP ${res.code})")
+            if (obj.get("ok")?.asBoolean != true) throw errorOf(obj, "join failed", res.code)
             return JoinResult(
                 viewerToken = obj.get("viewer_token").asString,
                 channel = obj.get("channel").asString,

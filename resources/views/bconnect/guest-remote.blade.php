@@ -152,7 +152,21 @@ function whisper(evt, data) { try { channel.trigger('client-' + evt, data); } ca
             .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
     }
 
-function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); postJson(API + '/' + CODE + '/signal', Object.assign({ agent_token: VTOKEN }, msg)); }
+function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); return postJson(API + '/' + CODE + '/signal', Object.assign({ agent_token: VTOKEN }, msg)); }
+// chunked SDP fallback — some networks/proxies drop large POST bodies; small
+// parts get reassembled server-side transparently.
+async function sendOfferRobust(sdp) {
+    const r = await sendSignal({ kind: 'offer', sdp });
+    if (r && r.ok) { dbg('offer delivered'); return; }
+    dbg('offer POST failed — chunked retry');
+    const CH = 3000, parts = [];
+    for (let i = 0; i < sdp.length; i += CH) parts.push(sdp.slice(i, i + CH));
+    for (let i = 0; i < parts.length; i++) {
+        const rr = await sendSignal({ kind: 'offer-part', i, total: parts.length, chunk: parts[i] });
+        if (!(rr && rr.ok)) { dbg('chunk ' + i + ' failed'); return; }
+    }
+    dbg('offer sent in ' + parts.length + ' parts');
+}
 
 async function join() {
     const code = $('codeInput').value.trim().toUpperCase();
@@ -284,7 +298,7 @@ async function startPeer() {
     const sendOffer = () => {
         if (!pc || pc.remoteDescription || offerTries >= 8) return;
         offerTries++;
-        sendSignal({ kind: 'offer', sdp: cleanSdp(pc.localDescription.sdp) });
+        sendOfferRobust(cleanSdp(pc.localDescription.sdp));
         dbg('offer sent x' + offerTries);
         setTimeout(sendOffer, 4000);
     };

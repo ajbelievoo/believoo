@@ -136,6 +136,17 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 
 async function handleOffer(m) {
     if (!stream) { pendingOffer = m; dbg('offer queued (no screen yet)'); setStatus('Viewer waiting — pick a screen to share', 'bc-badge-amber'); return; }
+    if (pc) {
+        // repeat offer (viewer retransmit / reconnect) — re-answer on same peer
+        try {
+            await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            sendSignal({ kind: 'answer', sdp: pc.localDescription.sdp });
+            dbg('re-answer sent');
+        } catch (e) { dbg('re-offer failed ' + e.message); }
+        return;
+    }
     dbg('handling offer');
     try {
         pc = new RTCPeerConnection(pcConfig);

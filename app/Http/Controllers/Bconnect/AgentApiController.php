@@ -417,6 +417,23 @@ class AgentApiController extends Controller
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
         }
         $kind = (string) $r->input('kind', '');
+        // chunked-offer path: small parts cached until complete, then relayed
+        // as a normal offer — receivers never see the split.
+        if (in_array($kind, ['offer-part', 'answer-part'], true)) {
+            $i = (int) $r->input('i', 0); $total = (int) $r->input('total', 0);
+            if ($total < 1 || $total > 200 || $i < 0 || $i >= $total) abort(422);
+            $ck = 'rsig.part.' . $session->session_code . '.' . ($isHost ? 'h' : 'v') . '.' . $kind;
+            $buf = \Illuminate\Support\Facades\Cache::get($ck, []);
+            $buf[$i] = (string) $r->input('chunk', '');
+            if (count($buf) < $total) {
+                \Illuminate\Support\Facades\Cache::put($ck, $buf, now()->addMinutes(5));
+                return response()->json(['ok' => true, 'partial' => count($buf)]);
+            }
+            \Illuminate\Support\Facades\Cache::forget($ck);
+            ksort($buf);
+            $r->merge(['kind' => substr($kind, 0, -5), 'sdp' => implode('', $buf)]);
+            $kind = substr($kind, 0, -5);
+        }
         if (!in_array($kind, ['offer', 'answer', 'ice', 'end'], true)) {
             return response()->json(['ok' => false, 'error' => 'bad kind'], 422);
         }

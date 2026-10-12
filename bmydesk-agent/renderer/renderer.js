@@ -167,14 +167,40 @@ const sigFresh = (m) => m.kind === 'ice' ? (!m.at || (Date.now() - Date.parse(m.
 const nonce = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 function postSignal(code, token, msg) {
     msg.n = nonce();
-    fetch(`${API}/${code}/signal`, {
+    return fetch(`${API}/${code}/signal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify(msg),
-    }).catch(() => {});
+    }).then(r => r.json()).catch(() => ({}));
 }
 const hostSignal = (m) => session && postSignal(session.session_code, session.agent_token, m);
 const viewerSignal = (m) => vJoinedCode && postSignal(vJoinedCode, vChanToken, m);
+async function hostAnswerRobust(sdp) {
+    const r = await hostSignal({ kind: 'answer', sdp });
+    if (r && r.ok) return;
+    hdbg('answer POST failed — chunked retry');
+    const CH = 3000, parts = [];
+    for (let i = 0; i < sdp.length; i += CH) parts.push(sdp.slice(i, i + CH));
+    for (let i = 0; i < parts.length; i++) {
+        const rr = await hostSignal({ kind: 'answer-part', i, total: parts.length, chunk: parts[i] });
+        if (!(rr && rr.ok)) { hdbg('chunk ' + i + ' failed'); return; }
+    }
+    hdbg('answer sent in ' + parts.length + ' parts');
+}
+// chunked fallback — some networks drop large POST bodies; parts are
+// reassembled server-side into a normal offer.
+async function viewerOfferRobust(sdp) {
+    const r = await viewerSignal({ kind: 'offer', sdp });
+    if (r && r.ok) return;
+    vDbg('offer POST failed — chunked retry');
+    const CH = 3000, parts = [];
+    for (let i = 0; i < sdp.length; i += CH) parts.push(sdp.slice(i, i + CH));
+    for (let i = 0; i < parts.length; i++) {
+        const rr = await viewerSignal({ kind: 'offer-part', i, total: parts.length, chunk: parts[i] });
+        if (!(rr && rr.ok)) { vDbg('chunk ' + i + ' failed'); return; }
+    }
+    vDbg('offer sent in ' + parts.length + ' parts');
+}
 
 // ws signaling is the primary path; if it keeps failing we still surface join
 // requests by polling /status — accept then rides the ws once it recovers.
@@ -351,7 +377,7 @@ async function handleOffer(m) {
             await setRemoteSdp(pc, 'offer', m.sdp);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            hostSignal({ kind: 'answer', sdp: cleanSdp(pc.localDescription.sdp) });
+            hostAnswerRobust(cleanSdp(pc.localDescription.sdp));
             hdbg('re-answer sent');
         } catch (e) { console.error('re-offer failed', e); }
         return;
@@ -386,7 +412,7 @@ async function handleOffer(m) {
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        hostSignal({ kind: 'answer', sdp: cleanSdp(pc.localDescription.sdp) });
+        hostAnswerRobust(cleanSdp(pc.localDescription.sdp));
         hdbg('answer sent');
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
         iceQueue = [];
@@ -750,8 +776,16 @@ async function startViewerPeer() {
 
     const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await vPc.setLocalDescription(offer);
-    viewerSignal({ kind: 'offer', sdp: cleanSdp(vPc.localDescription.sdp) });
-    vDbg('offer sent');
+    // retransmit until an answer lands — a single lost POST must not kill the session
+    let vOfferTries = 0;
+    const sendOffer = () => {
+        if (!vPc || vPc.remoteDescription || vOfferTries >= 8) return;
+        vOfferTries++;
+        viewerOfferRobust(cleanSdp(vPc.localDescription.sdp));
+        vDbg('offer sent x' + vOfferTries);
+        setTimeout(sendOffer, 4000);
+    };
+    sendOffer();
 }
 
 // Auto-reconnect: on 'failed' re-offer with ICE restart — the session survives

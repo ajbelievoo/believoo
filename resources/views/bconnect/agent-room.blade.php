@@ -102,7 +102,19 @@ function whisper(evt, data) {
             .filter(l => l && !/^a=max-message-size/.test(l)).join('\r\n');
     }
 
-function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); postJson(API + '/signal', msg); }
+function sendSignal(msg) { msg.n = nonce(); whisper('signal', msg); return postJson(API + '/signal', msg); }
+async function sendOfferRobust(sdp) {
+    const r = await sendSignal({ kind: 'offer', sdp });
+    if (r && r.ok) return;
+    dbg('offer POST failed — chunked retry');
+    const CH = 3000, parts = [];
+    for (let i = 0; i < sdp.length; i += CH) parts.push(sdp.slice(i, i + CH));
+    for (let i = 0; i < parts.length; i++) {
+        const rr = await sendSignal({ kind: 'offer-part', i, total: parts.length, chunk: parts[i] });
+        if (!(rr && rr.ok)) { dbg('chunk ' + i + ' failed'); return; }
+    }
+    dbg('offer sent in ' + parts.length + ' parts');
+}
 
 function onAccept() {
     setStatus('Accepted — starting stream…', 'text-green-400');
@@ -202,7 +214,7 @@ async function startPeer() {
     const sendOffer = () => {
         if (!pc || pc.remoteDescription || offerTries >= 8) return;
         offerTries++;
-        sendSignal({ kind: 'offer', sdp: cleanSdp(pc.localDescription.sdp) });
+        sendOfferRobust(cleanSdp(pc.localDescription.sdp));
         dbg('offer sent x' + offerTries);
         setTimeout(sendOffer, 4000);
     };
