@@ -1,4 +1,4 @@
-package com.believoo.bmydeskagent
+package com.believoo.bmd
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject

@@ -1,4 +1,4 @@
-package com.believoo.bmydeskagent
+package com.believoo.bmd
 
 import android.content.BroadcastReceiver
 import android.content.Context

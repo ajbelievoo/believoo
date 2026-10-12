@@ -1,4 +1,4 @@
-package com.believoo.bmydeskagent
+package com.believoo.bmd
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -107,9 +107,9 @@ class ScreenShareService : Service() {
     }
 
     companion object {
-        const val ACTION_START = "com.believoo.bmydeskagent.START"
-        const val ACTION_CAPTURE = "com.believoo.bmydeskagent.CAPTURE"
-        const val ACTION_STOP = "com.believoo.bmydeskagent.STOP"
+        const val ACTION_START = "com.believoo.bmd.START"
+        const val ACTION_CAPTURE = "com.believoo.bmd.CAPTURE"
+        const val ACTION_STOP = "com.believoo.bmd.STOP"
         const val EXTRA_RESULT_DATA = "result_data"
     }
 }

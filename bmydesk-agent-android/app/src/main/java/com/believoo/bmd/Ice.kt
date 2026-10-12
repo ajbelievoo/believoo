@@ -1,4 +1,4 @@
-package com.believoo.bmydeskagent
+package com.believoo.bmd
 
 import com.google.gson.JsonArray
 import org.webrtc.PeerConnection

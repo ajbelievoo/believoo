@@ -1,4 +1,4 @@
-package com.believoo.bmydeskagent
+package com.believoo.bmd
 
 import android.app.Activity
 import android.content.ComponentName
@@ -743,10 +743,22 @@ class MainActivity : Activity() {
     private fun register() {
         thread {
             try {
+                // warm the FCM token into prefs so register() can attach it —
+                // onNewToken also re-registers on refresh, so this only matters
+                // on first launch / after token rotation.
+                runCatching {
+                    val tok = com.google.android.gms.tasks.Tasks.await(
+                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token,
+                        8, java.util.concurrent.TimeUnit.SECONDS
+                    )
+                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+                        .edit().putString("fcm_token", tok).apply()
+                }
                 val r = api.register(
                     android.os.Build.MODEL ?: "android-device", "android",
                     getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_token", null),
-                    deviceId()
+                    deviceId(),
+                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("fcm_token", null)
                 )
                 reg = r
                 ui { codeView.text = r.code; setStatus("Connecting realtime…", "#f59e0b"); spinner.visibility = View.GONE }

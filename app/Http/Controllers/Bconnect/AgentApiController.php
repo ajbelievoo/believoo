@@ -13,7 +13,7 @@ class AgentApiController extends Controller
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
     const AGENT_LATEST_WINDOWS = '1.3.5';
-    const AGENT_LATEST_ANDROID = '1.3.4';
+    const AGENT_LATEST_ANDROID = '1.3.5';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -70,6 +70,7 @@ class AgentApiController extends Controller
             'os' => 'nullable|string|max:40',
             'member_token' => 'nullable|string|max:80',
             'device_id' => 'nullable|string|max:64',
+            'fcm_token' => 'nullable|string|max:300',
         ]);
 
         $member = null;
@@ -79,18 +80,20 @@ class AgentApiController extends Controller
 
         // Track fleet metadata for the admin device dashboard
         if (!empty($data['device_id'])) {
+            $fields = [
+                'platform' => $data['os'] ?? null,
+                'version' => $data['version'] ?? null,
+                'label' => $member?->user?->name ?? $data['host_name'] ?? null,
+                'company_id' => $member?->company_id,
+                'last_seen_at' => now(),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ];
+            // never wipe a stored push token just because this register call
+            // didn't carry one (e.g. the Windows agent has no FCM)
+            if (!empty($data['fcm_token'])) $fields['fcm_token'] = $data['fcm_token'];
             \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->updateOrInsert(
-                ['device_id' => $data['device_id']],
-                [
-                    'platform' => $data['os'] ?? null,
-                    'version' => $data['version'] ?? null,
-                    'label' => $member?->user?->name ?? $data['host_name'] ?? null,
-                    'company_id' => $member?->company_id,
-                    'last_seen_at' => now(),
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
+                ['device_id' => $data['device_id']], $fields);
         }
 
         if (!empty($data['device_id'])) {

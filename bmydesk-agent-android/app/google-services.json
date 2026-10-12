@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "759752024135",
+    "firebase_url": "https://hitune-live-box-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "hitune-live-box",
+    "storage_bucket": "hitune-live-box.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:759752024135:android:d689d8d21523499b325162",
+        "android_client_info": {
+          "package_name": "com.believoo.bmd"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "759752024135-qfm2fahpo2bpcn5baceoijtoh1gp74n5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvpVSxhVOFv5cyd7nNxCF797DjYYVMSmk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "759752024135-647o3e91kn4bruprqpcuvj8bosobe2lp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

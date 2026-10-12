@@ -1,4 +1,4 @@
-package com.believoo.bmydeskagent
+package com.believoo.bmd
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription

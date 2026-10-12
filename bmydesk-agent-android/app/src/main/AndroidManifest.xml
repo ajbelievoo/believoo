@@ -38,6 +38,15 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- FCM — server pushes a join-request wake-up to this device -->
+        <service
+            android:name=".BmdFirebaseService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Re-register the device's permanent code after reboot so viewers
              can reach it again without anyone opening the app. -->
         <receiver

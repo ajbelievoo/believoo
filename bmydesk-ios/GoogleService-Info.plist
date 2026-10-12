@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>759752024135-083f701alspp2tc9cqi13dh8a381gbv8.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDoH_ef5H3HrRFX5H2k9gD7FjonVzmyrs8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>759752024135</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.believoo.bmd</string>
+	<key>PROJECT_ID</key>
+	<string>hitune-live-box</string>
+	<key>STORAGE_BUCKET</key>
+	<string>hitune-live-box.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:759752024135:ios:e688eeb8e677dc95325162</string>
+	<key>DATABASE_URL</key>
+	<string>https://hitune-live-box-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+</dict>
+</plist>
