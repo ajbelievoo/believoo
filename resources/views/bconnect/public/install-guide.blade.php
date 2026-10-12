@@ -30,7 +30,7 @@
         </div>
         <a href="/dl/agent.exe" class="inline-block px-6 py-3 bg-brand text-white font-bold rounded-xl mb-8"><i class="fas fa-download mr-2"></i>Download for Windows</a>
         <ol class="space-y-5">
-            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">1</span><div><b>Run the installer</b> — open <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">BMyDesk-Agent-Setup-1.3.8.exe</code>. If Windows SmartScreen shows "Windows protected your PC", click <b>More info → Run anyway</b>. This warning appears for every new app until it builds download reputation — it does not mean the file is unsafe (see the verification box below).</div></li>
+            <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">1</span><div><b>Run the installer</b> — open <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">BMyDesk-Agent-Setup-1.3.9.exe</code>. If Windows SmartScreen shows "Windows protected your PC", click <b>More info → Run anyway</b>. This warning appears for every new app until it builds download reputation — it does not mean the file is unsafe (see the verification box below).</div></li>
             <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">2</span><div><b>Accept the License Agreement</b> — read the terms and click <b>I Agree</b>.</div></li>
             <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">3</span><div><b>Choose the install folder</b> — keep the default <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">%LOCALAPPDATA%\Programs\BMyDesk Agent</code> or pick your own, then <b>Install</b>. No admin rights needed.</div></li>
             <li class="flex gap-4"><span class="w-7 h-7 shrink-0 rounded-full bg-brand text-white font-bold text-sm flex items-center justify-center">4</span><div><b>Finish</b> — desktop and Start Menu shortcuts are created. Leave <b>Run BMyDesk Agent</b> checked and click <b>Finish</b> — a window opens showing <b>your device code</b> (e.g. <code class="bg-slate-100 px-1.5 py-0.5 rounded">XK4M2N9P</code>).</div></li>
@@ -39,9 +39,9 @@
         </ol>
         <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
             <div class="font-bold text-slate-800 mb-1"><i class="fas fa-shield-halved text-green-600 mr-1"></i>Verify your download</div>
-            <p class="text-slate-600 mb-2">Only download from <code class="bg-slate-100 px-1 rounded">bmydesk.believoo.com</code>. The official v1.3.8 installer SHA-256 is:</p>
-            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">c41315a659e15ac4b1a5b10366bdea15393c9a3b3b564b8aa0ec1fac5bbc9db9</code>
-            <p class="text-slate-500 text-xs mt-2">In PowerShell: <code class="bg-slate-100 px-1 rounded">Get-FileHash BMyDesk-Agent-Setup-1.3.8.exe</code></p>
+            <p class="text-slate-600 mb-2">Only download from <code class="bg-slate-100 px-1 rounded">bmydesk.believoo.com</code>. The official v1.3.9 installer SHA-256 is:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">b1e3f3f4d44410a1e4fecdfe359cfe42eddc34d27f832d80a733292f15d31926</code>
+            <p class="text-slate-500 text-xs mt-2">In PowerShell: <code class="bg-slate-100 px-1 rounded">Get-FileHash BMyDesk-Agent-Setup-1.3.9.exe</code></p>
         </div>
     </div>
 
@@ -59,8 +59,8 @@
         </ol>
         <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
             <div class="font-bold text-slate-800 mb-1"><i class="fas fa-fingerprint text-green-600 mr-1"></i>Signed &amp; verified</div>
-            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.8 APK SHA-256:</p>
-            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">21bb053d3fe40a207771076730ce720dc6551042aaed57201055ed7ce3b3d400</code>
+            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.9 APK SHA-256:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">5801a195abec680ffd1e7cb07aa88cb41e05fae44200a545208bdd6d8c18720a</code>
         </div>
     </div>
 
