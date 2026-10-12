@@ -271,7 +271,7 @@ class RemoteController extends Controller {
             $r->merge(['kind' => substr($kind, 0, -5), 'sdp' => implode('', $buf)]);
             $kind = substr($kind, 0, -5);
         }
-        if (!in_array($kind, ['offer', 'answer', 'ice', 'end'], true)) abort(422);
+        if (!in_array($kind, ['offer', 'answer', 'ice', 'end', 'join-request'], true)) abort(422);
         $sdp = $r->input('sdp');
         if (is_string($sdp)) {
             // strip attribute lines some libwebrtc builds reject outright
@@ -285,6 +285,7 @@ class RemoteController extends Controller {
             'kind' => $kind,
             'sdp' => $sdp,
             'candidate' => $r->input('candidate'),
+            'name' => $r->input('name'),
         ];
         \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
             ->broadcast(['private-remote-agent.' . $session->session_code],

@@ -36,6 +36,12 @@
                 <div class="w-14 h-14 mx-auto mb-4 rounded-full border-4 border-[var(--bc-border)] animate-spin" style="border-top-color:var(--bc-cyan);"></div>
                 <p class="font-bold mb-1" id="waitTitle">Waiting for host approval…</p>
                 <p class="text-xs text-slate-500" id="waitSub">The host will see your request and accept it.</p>
+                <div id="waitProgWrap" class="mt-4">
+                    <div class="w-64 max-w-[80vw] h-1.5 bg-slate-700/40 rounded-full mx-auto mb-1.5 overflow-hidden">
+                        <div id="waitProg" class="h-full w-0 rounded-full transition-all duration-500" style="background:linear-gradient(90deg,var(--bc-cyan,#22d3ee),#f43f5e);"></div>
+                    </div>
+                    <div id="waitPct" class="text-[11px] text-slate-500 tabular-nums">0%</div>
+                </div>
             </div>
         </div>
         <div id="chatPanel" class="absolute right-0 top-0 bottom-0 w-72 bg-[var(--bc-card,#0f172a)]/95 border-l border-[var(--bc-border)] z-20 hidden flex-col">
@@ -69,6 +75,18 @@ function dbg(step) {
     const el = document.getElementById('debugLine');
     el.textContent = (el.textContent + ' › ' + step).slice(-140);
     console.log('[bmydesk]', step);
+}
+
+// Connection progress — moves through the join stages so the client can
+// tell waiting-for-approval apart from a dead screen.
+let wPct = 0;
+const wJoinedAt = Date.now();
+function wStage(pct, title, sub) {
+    wPct = Math.max(wPct, pct);
+    const b = document.getElementById('waitProg'); if (b) b.style.width = wPct + '%';
+    const p = document.getElementById('waitPct'); if (p) p.textContent = wPct + '%';
+    if (title) document.getElementById('waitTitle').textContent = title;
+    if (sub !== undefined) document.getElementById('waitSub').textContent = sub;
 }
 
 const pcConfig = { iceServers: @json($iceServers ?? [['urls' => 'stun:stun.l.google.com:19302']]) };
@@ -119,6 +137,7 @@ async function sendOfferRobust(sdp) {
 function onAccept() {
     setStatus('Accepted — starting stream…', 'text-green-400');
     dbg('host accepted');
+    wStage(60, 'Accepted — starting stream…');
     startPeer();
 }
 function onReject(reason) {
@@ -127,6 +146,7 @@ function onReject(reason) {
     document.getElementById('waitSub').textContent = (reason === 'device')
         ? 'The host device cannot share its screen from a browser. Ask them to use the BMyDesk Agent app.'
         : 'The host declined your request.';
+    document.getElementById('waitProgWrap').style.display = 'none';
 }
 function onEnded() {
     setStatus('Session ended by host', 'text-red-400');
@@ -134,6 +154,7 @@ function onEnded() {
     document.getElementById('waitOverlay').classList.remove('hidden');
     document.getElementById('waitTitle').textContent = 'Session ended';
     document.getElementById('waitSub').textContent = 'The host ended this remote session.';
+    document.getElementById('waitProgWrap').style.display = 'none';
 }
 function dispatchViewerSignal(m) {
     if (m.kind === 'accept') onAccept();
@@ -147,6 +168,10 @@ function dispatchViewerSignal(m) {
 function startViewerPoll() {
     setInterval(async () => {
         try {
+            // keep waiting state alive — elapsed seconds tell the client the
+            // host still has to press Accept.
+            if (wPct && wPct < 60)
+                wStage(wPct, 'Waiting for host approval… (' + Math.round((Date.now() - wJoinedAt) / 1000) + 's)');
             const r = await fetch(API + '/signals', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
             const d = await r.json();
             (d.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) { dbg('poll sig: ' + (m.kind || '?')); dispatchViewerSignal(m); } });
@@ -166,6 +191,7 @@ async function startPeer() {
 
     pc.ontrack = (e) => {
         dbg('video track arrived');
+        wStage(100, 'Connected');
         video.srcObject = e.streams[0];
         $('statOverlay')?.classList.remove('hidden');
         startStats();
@@ -183,7 +209,7 @@ async function startPeer() {
 
     pc.onconnectionstatechange = () => {
         dbg('peer ' + pc.connectionState);
-        if (pc.connectionState === 'connected') setStatus('Connected', 'text-green-400');
+        if (pc.connectionState === 'connected') { wStage(92, 'Almost there…'); setStatus('Connected', 'text-green-400'); }
         if (pc.connectionState === 'failed' && pc) {
             setStatus('Reconnecting…', 'text-amber-400');
             try { pc.restartIce(); } catch (e) {}
@@ -220,6 +246,7 @@ async function startPeer() {
     };
     sendOffer();
     setStatus('Connecting…', 'text-amber-400');
+    wStage(72, 'Negotiating secure link…');
     if (streamTimeout) clearTimeout(streamTimeout);
     streamTimeout = setTimeout(() => {
         if (!connected) {
@@ -243,6 +270,7 @@ async function onSignal(m) {
     try {
         if (m.kind === 'answer') {
             dbg('answer received');
+            wStage(84, 'Answer received — connecting…');
             try { await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); }
             catch (e) { await pc.setRemoteDescription({ type: 'answer', sdp: cleanSdp(m.sdp) }); }
             iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
@@ -444,6 +472,7 @@ function initChannel() {
         document.getElementById('waitSub').textContent = 'Refresh the page and try again.';
         return;
     }
+    wStage(15, 'Waiting for host approval…');
     const p = new Pusher(@json(config('broadcasting.connections.reverb.key')), {
         cluster: 'mt1',
         wsHost: 'believoo.com',
@@ -471,13 +500,17 @@ function initChannel() {
         clearTimeout(subTimeout);
         setStatus('Requesting access…', 'text-amber-400');
         dbg('channel subscribed');
+        wStage(45, 'Waiting for host approval…');
         whisper('join-request', { name: VIEWER });
+        // queue the request too — a dead host ws must not hide the prompt
+        sendSignal({ kind: 'join-request', name: VIEWER });
         dbg('join-request sent');
     });
     channel.bind('pusher:subscription_error', () => {
         clearTimeout(subTimeout);
         setStatus('Channel auth failed — reload', 'text-red-400');
         dbg('subscription_error');
+        wStage(Math.max(wPct, 30), 'Connecting over relay…');
     });
 
     channel.bind('client-join-accept', (m) => { if (sigNew(m)) onAccept(); });

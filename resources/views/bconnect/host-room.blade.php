@@ -180,6 +180,14 @@ async function handleOffer(m) {
 }
 
 async function onSignal(m) {
+    // queued join-request (agent API / dead-ws relay) — same as the ws
+    // client-join-request binding; drained once per nonce so no repeat pop.
+    if (m.kind === 'join-request') {
+        if (document.getElementById('joinRequest').classList.contains('hidden') && !pc
+            && (!m.at || Date.parse(m.at) > respondedAt))
+            showJoinRequest(m.name || 'Someone');
+        return;
+    }
     if (m.kind === 'offer') return handleOffer(m);
     if (m.kind === 'ice' && m.candidate) {
         if (pc && pc.remoteDescription) await pc.addIceCandidate(m.candidate).catch(() => {});

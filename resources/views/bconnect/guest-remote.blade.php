@@ -108,6 +108,12 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
                 <div class="spin"></div>
                 <b id="waitTitle">Waiting for host approval…</b>
                 <div style="color:var(--dim);font-size:12px;margin-top:6px" id="waitSub">The host will see your request.</div>
+                <div id="waitProgWrap" style="margin-top:16px;">
+                    <div style="width:260px;max-width:80vw;height:6px;background:rgba(148,163,184,.16);border-radius:99px;margin:0 auto 6px;overflow:hidden;">
+                        <div id="waitProg" style="height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--rose));border-radius:99px;transition:width .45s ease;"></div>
+                    </div>
+                    <div id="waitPct" style="color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;">0%</div>
+                </div>
             </div>
         </div>
         <div id="clickHint" style="display:none">Click the screen once to enable keyboard &amp; mouse — Esc to release.</div>
@@ -131,6 +137,23 @@ const iceQueue = [];
 const $ = id => document.getElementById(id);
 const dbg = s => { const el = $('joinDbg'); el.textContent = (el.textContent + ' › ' + s).slice(-160); console.log('[guest]', s); };
 const setBadge = (t, on) => { $('connBadge').textContent = t; $('connBadge').className = 'badge' + (on ? ' on' : ''); };
+
+// Connection progress — the bar moves through the join stages so the client
+// isn't staring at a dead "waiting…" screen.
+let gPct = 0, gJoinedAt = 0;
+function gStage(pct, title, sub) {
+    gPct = Math.max(gPct, pct);
+    const b = $('waitProg'); if (b) b.style.width = gPct + '%';
+    const p = $('waitPct'); if (p) p.textContent = gPct + '%';
+    if (title) $('waitTitle').textContent = title;
+    if (sub !== undefined) $('waitSub').textContent = sub;
+}
+function gProgReset() {
+    gPct = 0; gJoinedAt = 0;
+    const b = $('waitProg'); if (b) b.style.width = '0%';
+    const p = $('waitPct'); if (p) p.textContent = '0%';
+    const w = $('waitProgWrap'); if (w) w.style.display = '';
+}
 
 const seenSig = new Set();
 function sigNew(m) {
@@ -183,13 +206,15 @@ async function join() {
         return;
     }
     saveRecent(code);
-    if (d.auto_accepted) { setBadge('accepted'); setTimeout(() => startPeer(), 400); }
+    if (d.auto_accepted) { setBadge('accepted'); setTimeout(() => { gStage(60, 'Accepted — starting stream…'); startPeer(); }, 400); }
     CODE = code; VTOKEN = d.viewer_token; channelName = d.channel;
     window.__ice = d.ice_servers || [{ urls: 'stun:stun.l.google.com:19302' }];
     $('hostLabel').textContent = d.host_label || 'Remote device';
     $('codeEcho').textContent = code;
     $('joinCard').classList.add('hidden'); $('stage').classList.remove('hidden');
     dbg('joined'); setBadge('requesting');
+    gProgReset(); gJoinedAt = Date.now();
+    gStage(15, 'Waiting for host approval…', 'The host will see your request.');
     initChannel();
     startViewerPoll();
 }
@@ -211,10 +236,11 @@ function initChannel() {
     channel = pusher.subscribe(channelName);
     channel.bind('pusher:subscription_succeeded', () => {
         dbg('subscribed');
+        gStage(45, 'Waiting for host approval…');
         whisper('join-request', { name: $('nameInput').value.trim() || 'Guest' });
         dbg('join-request sent');
     });
-    channel.bind('pusher:subscription_error', () => dbg('sub error (poll fallback active)'));
+    channel.bind('pusher:subscription_error', () => { dbg('sub error (poll fallback active)'); gStage(Math.max(gPct, 30), 'Connecting over relay…'); });
     channel.bind('client-join-accept', m => { if (sigNew(m)) onAccept(); });
     channel.bind('client-join-reject', m => { if (sigNew(m)) onReject(m && m.reason); });
     channel.bind('client-signal', m => { if (sigNew(m)) onSignal(m); });
@@ -225,6 +251,10 @@ function initChannel() {
 function startViewerPoll() {
     setInterval(async () => {
         try {
+            // keep the waiting state alive — elapsed seconds tell the client
+            // the host still has to press Accept.
+            if (gPct && gPct < 60 && gJoinedAt)
+                gStage(gPct, 'Waiting for host approval… (' + Math.round((Date.now() - gJoinedAt) / 1000) + 's)');
             const r = await fetch(API + '/' + CODE + '/signals?agent_token=' + encodeURIComponent(VTOKEN), { headers: { 'Accept': 'application/json' } });
             const d = await r.json();
             (d.signals || []).forEach(m => { if (sigNew(m) && sigFresh(m)) { dbg('poll:' + (m.kind || '?')); dispatchSignal(m); } });
@@ -244,11 +274,12 @@ function dispatchSignal(m) {
     else onSignal(m);
 }
 
-function onAccept() { setBadge('accepted'); dbg('accepted'); startPeer(); }
+function onAccept() { setBadge('accepted'); dbg('accepted'); gStage(60, 'Accepted — starting stream…'); startPeer(); }
 function onReject(reason) {
     setBadge('rejected');
     $('waitTitle').textContent = 'Connection declined';
     $('waitSub').textContent = 'The host declined your request.';
+    $('waitProgWrap').style.display = 'none';
     $('waitOverlay').classList.remove('hidden');
 }
 function onEnded(backToJoin) {
@@ -258,6 +289,7 @@ function onEnded(backToJoin) {
         $('joinBtn').disabled = false; $('joinErr').textContent = 'Session ended or unavailable.';
     } else {
         $('waitTitle').textContent = 'Session ended'; $('waitSub').textContent = 'The host ended this session.';
+        $('waitProgWrap').style.display = 'none';
         $('waitOverlay').classList.remove('hidden');
     }
 }
@@ -267,6 +299,7 @@ async function startPeer() {
     pc = new RTCPeerConnection({ iceServers: window.__ice });
     pc.ontrack = e => {
         dbg('video');
+        gStage(100, 'Connected');
         $('remoteVideo').srcObject = e.streams[0];
         $('statOverlay').style.display = 'block';
         startStats();
@@ -279,7 +312,7 @@ async function startPeer() {
     pc.onicecandidate = e => { if (e.candidate) sendSignal({ kind: 'ice', candidate: e.candidate }); };
     pc.onconnectionstatechange = () => {
         dbg('peer ' + pc.connectionState);
-        if (pc.connectionState === 'connected') setBadge('connected', true);
+        if (pc.connectionState === 'connected') { gStage(92, 'Almost there…'); setBadge('connected', true); }
         if (pc.connectionState === 'failed' && pc) { setBadge('reconnecting'); try { pc.restartIce(); } catch (e) {} }
         if (['disconnected', 'closed'].includes(pc.connectionState)) setBadge('lost');
     };
@@ -304,6 +337,7 @@ async function startPeer() {
     };
     sendOffer();
     setBadge('negotiating');
+    gStage(72, 'Negotiating secure link…');
     streamTimeout = setTimeout(() => {
         if (!connected) {
             setBadge('no response');
@@ -319,6 +353,7 @@ async function onSignal(m) {
     try {
         if (m.kind === 'answer') {
             dbg('answer');
+            gStage(84, 'Answer received — connecting…');
             try { await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); }
             catch (e) { await pc.setRemoteDescription({ type: 'answer', sdp: cleanSdp(m.sdp) }); }
             iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {})); iceQueue.length = 0;

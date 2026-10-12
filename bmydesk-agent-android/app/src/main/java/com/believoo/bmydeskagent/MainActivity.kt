@@ -50,6 +50,9 @@ class MainActivity : Activity() {
     private lateinit var remotePinInput: android.widget.EditText
     private lateinit var viewerPane: android.widget.FrameLayout
     private lateinit var viewerStatus: TextView
+    private lateinit var vProgress: ProgressBar
+    @Volatile private var vProgPct = 0
+    @Volatile private var vJoinedAtMs = 0L
 
     // Session tools (chat + file) — shared by host + viewer modes
     private lateinit var sessRow: LinearLayout
@@ -885,9 +888,23 @@ class MainActivity : Activity() {
     private var vJoin: AgentApi.JoinResult? = null
     @Volatile private var viewerPollRunning = false
 
+    // Connection progress — the bar keeps moving through the join stages so
+    // the client isn't staring at a dead "connecting…" label.
+    private fun vStage(pct: Int, text: String) {
+        vProgPct = maxOf(vProgPct, pct)
+        ui {
+            if (::vProgress.isInitialized) vProgress.progress = vProgPct
+            viewerStatus.text = "$text — $vProgPct%"
+        }
+    }
+    private fun vProgReset() {
+        vProgPct = 0; vJoinedAtMs = 0
+        ui { if (::vProgress.isInitialized) vProgress.progress = 0 }
+    }
+
     private fun handleViewerSignal(j: AgentApi.JoinResult, p: JsonObject) {
         when (p.get("kind")?.asString) {
-            "accept" -> ui { viewerStatus.text = "Accepted — starting stream…"; startViewerPeer(j) }
+            "accept" -> { vStage(60, "Accepted — starting stream…"); ui { startViewerPeer(j) } }
             "reject" -> { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
             "end" -> { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
             else -> remoteViewer?.onSignal(p)
@@ -902,6 +919,10 @@ class MainActivity : Activity() {
         thread {
             while (vJoin != null) {
                 try {
+                    // keep the waiting state alive — elapsed seconds tell the
+                    // client the host still has to press Accept.
+                    if (vProgPct in 1 until 60 && vJoinedAtMs > 0)
+                        vStage(vProgPct, "Waiting for host approval… ${(System.currentTimeMillis() - vJoinedAtMs) / 1000}s")
                     api.drainSignals(code, j.viewerToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleViewerSignal(j, p) }
                     if (remoteViewer == null) {
                         val st = api.status(code, j.viewerToken)
@@ -921,7 +942,15 @@ class MainActivity : Activity() {
         if (code.length < 6) { remoteCodeInput.requestFocus(); return }
         ui {
             viewerPane.visibility = View.VISIBLE
+            vProgReset()
             viewerStatus.text = "Joining $code…"
+        }
+        // joining your own code just hangs — the request prompt lands behind
+        // the viewer pane; refuse it up front instead of "waiting" forever.
+        if (code == reg?.code) {
+            ui { viewerStatus.text = "That's your own code — enter a partner's" }
+            thread { Thread.sleep(2000); ui { exitViewer() } }
+            return
         }
         if (!signaling.isConnected) {
             ui { viewerStatus.text = "Agent channel not ready yet — wait for \"Ready\" then retry" }
@@ -932,20 +961,22 @@ class MainActivity : Activity() {
             try {
                 val j = api.join(code, remotePinInput.text.toString().trim().ifBlank { null })
                 vJoin = j
-                if (j.autoAccepted) { ui { viewerStatus.text = "Unattended access — starting stream…"; startViewerPeer(j) } }
+                vJoinedAtMs = System.currentTimeMillis()
+                vStage(15, "Joined — opening channel…")
+                if (j.autoAccepted) { vStage(60, "Unattended access — starting stream…"); ui { startViewerPeer(j) } }
                 signaling.viewerRelay = { payload -> thread { api.signal(code, j.viewerToken, payload) } }
                 startViewerPoll(j, code)
                 signaling.connectViewer(j.channel, j.viewerToken, object : SignalingClient.Listener {
                     override fun onConnected() {}
-                    override fun onDisconnected() { ui { viewerStatus.text = "Signaling lost — relay mode active" } }
+                    override fun onDisconnected() { vStage(30, "Signaling lost — relay mode active") }
                     override fun onJoinRequest(name: String) {}
                     override fun onSubscribed() {
                         signaling.sendViewer("join-request", JsonObject().apply {
                             addProperty("name", (android.os.Build.MODEL ?: "Android") + " (app)")
                         })
-                        ui { viewerStatus.text = "Waiting for host approval…" }
+                        vStage(45, "Waiting for host approval…")
                     }
-                    override fun onJoinAccept() { ui { viewerStatus.text = "Accepted — starting stream…"; startViewerPeer(j) } }
+                    override fun onJoinAccept() { vStage(60, "Accepted — starting stream…"); ui { startViewerPeer(j) } }
                     override fun onJoinReject() { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
                     override fun onSignal(p: JsonObject) { if (sigNew(p)) handleViewerSignal(j, p) }
                     override fun onEnd() { ui { viewerStatus.text = "Host ended session"; thread { Thread.sleep(1200); ui { exitViewer() } } } }
@@ -959,17 +990,18 @@ class MainActivity : Activity() {
 
     private fun startViewerPeer(j: AgentApi.JoinResult) {
         if (remoteViewer != null) return // accept may arrive via ws + queue both
+        vStage(72, "Negotiating secure link…")
         remoteViewer = RemoteViewer(this).apply {
             listener = object : RemoteViewer.Listener {
                 override fun sendSignal(payload: JsonObject) = signaling.sendViewer("signal", payload)
-                override fun onPeerConnected() = ui { viewerStatus.text = "Connected — touch to control" }
+                override fun onPeerConnected() = vStage(92, "Almost there…")
                 override fun onPeerDisconnected() = ui { viewerStatus.text = "Disconnected" }
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
                     remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, null)
                     remoteSurface!!.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     track.addSink(remoteSurface)
                     bindViewerTouch()
-                    viewerStatus.text = "Live — touch to control"
+                    vStage(100, "Live — touch to control")
                 }
                 override fun onError(message: String) = ui { viewerStatus.text = message }
             }
@@ -1059,6 +1091,7 @@ class MainActivity : Activity() {
         vScale = 1f; panX = 0f; panY = 0f; keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
+        vProgReset()
     }
 
     override fun onDestroy() {
