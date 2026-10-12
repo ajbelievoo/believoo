@@ -91,11 +91,13 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             <button class="endbtn" id="chatBtn" title="Chat" style="background:#1e293b;color:#e2e8f0;display:none;">💬</button>
             <button class="endbtn" id="shotBtn" title="Screenshot" style="background:#1e293b;color:#e2e8f0;display:none;">📸</button>
             <button class="endbtn" id="recBtn" title="Record session" style="background:#1e293b;color:#e2e8f0;display:none;">⏺</button>
+            <button class="endbtn" id="kbdBtn" title="Keyboard" style="background:#1e293b;color:#e2e8f0;display:none;">⌨</button>
             <select id="qualitySel" title="Quality" style="background:#1e293b;border:0;color:#94a3b8;font-size:11px;padding:5px;border-radius:6px;display:none;">
                 <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
             </select>
             <button class="endbtn" id="endBtn">End session</button>
             <input type="file" id="fileInput" style="display:none">
+            <input type="text" id="mobKbd" autocomplete="off" autocorrect="off" autocapitalize="none" style="position:fixed;bottom:-60px;left:0;width:2px;height:2px;opacity:.01;border:0;z-index:-1">
         </div>
     </div>
     <div class="stage-video">
@@ -269,8 +271,8 @@ async function startPeer() {
     };
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel'].forEach(i => $(i).style.display = 'inline-block'); };
-    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','chatPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn'].forEach(i => $(i).style.display = 'inline-block'); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','chatPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onmessage = e => {
         try { const m = JSON.parse(e.data); if (m.t === 'pong') { $('latBadge').style.display = 'inline-block'; $('latVal').textContent = Math.round(performance.now() - m.ts); } } catch (x) {}
@@ -454,21 +456,65 @@ video.addEventListener('mouseup', e => sendInput({ t: 'up', b: e.button }));
 video.addEventListener('wheel', e => { e.preventDefault(); sendInput({ t: 'wheel', dx: e.deltaX, dy: e.deltaY }); }, { passive: false });
 video.addEventListener('keydown', e => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
 video.addEventListener('keyup', e => { e.preventDefault(); sendInput({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }); });
-let touchMoved = false;
+let touchMoved = false, touchStartMs = 0, twoFinger = false, lastPinchY = 0, lpTimer = null;
 const tpos = t => { const r = video.getBoundingClientRect(); return { x: (t.clientX - r.left) / r.width, y: (t.clientY - r.top) / r.height }; };
-video.addEventListener('touchstart', e => { touchMoved = false; e.preventDefault(); }, { passive: false });
+video.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+        twoFinger = true; touchMoved = true; lastPinchY = e.touches[0].clientY;
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+        return; // two-finger → scroll; tap later → right-click
+    }
+    twoFinger = false; touchMoved = false; touchStartMs = performance.now();
+    // long-press (600ms, no move) → right click
+    const p0 = tpos(e.touches[0]);
+    lpTimer = setTimeout(() => {
+        if (!touchMoved) {
+            sendInput({ t: 'move', x: p0.x, y: p0.y }); sendInput({ t: 'down', b: 2 });
+            setTimeout(() => sendInput({ t: 'up', b: 2 }), 60);
+            lpTimer = 'fired'; if (navigator.vibrate) navigator.vibrate(25);
+        }
+    }, 600);
+}, { passive: false });
 video.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) { // two-finger drag → scroll
+        const y = e.touches[0].clientY, dy = lastPinchY - y; lastPinchY = y;
+        sendInput({ t: 'wheel', dx: 0, dy: dy * 3 }); return;
+    }
+    if (lpTimer && lpTimer !== 'fired' && !touchMoved) { clearTimeout(lpTimer); lpTimer = null; }
+    if (lpTimer === 'fired') return;
     touchMoved = true; const p = tpos(e.touches[0]);
     const now = performance.now(); if (now - lastMove < 33) return; lastMove = now;
     sendInput({ t: 'move', x: p.x, y: p.y });
 }, { passive: true });
 video.addEventListener('touchend', e => {
+    if (lpTimer && lpTimer !== 'fired') { clearTimeout(lpTimer); lpTimer = null; }
+    if (twoFinger) {
+        twoFinger = false;
+        if (!touchMoved || performance.now() - touchStartMs < 250) { /* was scroll */ }
+        return;
+    }
+    if (lpTimer === 'fired') { lpTimer = null; return; }
     if (!touchMoved && e.changedTouches.length) {
         const p = tpos(e.changedTouches[0]);
         sendInput({ t: 'move', x: p.x, y: p.y }); sendInput({ t: 'down', b: 0 });
         setTimeout(() => sendInput({ t: 'up', b: 0 }), 60);
     }
 }, { passive: true });
+// soft-keyboard button → hidden input focuses → mobile keyboard opens → keys forwarded
+document.getElementById('kbdBtn')?.addEventListener('click', () => {
+    const i = document.getElementById('mobKbd');
+    i.style.display = 'block'; i.focus();
+    i.addEventListener('blur', () => { i.style.display = 'none'; }, { once: true });
+});
+document.getElementById('mobKbd')?.addEventListener('keydown', e => {
+    e.preventDefault();
+    sendInput({ t: 'key', k: e.key, code: e.code, down: true, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey });
+    if (e.key === 'Backspace') sendInput({ t: 'key', k: e.key, code: e.code, down: false });
+});
+document.getElementById('mobKbd')?.addEventListener('keyup', e => {
+    if (e.key !== 'Backspace') sendInput({ t: 'key', k: e.key, code: e.code, down: false, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey });
+});
 video.addEventListener('contextmenu', e => e.preventDefault());
 video.addEventListener('click', () => { video.focus(); $('clickHint').style.display = 'none'; });
 

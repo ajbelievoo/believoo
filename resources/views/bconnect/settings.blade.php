@@ -16,7 +16,12 @@
     <div class="space-y-2 mb-4">
         @foreach($canned as $cr)
             <details class="bg-slate-800/50 rounded-lg p-3">
-                <summary class="text-sm font-semibold cursor-pointer">{{ $cr->title }}</summary>
+                <summary class="text-sm font-semibold cursor-pointer flex justify-between items-center">
+                    <span>{{ $cr->title }}</span>
+                    <form method="POST" action="{{ route('bconnect.canned.delete', $cr->id) }}" onsubmit="event.stopPropagation(); return confirm('Delete this canned response?');">@csrf @method('DELETE')
+                        <button class="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                    </form>
+                </summary>
                 <p class="text-xs text-slate-400 mt-2 whitespace-pre-line">{{ $cr->body }}</p>
             </details>
         @endforeach
