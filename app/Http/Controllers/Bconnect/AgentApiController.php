@@ -12,7 +12,7 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.3.2';
+    const AGENT_LATEST_WINDOWS = '1.3.3';
     const AGENT_LATEST_ANDROID = '1.3.3';
 
     protected function findByCode(string $code): ?RemoteSession
@@ -320,6 +320,16 @@ class AgentApiController extends Controller
             'viewer_name' => Str::limit((string) $r->input('name', ''), 60, '') ?: null,
             'status' => $session->status === 'waiting' ? 'connecting' : $session->status,
         ]);
+
+        // Relay-mode viewers can't whisper client-join-request over ws (their
+        // socket is dead by definition), so the host's HTTP drain carries the
+        // request too. Hosts dedupe against viewer_joined_at/ws delivery.
+        if (!$autoAccept) {
+            $this->queueSignal($session->session_code, 'h', [
+                'kind' => 'join-request',
+                'name' => $session->viewer_name ?: 'Someone',
+            ]);
+        }
 
         if ($autoAccept) {
             $session->update(['status' => 'active']);

@@ -220,11 +220,8 @@ function startStatusPoll() {
             // waiting for our answer regardless of how long ago they joined.
             if (joinMs && joinMs > respondedAt && d.status === 'connecting'
                 && $('reqBox').classList.contains('hidden') && !pc) {
-                $('reqName').textContent = (d.viewer || 'Someone') +
-                    (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : '');
-                $('reqBox').classList.remove('hidden');
-                window.agent.attention(d.viewer);
-                setStatus('Connection request…', 'wait');
+                showJoinReq((d.viewer || 'Someone') +
+                    (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : ''));
             }
             // viewer gave up / server moved past it — hide a stale prompt
             if (d.status !== 'connecting' && $('reqBox') && !$('reqBox').classList.contains('hidden') && !pc) {
@@ -238,6 +235,16 @@ function startStatusPoll() {
             (sd.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) dispatchHostSignal(m); });
         } catch (e) {}
     }, 3000);
+}
+
+// One place that surfaces "someone wants in" — used by the ws whisper, the
+// HTTP drain ('join-request' queued server-side), and the /status poll.
+function showJoinReq(name) {
+    $('reqName').textContent = name || 'Someone';
+    $('reqBox').classList.remove('hidden');
+    window.agent.attention(name);
+    setStatus('Connection request…', 'wait');
+    try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play().catch(()=>{}); } catch(e){}
 }
 
 function connectChannel() {
@@ -285,13 +292,7 @@ function connectChannel() {
         setTimeout(connectChannel, 5000);
     });
 
-    ch.bind('client-join-request', (m) => {
-        $('reqName').textContent = m.name || 'Someone';
-        $('reqBox').classList.remove('hidden');
-        window.agent.attention(m.name);
-        setStatus('Connection request…', 'wait');
-        try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play().catch(()=>{}); } catch(e){}
-    });
+    ch.bind('client-join-request', (m) => showJoinReq(m.name));
 
     ch.bind('client-signal', (m) => { if (sigNew(m)) dispatchHostSignal(m); });
     ch.bind('client-end', (m) => { if (sigNew(m)) teardown('Viewer disconnected'); });
@@ -300,7 +301,8 @@ function connectChannel() {
 // one dispatcher for host signals — same handling whether they arrive by
 // ws broadcast or the HTTP fallback queue.
 function dispatchHostSignal(m) {
-    if (m.kind === 'offer') handleOffer(m);
+    if (m.kind === 'join-request') showJoinReq(m.name);
+    else if (m.kind === 'offer') handleOffer(m);
     else if (m.kind === 'ice' && m.candidate) {
         if (pc && pc.remoteDescription) pc.addIceCandidate(m.candidate).catch(() => {});
         else iceQueue.push(m.candidate);
@@ -641,6 +643,25 @@ window.addEventListener('beforeunload', () => {
 
 // ═══════════ VIEWER MODE — connect to a partner's code (Remote Desk) ═══════════
 let vCh = null, vPc = null, vDc = null, vJoinedCode = null;
+let vProgPct = 0, vJoinedAt = 0;
+
+// Connection progress — advances the overlay bar through the join stages so
+// the client can see motion instead of a dead "connecting…" screen.
+function vStage(pct, text) {
+    vProgPct = Math.max(vProgPct, pct);
+    const bar = $('vProgBar'); if (bar) bar.style.width = vProgPct + '%';
+    const p = $('vProgPct'); if (p) p.textContent = vProgPct + '%';
+    if (text) {
+        const t = $('vOverlayText'); if (t) t.textContent = text;
+        vStatus(text);
+    }
+}
+function vProgReset() {
+    vProgPct = 0; vJoinedAt = 0;
+    const bar = $('vProgBar'); if (bar) bar.style.width = '0%';
+    const p = $('vProgPct'); if (p) p.textContent = '0%';
+    const t = $('vOverlayText'); if (t) t.textContent = 'Connecting to remote device…';
+}
 
 function vStatus(t) { $('viewerStatus').textContent = t; }
 function vDbg(t) { const el = $('viewerDebug'); if (el) { el.textContent = (el.textContent ? el.textContent + ' › ' : '') + t; } }
@@ -654,7 +675,17 @@ async function connectToPartner() {
     $('viewerPane').classList.remove('hidden');
     $('viewerOverlay').classList.remove('hidden');
     window.agent.setViewMode(true);
+    vProgReset();
     vStatus('Joining ' + code + '…');
+
+    // joining your own code just hangs — the request prompt lands behind the
+    // viewer pane; refuse it up front instead of "waiting" forever.
+    if (session && code === session.session_code) {
+        vStage(0, "That's your own code — enter a partner's");
+        $('connectBtn').disabled = false;
+        setTimeout(() => exitViewer(0), 2500);
+        return;
+    }
 
     try {
         const r = await fetch(API + '/' + code + '/join', {
@@ -664,9 +695,11 @@ async function connectToPartner() {
                 pin: ($('remotePin') && $('remotePin').value.trim()) || undefined,
             }),
         });
-        const d = await r.json();
-        if (!d.ok) throw new Error(d.error || 'join failed');
+        const d = await r.json().catch(() => null);
+        if (!d || !d.ok) throw new Error((d && (d.error || d.message)) || ('join failed (HTTP ' + r.status + ')'));
         saveRecent(code);
+        vStage(15, 'Joined — opening channel…');
+        vJoinedAt = Date.now();
         if (d.auto_accepted) vAutoAccepted = true;
         vJoinedCode = code;
         const vToken = d.viewer_token;
@@ -684,7 +717,7 @@ async function connectToPartner() {
         vDbgReset(); vDbg('subscribing');
         vp.connection.bind('state_change', (s) => vDbg('ws:' + s.current));
         const subTimeout = setTimeout(() => {
-            vStatus('Relay mode — waiting for host approval…');
+            vStage(30, 'Relay mode — waiting for host approval…');
             vDbg('ws timeout — http fallback');
             startViewerPoll();
         }, 20000);
