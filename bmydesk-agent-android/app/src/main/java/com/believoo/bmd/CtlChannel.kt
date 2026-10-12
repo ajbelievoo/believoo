@@ -52,6 +52,16 @@ class CtlChannel(private val gson: Gson = Gson()) {
                     rxSize = m.get("size")?.asInt ?: 0
                     rxBuf.reset()
                 }
+                "file-cancel" -> { rxName = null; rxBuf.reset(); sink?.onChat("System", "Transfer cancelled by peer") }
+                // remote-terminal output + host mode notices render in the chat
+                "cmd-out" -> sink?.onChat("Host ▸", m.get("out")?.asString ?: "(no output)")
+                "view-only" -> sink?.onChat("System", if (m.get("on")?.asBoolean == true)
+                    "Host locked remote input (view-only mode)" else "Host re-enabled remote input")
+                // host-side actions — Android can't exec shell/reboot/switch displays
+                "cmd", "reboot", "screen" -> send(JsonObject().apply {
+                    addProperty("t", "cmd-out")
+                    addProperty("out", "'${m.get("t")?.asString}' is not supported on this host")
+                })
             }
         } else if (rxName != null) {
             rxBuf.write(bytes)
@@ -78,6 +88,13 @@ class CtlChannel(private val gson: Gson = Gson()) {
     fun sendClip(text: String) = send(JsonObject().apply {
         addProperty("t", "clip"); addProperty("text", text)
     })
+
+    // viewer → host remote-control actions (desktop hosts only)
+    fun sendCmd(cmd: String) = send(JsonObject().apply {
+        addProperty("t", "cmd"); addProperty("cmd", cmd)
+    })
+    fun sendScreen() = send(JsonObject().apply { addProperty("t", "screen") })
+    fun sendReboot() = send(JsonObject().apply { addProperty("t", "reboot") })
 
     fun sendFile(name: String, data: ByteArray, chunk: Int = 16384) {
         val d = dc ?: return

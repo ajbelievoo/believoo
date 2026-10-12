@@ -21,6 +21,8 @@
             <button id="chatBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Chat"><i class="fas fa-comment mr-1"></i>Chat</button>
             <button id="shotBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Screenshot"><i class="fas fa-camera mr-1"></i></button>
             <button id="recBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Record session"><i class="fas fa-circle mr-1"></i></button>
+            <button id="monBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Switch remote display"><i class="fas fa-desktop mr-1"></i></button>
+            <button id="rebootBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Reboot remote computer"><i class="fas fa-power-off mr-1"></i></button>
             <select id="qualitySel" title="Quality" class="bc-btn bc-btn-secondary text-sm hidden" style="padding:4px 8px;">
                 <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
             </select>
@@ -226,8 +228,8 @@ async function startPeer() {
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel'].forEach(i => $(i).classList.remove('hidden')); };
-    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','chatPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn'].forEach(i => $(i).classList.remove('hidden')); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','chatPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onopen = () => { if (CAN_CONTROL) document.getElementById('inputBadge').classList.remove('hidden'); };
     dc.onclose = () => document.getElementById('inputBadge').classList.add('hidden');
@@ -325,6 +327,8 @@ async function onCtlMessage(e) {
             if (m.t === 'chat') addChat(m.from || 'Remote', m.text, false);
             else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
+            else if (m.t === 'cmd-out') addChat('Host ▸', m.out || '(no output)', false);
+            else if (m.t === 'view-only') addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
             if (rxFile.got >= rxFile.size) {
@@ -348,11 +352,19 @@ function addChat(from, text, mine) {
 const $ = id => document.getElementById(id);
 $('chatSend').onclick = () => {
     const t = $('chatInput').value.trim(); if (!t) return;
-    ctlSend({ t: 'chat', from: VIEWER, text: t });
-    addChat('Me', t, true); $('chatInput').value = '';
+    if (t.startsWith('/cmd ')) {
+        const c = t.slice(5).trim();
+        if (c) { ctlSend({ t: 'cmd', cmd: c }); addChat('Me ▸', c, true); }
+    } else {
+        ctlSend({ t: 'chat', from: VIEWER, text: t });
+        addChat('Me', t, true);
+    }
+    $('chatInput').value = '';
 };
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
+$('monBtn').onclick = () => ctlSend({ t: 'screen' });
+$('rebootBtn').onclick = () => { if (confirm('Reboot the REMOTE computer now?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'reboot' }); };
 
 let stTimer = null, stBytes = 0, stAt = 0, sessStart = 0, sessT = null, autoDropped = false;
 function startSessionTimer() {

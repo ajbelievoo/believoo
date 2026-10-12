@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('agent', {
     saveFile: (name, b64) => ipcRenderer.invoke('save-file', name, b64),
     clipboardGet: () => ipcRenderer.invoke('clipboard-get'),
     clipboardSet: (t) => ipcRenderer.send('clipboard-set', t),
+    execCmd: (c) => ipcRenderer.invoke('exec-cmd', c),
+    sysReboot: () => ipcRenderer.invoke('sys-reboot'),
     privacyScreen: (on) => ipcRenderer.send('privacy-screen', !!on),
     attention: (name) => ipcRenderer.send('attention', name),
     onUpdate: (cb) => ipcRenderer.on('agent-update', (_e, d) => cb(d)),

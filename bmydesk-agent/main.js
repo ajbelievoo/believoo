@@ -215,6 +215,27 @@ ipcMain.handle('save-file', async (_e, name, b64) => {
 ipcMain.handle('clipboard-get', () => clipboard.readText());
 ipcMain.on('clipboard-set', (_e, t) => clipboard.writeText(String(t || '')));
 
+// ── Remote terminal + power (viewer → ctl 'cmd'/'reboot') ──
+const { exec } = require('child_process');
+ipcMain.handle('exec-cmd', (_e, cmd) => new Promise((resolve) => {
+    exec(String(cmd || '').slice(0, 1000), {
+        timeout: 20000, maxBuffer: 512 * 1024,
+        cwd: app.getPath('home'), windowsHide: true,
+    }, (err, stdout, stderr) => {
+        let out = String(stdout || '') + (stderr ? '\n' + String(stderr) : '');
+        if (err && !out.trim()) out = String(err.message || err);
+        resolve(out.slice(0, 4000).trimEnd() || '(no output)');
+    });
+}));
+ipcMain.handle('sys-reboot', () => {
+    const plat = process.platform;
+    const cmd = plat === 'win32' ? 'shutdown /r /t 15 /c "BMyDesk remote session requested reboot"'
+        : plat === 'darwin' ? 'osascript -e "tell application \\"System Events\\" to restart"'
+        : 'systemctl reboot';
+    exec(cmd, () => {});
+    return true;
+});
+
 ipcMain.handle('get-display-size', async () => {
     const d = screen.getPrimaryDisplay();
     return { width: d.size.width, height: d.size.height, scale: d.scaleFactor };

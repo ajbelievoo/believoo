@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.5';
+const APP_VERSION = '1.3.6';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -400,6 +400,7 @@ async function handleOffer(m) {
     try {
         const sourceId = await pickScreen();
         if (!sourceId) { hdbg('no screen sources found'); setStatus('No screen to share', 'off'); hostSignal({ kind: 'end' }); offering = false; return; }
+        curSourceId = sourceId;
         await captureScreen(sourceId);
 
         pc = new RTCPeerConnection(pcConfig);
@@ -416,6 +417,7 @@ async function handleOffer(m) {
                 try {
                     const msg = JSON.parse(ev.data);
                     if (msg.t === 'ping') { dcIn.send(JSON.stringify({ t: 'pong', ts: msg.ts })); return; }
+                    if (viewOnly) return; // host locked remote input
                     window.agent.sendInput(msg); // inject into host OS
                 } catch (err) {}
             };
@@ -470,7 +472,13 @@ function cancelTransfer() {
 function wireCtl(ch) {
     ctl = ch;
     ctl.onmessage = onCtlMessage;
-    ctl.onopen = () => $('sessBar')?.classList.remove('hidden');
+    ctl.onopen = () => {
+        $('sessBar')?.classList.remove('hidden');
+        // mode-specific buttons: viewers get control buttons, hosts get safety toggles
+        const v = isViewing();
+        ['monBtn', 'rebootBtn', 'fsBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? '' : 'none'; });
+        ['viewOnlyBtn', 'hostMonBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? 'none' : ''; });
+    };
     ctl.onclose = () => { $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden'); };
 }
 function ctlSend(o) { if (ctl && ctl.readyState === 'open') { try { ctl.send(JSON.stringify(o)); } catch (e) {} } }
@@ -484,6 +492,12 @@ async function onCtlMessage(e) {
             else if (m.t === 'quality') { applyQuality(m.mode); }
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
             else if (m.t === 'file-cancel') { rxFile = null; fileProg(null); addChat('System', 'Transfer cancelled by peer', false); }
+            else if (m.t === 'cmd-out') { addChat('Host ▸', m.out || '(no output)', false); }
+            else if (m.t === 'view-only') { addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false); }
+            // host-side actions — ignored while WE are the viewer
+            else if (m.t === 'cmd' && !isViewing()) { handleRemoteCmd(m.cmd); }
+            else if (m.t === 'screen' && !isViewing()) { switchMonitor(); }
+            else if (m.t === 'reboot' && !isViewing()) { remoteReboot(); }
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
             fileProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%', true);
@@ -552,6 +566,49 @@ function applyQuality(mode) {
     hdbg('quality: ' + mode);
 }
 
+// ══ Remote-control actions (ctl channel, host-side) ══
+let curSourceId = null, viewOnly = false;
+function isViewing() { return !$('viewerPane')?.classList.contains('hidden'); }
+
+async function handleRemoteCmd(cmd) {
+    const c = String(cmd || '').slice(0, 500).trim();
+    if (!c) return;
+    hdbg('cmd> ' + c); // audit trail in the host log
+    if (!window.agent?.execCmd) { ctlSend({ t: 'cmd-out', out: 'Not supported on this host' }); return; }
+    const out = await window.agent.execCmd(c).catch(e => 'error: ' + (e.message || e));
+    ctlSend({ t: 'cmd-out', out: out || '(no output)' });
+}
+
+async function remoteReboot() {
+    if (!window.agent?.sysReboot) return;
+    if (!confirm('The remote viewer asked to REBOOT this computer.\n\nAllow it?')) {
+        ctlSend({ t: 'cmd-out', out: 'Reboot denied by host user' });
+        return;
+    }
+    ctlSend({ t: 'cmd-out', out: 'Rebooting in ~15 seconds — session will end.' });
+    try { hostSignal({ kind: 'end' }); } catch (e) {}
+    setTimeout(() => window.agent.sysReboot(), 800);
+}
+
+// Viewer 🖥 / host 🖥 — capture the next display and swap it onto the video sender
+async function switchMonitor() {
+    if (!window.agent?.getScreenSources || !pc || !stream) return;
+    try {
+        const sources = await window.agent.getScreenSources();
+        if (sources.length < 2) { ctlSend({ t: 'cmd-out', out: 'Only one display detected' }); return; }
+        const idx = sources.findIndex(s => s.id === curSourceId);
+        const next = sources[(idx + 1 + sources.length) % sources.length];
+        const oldStream = stream;
+        curSourceId = next.id;
+        await captureScreen(next.id);
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) await sender.replaceTrack(stream.getVideoTracks()[0]);
+        oldStream?.getTracks().forEach(t => t.stop());
+        ctlSend({ t: 'cmd-out', out: 'Switched display → ' + next.name });
+        hdbg('screen → ' + next.name);
+    } catch (e) { ctlSend({ t: 'cmd-out', out: 'Screen switch failed: ' + (e.message || e) }); }
+}
+
 // ── Chat UI ──
 function addChat(from, text, mine) {
     const box = $('chatMsgs');
@@ -568,11 +625,30 @@ $('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendC
 function sendChat() {
     const t = $('chatInput').value.trim();
     if (!t) return;
-    ctlSend({ t: 'chat', from: (localStorage.getItem('bmydesk_member_name') || 'Me'), text: t });
-    addChat('Me', t, true);
+    if (t.startsWith('/cmd ')) {
+        const c = t.slice(5).trim();
+        if (c) { ctlSend({ t: 'cmd', cmd: c }); addChat('Me ▸', c, true); }
+    } else {
+        ctlSend({ t: 'chat', from: (localStorage.getItem('bmydesk_member_name') || 'Me'), text: t });
+        addChat('Me', t, true);
+    }
     $('chatInput').value = '';
 }
 $('chatToggle').onclick = () => $('chatPanel').classList.toggle('hidden');
+$('fsBtn').onclick = () => {
+    const p = $('viewerPane');
+    if (!document.fullscreenElement) p?.requestFullscreen?.().catch(() => {});
+    else document.exitFullscreen?.();
+};
+$('monBtn').onclick = () => ctlSend({ t: 'screen' });
+$('rebootBtn').onclick = () => { if (confirm('Reboot the REMOTE computer now?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'reboot' }); };
+$('hostMonBtn').onclick = () => switchMonitor();
+$('viewOnlyBtn').onclick = () => {
+    viewOnly = !viewOnly;
+    $('viewOnlyBtn').style.background = viewOnly ? '#f43f5e' : '#1e293b';
+    ctlSend({ t: 'view-only', on: viewOnly });
+    addChat('System', viewOnly ? 'Remote input blocked (view-only)' : 'Remote input re-enabled', false);
+};
 
 // 🙈 privacy — blank this machine's screens while being viewed (host-side only)
 let privacyOn = false;
@@ -619,6 +695,8 @@ function stopClipSync() { if (clipTimer) { clearInterval(clipTimer); clipTimer =
 function teardown(msg) {
     resetPrivacy();
     stopClipSync();
+    viewOnly = false; $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#1e293b');
+    curSourceId = null;
     ctl = null; rxFile = null;
     $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }

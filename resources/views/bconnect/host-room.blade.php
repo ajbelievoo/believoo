@@ -164,6 +164,10 @@ async function handleOffer(m) {
                     const m2 = JSON.parse(ev.data);
                     if (m2.t === 'ping') dcIn.send(JSON.stringify({ t: 'pong', ts: m2.ts }));
                     else if (m2.t === 'quality') applyQuality(m2.mode);
+                    else if (m2.t === 'screen') webHostSwitchScreen(dcIn);
+                    else if (m2.t === 'cmd' || m2.t === 'reboot') {
+                        dcIn.send(JSON.stringify({ t: 'cmd-out', out: 'Not supported in the browser host — ask the host to install the BMyDesk app' }));
+                    }
                 } catch (err) {}
             };
         };
@@ -178,6 +182,24 @@ async function handleOffer(m) {
         iceQueue.length = 0;
         setStatus('Streaming…', 'bc-badge-green');
     } catch (e) { console.error('offer handling failed', e); dbg('ERR ' + e.message); setStatus('Stream error: ' + e.message, 'bc-badge-red'); }
+}
+
+// Viewer asked to switch display — browsers need a fresh getDisplayMedia,
+// so the host sees the screen picker again (can't happen silently).
+async function webHostSwitchScreen(dcIn) {
+    try {
+        const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        const sender = pc?.getSenders().find(x => x.track?.kind === 'video');
+        if (!sender) { s.getTracks().forEach(t => t.stop()); return; }
+        const old = stream; stream = s;
+        video.srcObject = stream;
+        await sender.replaceTrack(stream.getVideoTracks()[0]);
+        old?.getTracks().forEach(t => t.stop());
+        dcIn.send(JSON.stringify({ t: 'cmd-out', out: 'Switched shared screen' }));
+        dbg('screen switched');
+    } catch (e) {
+        dcIn.send(JSON.stringify({ t: 'cmd-out', out: 'Screen switch needs the host to pick a screen in the browser' }));
+    }
 }
 
 // Viewer picks quality (or auto-adapt drops it) → retune the outbound video

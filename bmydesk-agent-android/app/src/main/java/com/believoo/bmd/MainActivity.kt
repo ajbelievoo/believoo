@@ -471,6 +471,13 @@ class MainActivity : Activity() {
         vSessRow.addView(Button(this).apply { text = "💬"; setOnClickListener { toggleChat() } })
         vSessRow.addView(Button(this).apply { text = "📎"; setOnClickListener { pickFile() } })
         vSessRow.addView(Button(this).apply { text = "⌨"; setOnClickListener { keysRow.visibility = if (keysRow.visibility == View.VISIBLE) View.GONE else View.VISIBLE } })
+        vSessRow.addView(Button(this).apply { text = "🖥"; setOnClickListener { activeCtl()?.sendScreen() } })
+        vSessRow.addView(Button(this).apply { text = "⏻"; setOnClickListener {
+            android.app.AlertDialog.Builder(this@MainActivity)
+                .setMessage("Reboot the REMOTE computer? The host user will be asked to confirm.")
+                .setPositiveButton("Reboot") { _, _ -> activeCtl()?.sendReboot() }
+                .setNegativeButton("Cancel", null).show()
+        } })
         vBar.addView(vSessRow)
         vBar.addView(Button(this).apply { text = "Disconnect"; setOnClickListener { exitViewer() } })
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
@@ -555,10 +562,15 @@ class MainActivity : Activity() {
 
     private fun sendChat() {
         val t = chatInput.text.toString().trim(); if (t.isEmpty()) return
-        val me = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_name", null)
-            ?: (android.os.Build.MODEL ?: "Android")
-        activeCtl()?.sendChat(me, t)
-        chatAppend("You", t, true)
+        if (t.startsWith("/cmd ")) {
+            val c = t.removePrefix("/cmd ").trim()
+            if (c.isNotEmpty()) { activeCtl()?.sendCmd(c); chatAppend("You ▸", c, true) }
+        } else {
+            val me = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_name", null)
+                ?: (android.os.Build.MODEL ?: "Android")
+            activeCtl()?.sendChat(me, t)
+            chatAppend("You", t, true)
+        }
         chatInput.setText("")
     }
 

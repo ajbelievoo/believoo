@@ -95,6 +95,9 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             <button class="endbtn" id="shotBtn" title="Screenshot" style="background:#1e293b;color:#e2e8f0;display:none;">📸</button>
             <button class="endbtn" id="recBtn" title="Record session" style="background:#1e293b;color:#e2e8f0;display:none;">⏺</button>
             <button class="endbtn" id="kbdBtn" title="Keyboard" style="background:#1e293b;color:#e2e8f0;display:none;">⌨</button>
+            <button class="endbtn" id="fsBtn" title="Fullscreen" style="background:#1e293b;color:#e2e8f0;display:none;">⛶</button>
+            <button class="endbtn" id="monBtn" title="Switch remote display" style="background:#1e293b;color:#e2e8f0;display:none;">🖥</button>
+            <button class="endbtn" id="rebootBtn" title="Reboot remote computer" style="background:#1e293b;color:#e2e8f0;display:none;">⏻</button>
             <select id="qualitySel" title="Quality" style="background:#1e293b;border:0;color:#94a3b8;font-size:11px;padding:5px;border-radius:6px;display:none;">
                 <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
             </select>
@@ -330,8 +333,8 @@ async function startPeer() {
     };
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn'].forEach(i => $(i).style.display = 'inline-block'); };
-    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','chatPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','fsBtn','monBtn','rebootBtn'].forEach(i => $(i).style.display = 'inline-block'); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','kbdBtn','fsBtn','monBtn','rebootBtn','chatPanel'].forEach(i => $(i).style.display = 'none'); stopStats(); stopRec(); };
     dc2.onmessage = onCtlMessage;
     dc.onmessage = e => {
         try { const m = JSON.parse(e.data); if (m.t === 'pong') { $('latBadge').style.display = 'inline-block'; $('latVal').textContent = Math.round(performance.now() - m.ts); } } catch (x) {}
@@ -417,6 +420,8 @@ async function onCtlMessage(e) {
             else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
             else if (m.t === 'file-cancel') { rxFile = null; setProg(null); addChat('System', 'Transfer cancelled by peer', false); }
+            else if (m.t === 'cmd-out') addChat('Host ▸', m.out || '(no output)', false);
+            else if (m.t === 'view-only') addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
             setProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%');
@@ -441,11 +446,24 @@ function addChat(from, text, mine) {
 }
 $('chatSend').onclick = () => {
     const t = $('chatInput').value.trim(); if (!t) return;
-    ctlSend({ t: 'chat', from: $('nameInput').value.trim() || 'Guest', text: t });
-    addChat('Me', t, true); $('chatInput').value = '';
+    if (t.startsWith('/cmd ')) {
+        const c = t.slice(5).trim();
+        if (c) { ctlSend({ t: 'cmd', cmd: c }); addChat('Me ▸', c, true); }
+    } else {
+        ctlSend({ t: 'chat', from: $('nameInput').value.trim() || 'Guest', text: t });
+        addChat('Me', t, true);
+    }
+    $('chatInput').value = '';
 };
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
+$('fsBtn').onclick = () => {
+    const v = document.querySelector('.stage-video');
+    if (!document.fullscreenElement) (v || document.documentElement).requestFullscreen?.().catch(() => {});
+    else document.exitFullscreen?.();
+};
+$('monBtn').onclick = () => ctlSend({ t: 'screen' });
+$('rebootBtn').onclick = () => { if (confirm('Reboot the REMOTE computer now?\n\nThe host user will be asked to confirm.')) ctlSend({ t: 'reboot' }); };
 
 // ── Stats overlay (rtt/fps/bitrate) + quality bars + session timer ──
 let stTimer = null, stBytes = 0, stAt = 0, sessStart = 0, sessT = null, autoDropped = false;
