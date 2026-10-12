@@ -105,6 +105,11 @@ class MainActivity : Activity() {
 
     private fun handleHostSignal(p: JsonObject) {
         when (p.get("kind")?.asString) {
+            // queued by the server on join() so relay-mode viewers still reach us
+            "join-request" -> ui {
+                reqName.text = "${p.get("name")?.asString ?: "Someone"} wants to view this device"
+                reqBox.visibility = View.VISIBLE
+            }
             "offer" -> {
                 val sdp = p.get("sdp").asString
                 if (pendingProjection) waitingOfferSdp = sdp
@@ -437,8 +442,14 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             setPadding(20, 10, 20, 10); setBackgroundColor(Color.parseColor("#0f172a"))
         }
+        val vLeft = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         viewerStatus = TextView(this).apply { text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 12f }
-        vBar.addView(viewerStatus, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        vLeft.addView(viewerStatus)
+        vProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100; progress = 0; isIndeterminate = false
+        }
+        vLeft.addView(vProgress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 6 })
+        vBar.addView(vLeft, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         vSessRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
         vSessRow.addView(Button(this).apply { text = "💬"; setOnClickListener { toggleChat() } })
         vSessRow.addView(Button(this).apply { text = "📎"; setOnClickListener { pickFile() } })

@@ -52,7 +52,9 @@
     .screens button { background: #131c2e; border: 2px solid rgba(148,163,184,.15); border-radius: 12px; padding: 6px; cursor: pointer; color: #e2e8f0; font-size: 11px; }
     .screens button:hover { border-color: #fb7185; }
     .screens img { width: 100%; border-radius: 8px; display: block; }
-    .req { background: #1c1503; border: 1px solid rgba(245,158,11,.4); border-radius: 16px; padding: 16px; margin-top: 14px; text-align: center; }
+    .req { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 80; min-width: 300px; background: #1c1503; border: 1px solid rgba(245,158,11,.4); border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,.65); }
+    .vprog { width: 280px; max-width: 80vw; height: 6px; background: rgba(148,163,184,.16); border-radius: 99px; overflow: hidden; }
+    .vprog .bar { height: 100%; width: 0%; background: linear-gradient(90deg,#f59e0b,#e11d48,#7c3aed); border-radius: 99px; transition: width .45s ease; }
     .update { background: rgba(124,58,237,.18); border: 1px solid rgba(167,139,250,.45); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #c4b5fd; cursor: pointer; text-align: center; }
     .update:hover { background: rgba(124,58,237,.3); }
     .req b { color: #fbbf24; }
@@ -161,7 +163,13 @@
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
         <div id="statOverlay" style="position:absolute;top:44px;left:8px;font-size:10px;color:rgba(226,232,240,.85);background:rgba(15,23,42,.6);padding:2px 8px;border-radius:6px;display:none;"></div>
-        <div class="viewer-overlay" id="viewerOverlay"><div>Connecting to remote device…</div></div>
+        <div class="viewer-overlay" id="viewerOverlay">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;">
+                <div id="vOverlayText">Connecting to remote device…</div>
+                <div class="vprog"><div class="bar" id="vProgBar"></div></div>
+                <div id="vProgPct" style="font-size:11px;color:#64748b;font-variant-numeric:tabular-nums;">0%</div>
+            </div>
+        </div>
     </div>
 
     <div class="foot">BMyDesk Agent <span id="verFoot">v1.2.1</span> · <span id="verNote">your code is permanent — tap ↻ for a new one</span></div>

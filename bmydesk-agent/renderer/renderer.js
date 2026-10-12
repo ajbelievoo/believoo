@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.3';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -737,6 +737,12 @@ function startViewerPoll() {
     vDbg('poll on');
     vPoller = setInterval(async () => {
         if (!vJoinedCode) return;
+        // keep the waiting state alive — show elapsed time so the client
+        // knows the host still has to press Accept.
+        if (vProgPct < 60 && vJoinedAt) {
+            vStage(vProgPct < 30 ? 30 : vProgPct,
+                'Waiting for host approval… (' + Math.round((Date.now() - vJoinedAt) / 1000) + 's)');
+        }
         try {
             const r = await fetch(`${API}/${vJoinedCode}/signals`, {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },
@@ -757,10 +763,10 @@ function startViewerPoll() {
 function stopViewerPoll() { if (vPoller) { clearInterval(vPoller); vPoller = null; } }
 
 function dispatchViewerSignal(m) {
-    if (m.kind === 'accept') { vDbg('host accepted'); startViewerPeer(); }
+    if (m.kind === 'accept') { vDbg('host accepted'); vStage(60, 'Accepted — starting stream…'); startViewerPeer(); }
     else if (m.kind === 'reject') { vStatus('Host declined the request'); exitViewer(2500); }
     else if (m.kind === 'end') { vStatus('Session ended by host'); exitViewer(2000); }
-    else if (m.kind === 'answer' && vPc) { vDbg('answer received'); setRemoteSdp(vPc, 'answer', m.sdp).catch(() => {}); }
+    else if (m.kind === 'answer' && vPc) { vDbg('answer received'); vStage(84, 'Answer received — connecting…'); setRemoteSdp(vPc, 'answer', m.sdp).catch(() => {}); }
     else if (m.kind === 'ice' && vPc && m.candidate) vPc.addIceCandidate(m.candidate).catch(() => {});
 }
 
@@ -768,14 +774,14 @@ function bindViewerChannel(vc, subTimeout) {
     vc.bind('pusher:subscription_succeeded', () => {
         if (subTimeout) clearTimeout(subTimeout);
         vDbg('subscribed');
-        vStatus('Waiting for host approval…');
+        vStage(45, 'Waiting for host approval…');
         vc.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)' });
         vDbg('join-request sent');
         // keep the HTTP poll as a safety net even when ws is alive — signals
         // sent by an HTTP-only host still land via the queue.
         startViewerPoll();
     });
-    vc.bind('pusher:subscription_error', () => { if (subTimeout) clearTimeout(subTimeout); vDbg('sub err — http fallback'); vStatus('Connecting over relay…'); startViewerPoll(); });
+    vc.bind('pusher:subscription_error', () => { if (subTimeout) clearTimeout(subTimeout); vDbg('sub err — http fallback'); vStage(30, 'Connecting over relay…'); startViewerPoll(); });
     vc.bind('client-join-accept', (m) => { if (sigNew(m)) dispatchViewerSignal({ kind: 'accept' }); });
     vc.bind('client-join-reject', (m) => { if (sigNew(m)) dispatchViewerSignal({ kind: 'reject' }); });
     vc.bind('client-signal', (m) => { if (sigNew(m)) dispatchViewerSignal(m); });
@@ -794,12 +800,12 @@ async function startViewerPeer() {
         $('statOverlay').style.display = 'block';
         startStats();
         $('viewerOverlay').classList.add('hidden');
-        vStatus('Connected — move & click to control');
+        vStage(100, 'Connected — move & click to control');
     };
     vPc.onicecandidate = (e) => { if (e.candidate) viewerSignal({ kind: 'ice', candidate: e.candidate }); };
     vPc.onconnectionstatechange = () => {
         vDbg('rtc:' + vPc.connectionState);
-        if (vPc.connectionState === 'connected') { vStatus('Connected'); vReconnectTries = 0; }
+        if (vPc.connectionState === 'connected') { vStage(92, 'Almost there…'); vStatus('Connected'); vReconnectTries = 0; }
         if (vPc.connectionState === 'failed') {
             if (vReconnectTries++ < 3) { vStatus('Reconnecting…'); viewerReoffer(); }
             else vStatus('Connection failed — retry');
@@ -809,6 +815,7 @@ async function startViewerPeer() {
 
     const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await vPc.setLocalDescription(offer);
+    vStage(72, 'Negotiating secure link…');
     // retransmit until an answer lands — a single lost POST must not kill the session
     let vOfferTries = 0;
     const sendOffer = () => {
@@ -864,6 +871,7 @@ function exitViewer(delay = 0) {
         $('viewerPane').classList.add('hidden');
         $('remoteVideo').srcObject = null;
         window.agent.setViewMode(false);
+        vProgReset();
     };
     delay ? setTimeout(doIt, delay) : doIt();
 }
