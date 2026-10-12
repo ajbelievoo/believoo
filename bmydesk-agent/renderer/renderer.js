@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.9';
+const APP_VERSION = '1.3.10';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -422,7 +422,16 @@ async function handleOffer(m) {
                 // always-visible system notice — the host should never miss a session
                 try { window.agent?.attention(null, 'A remote viewer is connected — your screen is being shared'); } catch (e) {}
             }
-            if (pc.connectionState === 'disconnected') setStatus('Viewer connection unstable…', 'wait');
+            if (pc.connectionState === 'disconnected') {
+                setStatus('Viewer connection unstable…', 'wait');
+                // ICE 'disconnected' can sit for a while before 'failed' —
+                // don't let a killed viewer app hold the host screen hostage
+                clearTimeout(hostDiscT);
+                hostDiscT = setTimeout(() => {
+                    if (pc && pc.connectionState !== 'connected') teardown('Viewer disconnected');
+                }, 15000);
+            }
+            if (pc.connectionState === 'connected') clearTimeout(hostDiscT);
             if (['failed', 'closed'].includes(pc.connectionState)) { teardown('Viewer lost — ready for new connection'); }
         };
         pc.ondatachannel = (e) => {
@@ -461,7 +470,7 @@ async function handleOffer(m) {
 }
 
 // ══ ctl channel — reliable/ordered: chat, clipboard, file transfer ══
-let ctl = null, rxFile = null, ctlPeer = 'peer';
+let ctl = null, rxFile = null, ctlPeer = 'peer', hostDiscT = null;
 let txAbort = false, txActive = false;
 const FILE_CHUNK = 16384;
 
@@ -1093,7 +1102,9 @@ let vReconnectTries = 0, vDiscTimer = null, sessStart = 0, sessT = null, vAutoDr
 function viewerReconnect() {
     if (!vPc) return;
     vReconnectTries++;
-    if (vReconnectTries > 10) { vStatus('Connection lost — close and connect again'); return; }
+    // 4 tries ≈ ~30s — a flap recovers, a dead host exits fast instead of
+    // spinning retries for minutes
+    if (vReconnectTries > 4) { vStatus('Connection lost — host app closed or network dropped'); setTimeout(() => exitViewer(), 2500); return; }
     vStatus('Reconnecting… (attempt ' + vReconnectTries + ')');
     vDbg('reconnect x' + vReconnectTries);
     if (vReconnectTries <= 3) viewerReoffer();

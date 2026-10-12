@@ -48,6 +48,12 @@ Route::domain('bmydesk.believoo.com')->group(function () {
         $f = 'BMyDesk-Agent-Setup-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '.exe';
         return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
     })->name('bconnect.dl.exe');
+    // Stable portable-zip alias — pages link here instead of a versioned
+    // filename so bumps never break the link.
+    Route::get('/dl/agent-portable.zip', function () {
+        $f = 'BMyDesk Agent-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '-win.zip';
+        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
+    })->name('bconnect.dl.zip');
 });
 
 // Authenticated B-CONNECT workspace

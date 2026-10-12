@@ -293,7 +293,7 @@ let connTries = 0, discTimer = null;
 function attemptReconnect() {
     if (!pc) return;
     connTries++;
-    if (connTries > 10) {
+    if (connTries > 4) {
         setStatus('Connection lost — reload to retry', 'text-red-400');
         document.getElementById('waitTitle').textContent = 'Connection lost';
         document.getElementById('waitSub').textContent = 'The session could not be re-established. Reload this page to try again.';

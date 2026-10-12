@@ -413,7 +413,7 @@ let connTries = 0, discTimer = null;
 function attemptReconnect() {
     if (!pc) return;
     connTries++;
-    if (connTries > 10) {
+    if (connTries > 4) {
         setBadge('lost');
         $('waitTitle').textContent = 'Connection lost';
         $('waitSub').textContent = 'Could not re-establish the stream. Go back and connect again.';

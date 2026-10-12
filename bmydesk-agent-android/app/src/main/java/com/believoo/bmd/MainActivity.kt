@@ -495,7 +495,16 @@ class MainActivity : Activity() {
             applyViewMode()
         }
         vSessRow.addView(vFitBtn, lpGap(6))
-        vBar.addView(vSessRow)
+        // session buttons overflow on narrow phones — scroll them so the
+        // Disconnect button is ALWAYS visible at the right edge
+        val vSessScroll = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(vSessRow)
+        }
+        // cap the strip so the Disconnect button can never be pushed off-screen
+        vBar.addView(vSessScroll, LinearLayout.LayoutParams(
+            (resources.displayMetrics.widthPixels * 0.40f).toInt(),
+            LinearLayout.LayoutParams.WRAP_CONTENT))
         vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { exitViewer() }, lpGap(8))
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -1100,7 +1109,9 @@ class MainActivity : Activity() {
     private fun viewerReconnect(v: RemoteViewer) {
         if (remoteViewer !== v || vJoin == null || vRebuilding) return
         vConnTries++
-        if (vConnTries > 10) { ui { viewerStatus.text = "Connection lost — close and connect again" }; return }
+        // 4 tries ≈ ~30s — long enough for a WiFi↔data flap, short enough
+        // that a dead host doesn't keep the viewer spinning for minutes
+        if (vConnTries > 4) { ui { viewerStatus.text = "Connection lost — host app closed or network dropped" }; thread { Thread.sleep(2500); ui { exitViewer() } }; return }
         vRebuilding = true
         ui { viewerStatus.text = "Reconnecting… (attempt $vConnTries)" }
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({

@@ -108,7 +108,7 @@ function showMobileHostNotice() {
         '<p class="text-sm font-bold text-slate-300">Mobile browser cannot share its screen.</p>' +
         '<p class="text-xs text-slate-500 mt-1 mb-3">Use the BMyDesk app to share this device&apos;s screen — or open this page on a computer.</p>' +
         '<a href="bmydesk://open" class="bc-btn bc-btn-primary text-sm">Open in BMyDesk App</a>' +
-        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/downloads/BMyDesk-Agent-v1.0.7.apk" class="text-cyan-400 underline">Download APK</a></p>';
+        '<p class="text-[11px] text-slate-600 mt-2">App not installed? <a href="/dl/agent.apk" class="text-cyan-400 underline">Download APK</a></p>';
     const btn = document.getElementById('shareBtn');
     btn.disabled = true;
     btn.classList.add('opacity-40');
