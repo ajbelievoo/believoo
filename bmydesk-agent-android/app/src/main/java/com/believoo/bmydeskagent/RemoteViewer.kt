@@ -15,6 +15,7 @@ class RemoteViewer(context: Context) {
         fun sendSignal(payload: JsonObject)
         fun onPeerConnected()
         fun onPeerDisconnected()
+        fun onPeerUnstable() {} // transient DISCONNECTED — heals on its own
         fun onTrack(track: VideoTrack)
         fun onError(message: String)
     }
@@ -56,8 +57,8 @@ class RemoteViewer(context: Context) {
             override fun onConnectionChange(state: PeerConnection.PeerConnectionState?) {
                 when (state) {
                     PeerConnection.PeerConnectionState.CONNECTED -> listener?.onPeerConnected()
+                    PeerConnection.PeerConnectionState.DISCONNECTED -> listener?.onPeerUnstable()
                     PeerConnection.PeerConnectionState.FAILED,
-                    PeerConnection.PeerConnectionState.DISCONNECTED,
                     PeerConnection.PeerConnectionState.CLOSED -> listener?.onPeerDisconnected()
                     else -> {}
                 }

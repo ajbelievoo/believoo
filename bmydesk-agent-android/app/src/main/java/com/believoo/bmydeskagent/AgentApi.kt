@@ -97,9 +97,11 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
     )
 
     /** Join another session as a viewer (agent-to-agent remote). Throws on error. */
-    fun join(code: String, pin: String? = null): JoinResult {
+    fun join(code: String, pin: String? = null, name: String? = null, note: String? = null): JoinResult {
         val body = mutableMapOf<String, String>()
         pin?.takeIf { it.isNotBlank() }?.let { body["pin"] = it }
+        name?.takeIf { it.isNotBlank() }?.let { body["name"] = it }
+        note?.takeIf { it.isNotBlank() }?.let { body["note"] = it }
         val req = Request.Builder().url("$base/$code/join")
             .post(gson.toJson(body).toRequestBody(json)).build()
         http.newCall(req).execute().use { res ->

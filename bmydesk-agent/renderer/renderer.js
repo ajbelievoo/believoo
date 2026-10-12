@@ -1031,6 +1031,7 @@ function renderRecent() {
     box.querySelectorAll('a').forEach(a => a.onclick = (e) => {
         e.preventDefault();
         $('remoteCode').value = a.dataset.code;
+        connectToPartner(); // one-tap reconnect to a known device
     });
 }
 renderRecent();

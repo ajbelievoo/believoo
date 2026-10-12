@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private var remoteViewer: RemoteViewer? = null
     private var remoteSurface: org.webrtc.SurfaceViewRenderer? = null
     private lateinit var remoteCodeInput: android.widget.EditText
+    private lateinit var remoteNoteInput: android.widget.EditText
     private lateinit var remotePinInput: android.widget.EditText
     private lateinit var viewerPane: android.widget.FrameLayout
     private lateinit var viewerStatus: TextView
@@ -110,7 +111,9 @@ class MainActivity : Activity() {
         when (p.get("kind")?.asString) {
             // queued by the server on join() so relay-mode viewers still reach us
             "join-request" -> ui {
-                reqName.text = "${p.get("name")?.asString ?: "Someone"} wants to view this device"
+                val nm = p.get("name")?.asString ?: "Someone"
+                val nt = p.get("note")?.asString
+                reqName.text = "$nm wants to view this device" + (if (nt.isNullOrBlank()) "" else "\n“$nt”")
                 reqBox.visibility = View.VISIBLE
             }
             "offer" -> {
@@ -332,6 +335,17 @@ class MainActivity : Activity() {
             setOnClickListener { connectRemote() }
         })
         remoteCard.addView(row)
+        remoteNoteInput = android.widget.EditText(this).apply {
+            hint = "Purpose (optional) — shown on their accept prompt"
+            setTextColor(txtMain); textSize = 13f
+            setHintTextColor(Color.parseColor("#475569"))
+            filters = arrayOf(android.text.InputFilter.LengthFilter(100))
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            setPadding(20, 10, 20, 10)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
+            background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
+        }
+        remoteCard.addView(remoteNoteInput)
         remotePinInput = android.widget.EditText(this).apply {
             hint = "PIN — only for unattended devices"
             setTextColor(rose); textSize = 13f; typeface = Typeface.MONOSPACE
@@ -749,8 +763,8 @@ class MainActivity : Activity() {
             override fun onConnected() { ui { setStatus("Realtime connected…", "#f59e0b") } }
             override fun onDisconnected() { ui { setStatus("Realtime lost — reconnecting…", "#ef4444") } }
             override fun onSubscribed() { ui { setStatus("Ready — share your code", "#22c55e") } }
-            override fun onJoinRequest(name: String) {
-                ui { reqName.text = "$name wants to view this device"; reqBox.visibility = View.VISIBLE }
+            override fun onJoinRequest(name: String, note: String?) {
+                ui { reqName.text = "$name wants to view this device" + (if (note.isNullOrBlank()) "" else "\n“$note”"); reqBox.visibility = View.VISIBLE }
             }
             override fun onSignal(p: JsonObject) { if (sigNew(p)) handleHostSignal(p) }
             override fun onEnd() { ui { endSession() } }
@@ -959,9 +973,15 @@ class MainActivity : Activity() {
         }
         thread {
             try {
-                val j = api.join(code, remotePinInput.text.toString().trim().ifBlank { null })
+                val j = api.join(
+                    code,
+                    remotePinInput.text.toString().trim().ifBlank { null },
+                    (android.os.Build.MODEL ?: "Android") + " (app)",
+                    remoteNoteInput.text.toString().trim().ifBlank { null },
+                )
                 vJoin = j
                 vJoinedAtMs = System.currentTimeMillis()
+                vConnTries = 0
                 vStage(15, "Joined — opening channel…")
                 if (j.autoAccepted) { vStage(60, "Unattended access — starting stream…"); ui { startViewerPeer(j) } }
                 signaling.viewerRelay = { payload -> thread { api.signal(code, j.viewerToken, payload) } }
@@ -969,10 +989,11 @@ class MainActivity : Activity() {
                 signaling.connectViewer(j.channel, j.viewerToken, object : SignalingClient.Listener {
                     override fun onConnected() {}
                     override fun onDisconnected() { vStage(30, "Signaling lost — relay mode active") }
-                    override fun onJoinRequest(name: String) {}
+                    override fun onJoinRequest(name: String, note: String?) {}
                     override fun onSubscribed() {
                         signaling.sendViewer("join-request", JsonObject().apply {
                             addProperty("name", (android.os.Build.MODEL ?: "Android") + " (app)")
+                            remoteNoteInput.text.toString().trim().takeIf { it.isNotBlank() }?.let { addProperty("note", it) }
                         })
                         vStage(45, "Waiting for host approval…")
                     }
@@ -988,14 +1009,43 @@ class MainActivity : Activity() {
         }
     }
 
+    // Auto-reconnect — session stays 'active' server-side, so no re-join and
+    // no new host approval. Stale CLOSED events from the old peer instance are
+    // ignored by the identity check.
+    private var vConnTries = 0
+    private var vLastPeerOkAt = 0L
+    private var vRebuilding = false
+    private fun viewerReconnect(v: RemoteViewer) {
+        if (remoteViewer !== v || vJoin == null || vRebuilding) return
+        vConnTries++
+        if (vConnTries > 10) { ui { viewerStatus.text = "Connection lost — close and connect again" }; return }
+        vRebuilding = true
+        ui { viewerStatus.text = "Reconnecting… (attempt $vConnTries)" }
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            runCatching { remoteViewer?.stop() }
+            remoteViewer = null
+            vRebuilding = false
+            vJoin?.let { startViewerPeer(it) }
+        }, 1200)
+    }
+
     private fun startViewerPeer(j: AgentApi.JoinResult) {
         if (remoteViewer != null) return // accept may arrive via ws + queue both
         vStage(72, "Negotiating secure link…")
         remoteViewer = RemoteViewer(this).apply {
+            val self = this
             listener = object : RemoteViewer.Listener {
                 override fun sendSignal(payload: JsonObject) = signaling.sendViewer("signal", payload)
-                override fun onPeerConnected() = vStage(92, "Almost there…")
-                override fun onPeerDisconnected() = ui { viewerStatus.text = "Disconnected" }
+                override fun onPeerConnected() { vLastPeerOkAt = System.currentTimeMillis(); vConnTries = 0; vStage(92, "Almost there…") }
+                override fun onPeerUnstable() {
+                    if (remoteViewer !== self) return
+                    ui { viewerStatus.text = "Unstable — watching…" }
+                    val droppedAt = vLastPeerOkAt
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        if (remoteViewer === self && vJoin != null && vLastPeerOkAt == droppedAt) viewerReconnect(self)
+                    }, 6000)
+                }
+                override fun onPeerDisconnected() = viewerReconnect(self)
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
                     remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, null)
                     remoteSurface!!.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
