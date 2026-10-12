@@ -459,7 +459,7 @@ class MainActivity : Activity() {
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
         val vBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setPadding(20, 10, 20, 10); setBackgroundColor(Color.parseColor("#0f172a"))
+            setPadding(20, 10, 20, 10); setBackgroundColor(Color.parseColor("#b30f172a")) // translucent float over video
         }
         val vLeft = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         viewerStatus = TextView(this).apply { text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 12f }
@@ -487,6 +487,14 @@ class MainActivity : Activity() {
             remoteViewer?.ctl?.sendQuality(vQuality)
         }
         vSessRow.addView(vQualityBtn, lpGap(6))
+        // fit ↔ fill — a landscape remote letterboxes tiny on a portrait phone;
+        // fill crops the edges and drag pans the visible window instead.
+        vFitBtn = mbtn("⛶ Fill", Color.parseColor("#1e293b"), 12f) {
+            fillMode = !fillMode
+            vFitBtn.text = if (fillMode) "⛶ Fit" else "⛶ Fill"
+            applyViewMode()
+        }
+        vSessRow.addView(vFitBtn, lpGap(6))
         vBar.addView(vSessRow)
         vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { exitViewer() }, lpGap(8))
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
@@ -554,7 +562,20 @@ class MainActivity : Activity() {
     private lateinit var vSessRow: LinearLayout
     private lateinit var keysRow: LinearLayout
     private lateinit var vQualityBtn: Button
+    private lateinit var vFitBtn: Button
     private var vQuality = "auto"
+    private var fillMode = false
+
+    /** Switch the surface between whole-screen fit and edge-cropped fill. */
+    private fun applyViewMode() {
+        vScale = 1f; panX = 0f; panY = 0f
+        remoteSurface?.let {
+            it.scaleX = 1f; it.scaleY = 1f; it.translationX = 0f; it.translationY = 0f
+            it.setScalingType(if (fillMode)
+                org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
+                else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+        }
+    }
 
     // ── Session tools: chat / file / clipboard (host + viewer share these) ──
     private fun activeCtl(): CtlChannel? =
@@ -1014,6 +1035,7 @@ class MainActivity : Activity() {
         if (code.length < 6) { remoteCodeInput.requestFocus(); return }
         ui {
             viewerPane.visibility = View.VISIBLE
+            enterImmersive()
             vProgReset()
             viewerStatus.text = "Joining $code…"
         }
@@ -1124,6 +1146,7 @@ class MainActivity : Activity() {
                 override fun onCtlOpen() = ui {
                     vSessRow.visibility = View.VISIBLE; startClipSync()
                     if (vQuality != "auto") remoteViewer?.ctl?.sendQuality(vQuality)
+                    else if (isMetered()) remoteViewer?.ctl?.sendQuality("sd") // mobile data → SD for smoothness
                 }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onClip(text: String) = clipSet(text)
@@ -1142,20 +1165,25 @@ class MainActivity : Activity() {
     private var vScale = 1f
     private var panX = 0f; private var panY = 0f
     private var lastTX = 0f; private var lastTY = 0f
+    private var last2Y = Float.MIN_VALUE; private var lastWheel = 0L
     // remote frame dims — the video is letterboxed (aspect-fit) inside the
     // view, so raw view coords must be mapped through the visible video rect
     private var vidW = 0; private var vidH = 0; private var vidRot = 0
 
-    /** Map a touch point on the view → normalized coords inside the remote frame. */
-    private fun mapTouch(vw: Float, vh: Float, x: Float, y: Float): Pair<Float, Float>? {
+    /** Rendered frame size inside the view for the current scaling mode. */
+    private fun renderRect(vw: Float, vh: Float): FloatArray? {
         val fw = if (vidRot == 90 || vidRot == 270) vidH.toFloat() else vidW.toFloat()
         val fh = if (vidRot == 90 || vidRot == 270) vidW.toFloat() else vidH.toFloat()
-        if (fw <= 0f || fh <= 0f) return null // no frame yet — fall back to view coords
-        val scale = minOf(vw / fw, vh / fh)
-        val dw = fw * scale; val dh = fh * scale
-        val ox = (vw - dw) / 2f; val oy = (vh - dh) / 2f
-        val nx = ((x - ox) / dw).coerceIn(0f, 1f)
-        val ny = ((y - oy) / dh).coerceIn(0f, 1f)
+        if (fw <= 0f || fh <= 0f) return null
+        val scale = if (fillMode) maxOf(vw / fw, vh / fh) else minOf(vw / fw, vh / fh)
+        return floatArrayOf(fw * scale, fh * scale, (vw - fw * scale) / 2f, (vh - fh * scale) / 2f)
+    }
+
+    /** Map a touch point on the view → normalized coords inside the remote frame. */
+    private fun mapTouch(vw: Float, vh: Float, x: Float, y: Float): Pair<Float, Float>? {
+        val r = renderRect(vw, vh) ?: return null // no frame yet — fall back to view coords
+        val nx = ((x - r[2]) / r[0]).coerceIn(0f, 1f)
+        val ny = ((y - r[3]) / r[1]).coerceIn(0f, 1f)
         return Pair(nx, ny)
     }
 
@@ -1197,8 +1225,25 @@ class MainActivity : Activity() {
                 // pinch starts mid-gesture — release any held remote button
                 if (dragging) { sendMouse("up", ev.x, ev.y); dragging = false }
                 touchMoved = true
+                // two-finger drag on a fit view = remote scroll (wheel events)
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_MOVE && !fillMode && vScale <= 1.01f) {
+                    val ay = (ev.getY(0) + ev.getY(1)) / 2f
+                    if (last2Y != Float.MIN_VALUE) {
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastWheel >= 50) {
+                            lastWheel = now
+                            remoteViewer?.sendInput(JsonObject().apply {
+                                addProperty("t", "wheel"); addProperty("dy", (ay - last2Y) * 3); addProperty("dx", 0)
+                            })
+                        }
+                    }
+                    last2Y = ay
+                } else if (ev.actionMasked == android.view.MotionEvent.ACTION_POINTER_DOWN) {
+                    last2Y = (ev.getY(0) + ev.getY(1)) / 2f
+                }
                 return@setOnTouchListener true
             }
+            last2Y = Float.MIN_VALUE
             when (ev.actionMasked) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     touchMoved = false; dragging = false
@@ -1206,7 +1251,7 @@ class MainActivity : Activity() {
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val moved = kotlin.math.hypot(ev.x - downX, ev.y - downY) > slop
-                    if (vScale > 1.01f) { // zoomed → pan locally instead of remote-drag
+                    if (vScale > 1.01f || fillMode) { // zoomed/fill → pan locally instead of remote-drag
                         panX += ev.x - lastTX; panY += ev.y - lastTY; lastTX = ev.x; lastTY = ev.y
                         clampPan()
                         remoteSurface?.let { it.translationX = panX; it.translationY = panY }
@@ -1242,11 +1287,34 @@ class MainActivity : Activity() {
         }
     }
     private fun clampPan() {
-        remoteSurface?.let {
-            val mx = it.width * (vScale - 1) / 2f; val my = it.height * (vScale - 1) / 2f
-            panX = panX.coerceIn(-mx, mx); panY = panY.coerceIn(-my, my)
+        remoteSurface?.let { v ->
+            if (fillMode) { // pan range = how much of the cropped frame hangs off-view
+                val r = renderRect(v.width.toFloat(), v.height.toFloat())
+                val mx = if (r != null) maxOf(0f, (r[0] - v.width) / 2f) * vScale else 0f
+                val my = if (r != null) maxOf(0f, (r[1] - v.height) / 2f) * vScale else 0f
+                panX = panX.coerceIn(-mx, mx); panY = panY.coerceIn(-my, my)
+            } else {
+                val mx = v.width * (vScale - 1) / 2f; val my = v.height * (vScale - 1) / 2f
+                panX = panX.coerceIn(-mx, mx); panY = panY.coerceIn(-my, my)
+            }
         }
     }
+
+    // Immersive full-screen while viewing — system bars eat real estate the
+    // remote desktop needs.
+    @Suppress("DEPRECATION")
+    private fun enterImmersive() {
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
+    }
+    @Suppress("DEPRECATION")
+    private fun exitImmersive() { window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE }
+
+    // Metered link (mobile data) — auto-drop to SD so the stream stays fluid.
+    private fun isMetered(): Boolean =
+        (getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).isActiveNetworkMetered
 
     private fun exitViewer() {
         runCatching { signaling.sendViewer("end", JsonObject()) }
@@ -1254,7 +1322,9 @@ class MainActivity : Activity() {
         remoteViewer?.stop(); remoteViewer = null
         signaling.disconnectViewer()
         runCatching { remoteSurface?.release() }
+        fillMode = false; vFitBtn.text = "⛶ Fill"
         vScale = 1f; panX = 0f; panY = 0f; vidW = 0; vidH = 0; vidRot = 0
+        exitImmersive()
         keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
