@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Bconnect;
 use App\Events\BconnectMessageSent;
 use App\Events\BconnectTyping;
 use App\Http\Controllers\Controller;
+use App\Models\Bconnect\ChatChannel;
 use App\Models\Bconnect\Member;
 use App\Models\Bconnect\Message;
 use App\Models\Bconnect\Notification;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ChatController extends Controller {
 
-    protected function channelData(Request $r, Project|Ticket $channel): array
+    protected function channelData(Request $r, Project|Ticket|ChatChannel $channel): array
     {
         $memberId = $r->input('bconnect_member')->id;
         $companyId = $r->input('bconnect_company_id');
@@ -23,7 +24,7 @@ class ChatController extends Controller {
         $search = $r->input('search');
         $query = Message::where('channel_type', get_class($channel))
             ->where('channel_id', $channel->id)
-            ->whereNull('parent_id')
+            ->whereNull('parent_id')->whereNull('deleted_at')
             ->with(['member.user', 'replies.member.user'])
             ->latest();
 
@@ -69,9 +70,74 @@ class ChatController extends Controller {
         return view('bconnect.chat', compact('ticket', 'messages', 'unreadCount', 'members', 'search', 'memberId'));
     }
 
+    // ── Standalone channels / group rooms ──
+    public function index(Request $r) {
+        $companyId = $r->input('bconnect_company_id');
+        $memberId = $r->input('bconnect_member')->id;
+        $channels = ChatChannel::where('company_id', $companyId)
+            ->with('creator.user')
+            ->latest()->get()
+            ->filter(fn ($c) => $c->canView($memberId))
+            ->values();
+        $members = Member::where('company_id', $companyId)->with('user')->get();
+        return view('bconnect.channels', compact('channels', 'members'));
+    }
+
+    public function storeChannel(Request $r) {
+        $data = $r->validate([
+            'name' => 'required|string|min:2|max:80',
+            'is_private' => 'nullable|boolean',
+            'member_ids' => 'nullable|array|max:200',
+            'member_ids.*' => 'integer',
+        ]);
+        $me = $r->input('bconnect_member');
+        $private = !empty($data['is_private']);
+        $ids = $private ? array_values(array_unique(array_merge([$me->id], array_map('intval', $data['member_ids'] ?? [])))) : null;
+        $channel = ChatChannel::create([
+            'company_id' => $r->input('bconnect_company_id'),
+            'created_by' => $me->id,
+            'name' => trim($data['name']),
+            'is_private' => $private,
+            'member_ids' => $ids,
+        ]);
+        return redirect()->route('bconnect.chat.channel', $channel->id);
+    }
+
+    public function channel(Request $r, ChatChannel $channel) {
+        if ($channel->company_id != $r->input('bconnect_company_id')) abort(403);
+        if (!$channel->canView($r->input('bconnect_member')->id)) abort(403);
+        extract($this->channelData($r, $channel));
+        return view('bconnect.chat', compact('channel', 'messages', 'unreadCount', 'members', 'search', 'memberId'));
+    }
+
+    // ── Message edit / delete ──
+    public function update(Request $r, Message $message) {
+        if ($message->company_id != $r->input('bconnect_company_id')) abort(403);
+        if ($message->member_id != $r->input('bconnect_member')->id) abort(403);
+        if ($message->deleted_at) abort(404);
+        $data = $r->validate(['message' => 'required|string|max:10000']);
+        $message->message = $data['message'];
+        $message->edited_at = now();
+        $message->save();
+        return response()->json(['success' => true, 'message' => $message->message]);
+    }
+
+    public function destroy(Request $r, Message $message) {
+        if ($message->company_id != $r->input('bconnect_company_id')) abort(403);
+        $me = $r->input('bconnect_member');
+        if ($message->member_id != $me->id && $me->role !== 'admin' && $me->role !== 'owner') abort(403);
+        foreach ((array) $message->attachments as $p) Storage::disk('public')->delete($p);
+        foreach ($message->replies as $reply) {
+            foreach ((array) $reply->attachments as $p) Storage::disk('public')->delete($p);
+            $reply->delete();
+        }
+        $message->delete();
+        return response()->json(['success' => true]);
+    }
+
     public function store(Request $r) {
         $data = $r->validate([
-            'channel_type' => 'required|in:project,ticket',
+            'channel_type' => 'required|in:project,ticket,channel',
             'channel_id' => 'required|integer',
             'message' => 'nullable|string|max:10000',
             'attachments' => 'nullable|array',
@@ -83,8 +149,9 @@ class ChatController extends Controller {
             return response()->json(['error' => 'Message or attachment is required.'], 422);
         }
 
-        $model = $data['channel_type'] === 'project' ? Project::class : Ticket::class;
+        $model = match ($data['channel_type']) { 'project' => Project::class, 'ticket' => Ticket::class, default => ChatChannel::class };
         $record = $model::where('company_id', $r->input('bconnect_company_id'))->findOrFail($data['channel_id']);
+        if ($record instanceof ChatChannel && !$record->canView($r->input('bconnect_member')->id)) abort(403);
 
         $attachments = [];
         if ($r->hasFile('attachments')) {
@@ -139,9 +206,10 @@ class ChatController extends Controller {
     }
 
     public function search(Request $r) {
-        $r->validate(['channel_type' => 'required|in:project,ticket', 'channel_id' => 'required|integer', 'q' => 'required|string']);
-        $model = $r->channel_type === 'project' ? Project::class : Ticket::class;
+        $r->validate(['channel_type' => 'required|in:project,ticket,channel', 'channel_id' => 'required|integer', 'q' => 'required|string']);
+        $model = match ($r->channel_type) { 'project' => Project::class, 'ticket' => Ticket::class, default => ChatChannel::class };
         $channel = $model::where('company_id', $r->input('bconnect_company_id'))->findOrFail($r->channel_id);
+        if ($channel instanceof ChatChannel && !$channel->canView($r->input('bconnect_member')->id)) abort(403);
         $messages = Message::where('channel_type', $model)
             ->where('channel_id', $channel->id)
             ->where('message', 'like', '%' . $r->q . '%')
@@ -161,7 +229,7 @@ class ChatController extends Controller {
     }
 
     public function typing(Request $r) {
-        $data = $r->validate(['channel_type' => 'required|in:project,ticket', 'channel_id' => 'required|integer']);
+        $data = $r->validate(['channel_type' => 'required|in:project,ticket,channel', 'channel_id' => 'required|integer']);
         $member = $r->input('bconnect_member');
         broadcast(new BconnectTyping(
             $r->input('bconnect_company_id'),
@@ -174,14 +242,15 @@ class ChatController extends Controller {
     }
 
     public function poll(Request $r) {
-        $data = $r->validate(['channel_type' => 'required|in:project,ticket', 'channel_id' => 'required|integer', 'after_id' => 'nullable|integer']);
-        $model = $data['channel_type'] === 'project' ? Project::class : Ticket::class;
+        $data = $r->validate(['channel_type' => 'required|in:project,ticket,channel', 'channel_id' => 'required|integer', 'after_id' => 'nullable|integer']);
+        $model = match ($data['channel_type']) { 'project' => Project::class, 'ticket' => Ticket::class, default => ChatChannel::class };
         $channel = $model::where('company_id', $r->input('bconnect_company_id'))->findOrFail($data['channel_id']);
+        if ($channel instanceof ChatChannel && !$channel->canView($r->input('bconnect_member')->id)) abort(403);
         $memberId = $r->input('bconnect_member')->id;
 
         $query = Message::where('channel_type', $model)
             ->where('channel_id', $channel->id)
-            ->whereNull('parent_id')
+            ->whereNull('parent_id')->whereNull('deleted_at')
             ->with(['member.user', 'replies.member.user'])
             ->orderBy('id');
 
@@ -233,11 +302,13 @@ class ChatController extends Controller {
     {
         foreach ($mentions as $memberId) {
             if ($memberId === $sender->id) continue;
-            $channelName = $msg->channel_type === Project::class ? 'project' : 'ticket';
+            $channelName = $msg->channel_type === Project::class ? 'project' : ($msg->channel_type === ChatChannel::class ? 'channel' : 'ticket');
             $channelId = $msg->channel_id;
-            $url = $msg->channel_type === Project::class
-                ? route('bconnect.projects.chat', $channelId)
-                : route('bconnect.tickets.show', $channelId) . '?chat=1';
+            $url = match (true) {
+                $msg->channel_type === Project::class => route('bconnect.projects.chat', $channelId),
+                $msg->channel_type === ChatChannel::class => route('bconnect.chat.channel', $channelId),
+                default => route('bconnect.tickets.show', $channelId) . '?chat=1',
+            };
             Notification::create([
                 'company_id' => $msg->company_id,
                 'member_id' => $memberId,
@@ -246,6 +317,16 @@ class ChatController extends Controller {
                 'message' => $sender->user->name . ' mentioned you in a ' . $channelName . ' chat.',
                 'url' => $url,
             ]);
+            $target = Member::with('user')->find($memberId);
+            if ($target?->user?->email) {
+                \App\Services\BconnectMail::toMember($target,
+                    $sender->user->name . ' mentioned you in Bmydesk',
+                    'You were mentioned',
+                    ['Hi ' . ($target->user->name ?? 'there') . ',', '<strong>' . e($sender->user->name) . '</strong> mentioned you in a ' . $channelName . ' chat:', '<blockquote style="border-left:4px solid #00b7ff;padding-left:12px;margin:12px 0;color:#334155;">' . e(\Illuminate\Support\Str::limit($msg->message, 280)) . '</blockquote>'],
+                    url($url),
+                    'Open chat'
+                );
+            }
         }
     }
 }

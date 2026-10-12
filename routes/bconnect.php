@@ -129,7 +129,12 @@ Route::domain('bmydesk.believoo.com')->middleware(['auth', 'bconnect', 'bconnect
     Route::post('/agora/token', [\App\Http\Controllers\Bconnect\AgoraController::class, 'token'])->name('bconnect.agora.token');
 
     // Common member actions
+    Route::get('/chat', [\App\Http\Controllers\Bconnect\ChatController::class, 'index'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat');
+    Route::post('/chat/channels', [\App\Http\Controllers\Bconnect\ChatController::class, 'storeChannel'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat.channels.store');
+    Route::get('/chat/channels/{channel}', [\App\Http\Controllers\Bconnect\ChatController::class, 'channel'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat.channel');
     Route::post('/chat/messages', [\App\Http\Controllers\Bconnect\ChatController::class, 'store'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat.store');
+    Route::post('/chat/messages/{message}/edit', [\App\Http\Controllers\Bconnect\ChatController::class, 'update'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat.edit');
+    Route::post('/chat/messages/{message}/delete', [\App\Http\Controllers\Bconnect\ChatController::class, 'destroy'])->middleware('bconnect.permission:chat.use')->name('bconnect.chat.delete');
     Route::post('/chat/messages/{message}/read', [\App\Http\Controllers\Bconnect\ChatController::class, 'markRead'])->name('bconnect.chat.read');
     Route::post('/chat/search', [\App\Http\Controllers\Bconnect\ChatController::class, 'search'])->name('bconnect.chat.search');
     Route::post('/chat/typing', [\App\Http\Controllers\Bconnect\ChatController::class, 'typing'])->name('bconnect.chat.typing');

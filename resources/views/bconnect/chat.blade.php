@@ -1,9 +1,10 @@
 @extends('bconnect.layout')
-@section('title', 'Chat: ' . (isset($project) ? $project->name : $ticket->title))
+@section('title', 'Chat: ' . (isset($project) ? $project->name : (isset($ticket) ? $ticket->title : ($channel->name ?? 'Channel'))))
 @section('content')
 @php
-$channel = $project ?? $ticket;
-$channelType = isset($project) ? 'project' : 'ticket';
+if (isset($project)) { $channel = $project; $channelType = 'project'; $channelTitle = $project->name; }
+elseif (isset($ticket)) { $channel = $ticket; $channelType = 'ticket'; $channelTitle = $ticket->title; }
+else { $channelType = 'channel'; $channelTitle = ($channel->is_private ? '' : '#') . $channel->name; }
 $channelId = $channel->id;
 @endphp
 <div class="h-[calc(100vh-140px)] flex flex-col">
