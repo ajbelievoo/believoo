@@ -197,8 +197,16 @@ async function startPeer() {
 
     const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
     await pc.setLocalDescription(offer);
-    sendSignal({ kind: 'offer', sdp: cleanSdp(pc.localDescription.sdp) });
-    dbg('offer sent');
+    // retransmit until an answer lands — a single lost POST must not kill the session
+    let offerTries = 0;
+    const sendOffer = () => {
+        if (!pc || pc.remoteDescription || offerTries >= 8) return;
+        offerTries++;
+        sendSignal({ kind: 'offer', sdp: cleanSdp(pc.localDescription.sdp) });
+        dbg('offer sent x' + offerTries);
+        setTimeout(sendOffer, 4000);
+    };
+    sendOffer();
     setStatus('Connecting…', 'text-amber-400');
     if (streamTimeout) clearTimeout(streamTimeout);
     streamTimeout = setTimeout(() => {

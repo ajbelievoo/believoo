@@ -403,6 +403,10 @@ class AgentApiController extends Controller
     // fully wedged ws on either end still lets the session complete.
     public function signal(Request $r, string $code)
     {
+        // log every attempt first — auth/kind failures must still be visible
+        \Illuminate\Support\Facades\Log::info("bmysig {$code} SIGIN kind=" . $r->input('kind', '?')
+            . " sdp_len=" . strlen((string) $r->input('sdp', ''))
+            . " tok=" . ($r->bearerToken() || $r->input('agent_token') ? 'y' : 'n'));
         $session = $this->findByCode($code);
         if (!$session) {
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
