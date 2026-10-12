@@ -29,7 +29,7 @@
                         <div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400"><i class="fas fa-user"></i></div>
                         <div>
                             <p class="font-bold text-sm"><span id="joinName">Someone</span> wants to connect</p>
-                            <p class="text-xs text-slate-400">They will see your screen (view only in browser host mode)</p>
+                            <p class="text-xs text-slate-400" id="joinNote">They will see your screen (view only in browser host mode)</p>
                         </div>
                     </div>
                     <div class="flex gap-2">
@@ -163,6 +163,7 @@ async function handleOffer(m) {
                 try {
                     const m2 = JSON.parse(ev.data);
                     if (m2.t === 'ping') dcIn.send(JSON.stringify({ t: 'pong', ts: m2.ts }));
+                    else if (m2.t === 'quality') applyQuality(m2.mode);
                 } catch (err) {}
             };
         };
@@ -179,13 +180,27 @@ async function handleOffer(m) {
     } catch (e) { console.error('offer handling failed', e); dbg('ERR ' + e.message); setStatus('Stream error: ' + e.message, 'bc-badge-red'); }
 }
 
+// Viewer picks quality (or auto-adapt drops it) → retune the outbound video
+// sender live — same scheme the Electron agent uses.
+function applyQuality(mode) {
+    const sender = pc && pc.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (!sender) return;
+    const p = sender.getParameters(); p.encodings = p.encodings || [{}];
+    const e = p.encodings[0];
+    if (mode === 'sd') { e.maxBitrate = 1200000; e.scaleResolutionDownBy = 2; e.maxFramerate = 20; }
+    else if (mode === 'hd') { e.maxBitrate = 9000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    else { e.maxBitrate = 4000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    sender.setParameters(p).catch(() => {});
+    dbg('quality: ' + mode);
+}
+
 async function onSignal(m) {
     // queued join-request (agent API / dead-ws relay) — same as the ws
     // client-join-request binding; drained once per nonce so no repeat pop.
     if (m.kind === 'join-request') {
         if (document.getElementById('joinRequest').classList.contains('hidden') && !pc
             && (!m.at || Date.parse(m.at) > respondedAt))
-            showJoinRequest(m.name || 'Someone');
+            showJoinRequest(m.name || 'Someone', m.note);
         return;
     }
     if (m.kind === 'offer') return handleOffer(m);
@@ -234,7 +249,7 @@ function initChannel() {
 
     channel.bind('client-join-request', (m) => {
         dbg('join-request received');
-        showJoinRequest(m.name || 'Someone');
+        showJoinRequest(m.name || 'Someone', m.note);
     });
     channel.bind('client-signal', (m) => { if (sigNew(m)) { dbg('signal: ' + (m.kind || '?')); onSignal(m); } });
     channel.bind('client-end', (m) => {
@@ -245,11 +260,12 @@ function initChannel() {
     startHostPoll();
 }
 
-function showJoinRequest(name) {
+function showJoinRequest(name, note) {
     // mark answered BEFORE auto-rejecting — otherwise the 3s status poll
     // refires showJoinRequest forever and spams /respond (seen in prod logs)
     if (!CAN_SHARE) { respondedAt = Date.now(); showMobileHostNotice(); postJson(API + '/respond', { action: 'reject' }); whisper('join-reject', { reason: 'device' }); return; }
     document.getElementById('joinName').textContent = name;
+    document.getElementById('joinNote').textContent = note ? '“' + note + '”' : 'They will see your screen (view only in browser host mode)';
     document.getElementById('joinRequest').classList.remove('hidden');
     setStatus('Join request', 'bc-badge-amber');
 }
@@ -268,7 +284,7 @@ function startHostPoll() {
             if (jt && jt > respondedAt
                 && document.getElementById('joinRequest').classList.contains('hidden') && !pc) {
                 dbg('poll join-request');
-                showJoinRequest(sd2.viewer || 'Someone');
+                showJoinRequest(sd2.viewer || 'Someone', sd2.viewer_note);
             }
             if (sd2.ok && sd2.status !== 'connecting'
                 && !document.getElementById('joinRequest').classList.contains('hidden') && !pc) {

@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.4';
+const APP_VERSION = '1.3.5';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -171,19 +171,20 @@ function postSignal(code, token, msg) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify(msg),
-    }).then(r => r.json()).catch(() => ({}));
+    }).then(r => r.json().then(j => (j._st = r.status, j)).catch(() => ({ _st: r.status }))).catch(() => ({}));
 }
+const failSt = (r) => ' (http ' + (r && r._st || 'net') + ')';
 const hostSignal = (m) => session && postSignal(session.session_code, session.agent_token, m);
 const viewerSignal = (m) => vJoinedCode && postSignal(vJoinedCode, vChanToken, m);
 async function hostAnswerRobust(sdp) {
     const r = await hostSignal({ kind: 'answer', sdp });
     if (r && r.ok) return;
-    hdbg('answer POST failed — chunked retry');
+    hdbg('answer POST failed' + failSt(r) + ' — chunked retry');
     const CH = 3000, parts = [];
     for (let i = 0; i < sdp.length; i += CH) parts.push(sdp.slice(i, i + CH));
     for (let i = 0; i < parts.length; i++) {
         const rr = await hostSignal({ kind: 'answer-part', i, total: parts.length, chunk: parts[i] });
-        if (!(rr && rr.ok)) { hdbg('chunk ' + i + ' failed'); return; }
+        if (!(rr && rr.ok)) { hdbg('chunk ' + i + ' failed' + failSt(rr)); return; }
     }
     hdbg('answer sent in ' + parts.length + ' parts');
 }
@@ -192,12 +193,12 @@ async function hostAnswerRobust(sdp) {
 async function viewerOfferRobust(sdp) {
     const r = await viewerSignal({ kind: 'offer', sdp });
     if (r && r.ok) return;
-    vDbg('offer POST failed — chunked retry');
+    vDbg('offer POST failed' + failSt(r) + ' — chunked retry');
     const CH = 3000, parts = [];
     for (let i = 0; i < sdp.length; i += CH) parts.push(sdp.slice(i, i + CH));
     for (let i = 0; i < parts.length; i++) {
         const rr = await viewerSignal({ kind: 'offer-part', i, total: parts.length, chunk: parts[i] });
-        if (!(rr && rr.ok)) { vDbg('chunk ' + i + ' failed'); return; }
+        if (!(rr && rr.ok)) { vDbg('chunk ' + i + ' failed' + failSt(rr)); return; }
     }
     vDbg('offer sent in ' + parts.length + ' parts');
 }
@@ -221,7 +222,8 @@ function startStatusPoll() {
             if (joinMs && joinMs > respondedAt && d.status === 'connecting'
                 && $('reqBox').classList.contains('hidden') && !pc) {
                 showJoinReq((d.viewer || 'Someone') +
-                    (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : ''));
+                    (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : ''),
+                    d.viewer_note);
             }
             // viewer gave up / server moved past it — hide a stale prompt
             if (d.status !== 'connecting' && $('reqBox') && !$('reqBox').classList.contains('hidden') && !pc) {
@@ -231,16 +233,20 @@ function startStatusPoll() {
             const sr = await fetch(`${API}/${session.session_code}/signals`, {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
             });
+            if (sr.status === 403 || sr.status === 404) { stopStatusPoll(); return; } // dead session — stop zombie-polling
             const sd = await sr.json();
             (sd.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) dispatchHostSignal(m); });
         } catch (e) {}
     }, 3000);
 }
+function stopStatusPoll() { if (statusPoller) { clearInterval(statusPoller); statusPoller = null; } }
 
 // One place that surfaces "someone wants in" — used by the ws whisper, the
 // HTTP drain ('join-request' queued server-side), and the /status poll.
-function showJoinReq(name) {
+function showJoinReq(name, note) {
     $('reqName').textContent = name || 'Someone';
+    const ne = $('reqNote');
+    if (ne) { ne.style.display = note ? 'block' : 'none'; ne.textContent = note ? '“' + note + '”' : ''; }
     $('reqBox').classList.remove('hidden');
     window.agent.attention(name);
     setStatus('Connection request…', 'wait');
@@ -292,7 +298,7 @@ function connectChannel() {
         setTimeout(connectChannel, 5000);
     });
 
-    ch.bind('client-join-request', (m) => showJoinReq(m.name));
+    ch.bind('client-join-request', (m) => showJoinReq(m.name, m.note));
 
     ch.bind('client-signal', (m) => { if (sigNew(m)) dispatchHostSignal(m); });
     ch.bind('client-end', (m) => { if (sigNew(m)) teardown('Viewer disconnected'); });
@@ -301,7 +307,7 @@ function connectChannel() {
 // one dispatcher for host signals — same handling whether they arrive by
 // ws broadcast or the HTTP fallback queue.
 function dispatchHostSignal(m) {
-    if (m.kind === 'join-request') showJoinReq(m.name);
+    if (m.kind === 'join-request') showJoinReq(m.name, m.note);
     else if (m.kind === 'offer') handleOffer(m);
     else if (m.kind === 'ice' && m.candidate) {
         if (pc && pc.remoteDescription) pc.addIceCandidate(m.candidate).catch(() => {});
@@ -697,6 +703,7 @@ async function connectToPartner() {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
                 name: localStorage.getItem('bmydesk_member_name') || require_os_name(),
+                note: ($('remoteNote') && $('remoteNote').value.trim()) || undefined,
                 pin: ($('remotePin') && $('remotePin').value.trim()) || undefined,
             }),
         });
@@ -752,6 +759,7 @@ function startViewerPoll() {
             const r = await fetch(`${API}/${vJoinedCode}/signals`, {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },
             });
+            if (r.status === 403 || r.status === 404) { vStatus('Session closed'); exitViewer(1800); return; }
             const d = await r.json();
             (d.signals || []).forEach((m) => { if (sigNew(m) && sigFresh(m)) dispatchViewerSignal(m); });
             // queued accept may be missed mid-flight — status poll is the backup
@@ -780,7 +788,7 @@ function bindViewerChannel(vc, subTimeout) {
         if (subTimeout) clearTimeout(subTimeout);
         vDbg('subscribed');
         vStage(45, 'Waiting for host approval…');
-        vc.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)' });
+        vc.trigger('client-join-request', { name: (localStorage.getItem('bmydesk_member_name') || require_os_name()) + ' (agent)', note: ($('remoteNote') && $('remoteNote').value.trim()) || undefined });
         vDbg('join-request sent');
         // keep the HTTP poll as a safety net even when ws is alive — signals
         // sent by an HTTP-only host still land via the queue.
@@ -804,18 +812,20 @@ async function startViewerPeer() {
         $('remoteVideo').srcObject = e.streams[0];
         $('statOverlay').style.display = 'block';
         startStats();
+        startSessionTimer();
         $('viewerOverlay').classList.add('hidden');
         vStage(100, 'Connected — move & click to control');
     };
     vPc.onicecandidate = (e) => { if (e.candidate) viewerSignal({ kind: 'ice', candidate: e.candidate }); };
     vPc.onconnectionstatechange = () => {
         vDbg('rtc:' + vPc.connectionState);
-        if (vPc.connectionState === 'connected') { vStage(92, 'Almost there…'); vStatus('Connected'); vReconnectTries = 0; }
-        if (vPc.connectionState === 'failed') {
-            if (vReconnectTries++ < 3) { vStatus('Reconnecting…'); viewerReoffer(); }
-            else vStatus('Connection failed — retry');
+        if (vPc.connectionState === 'connected') { vStage(92, 'Almost there…'); vStatus('Connected'); vReconnectTries = 0; if (vDiscTimer) { clearTimeout(vDiscTimer); vDiscTimer = null; } }
+        if (vPc.connectionState === 'failed') viewerReconnect();
+        if (vPc.connectionState === 'disconnected') {
+            vStatus('Unstable — watching…');
+            vDiscTimer = setTimeout(() => { if (vPc && vPc.connectionState === 'disconnected') viewerReconnect(); }, 6000);
         }
-        if (['disconnected', 'closed'].includes(vPc.connectionState)) vStatus('Disconnected');
+        if (vPc.connectionState === 'closed') vStatus('Disconnected');
     };
 
     const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
@@ -833,9 +843,32 @@ async function startViewerPeer() {
     sendOffer();
 }
 
-// Auto-reconnect: on 'failed' re-offer with ICE restart — the session survives
-// a network hiccup without re-joining or a new host approval.
-let vReconnectTries = 0;
+// Auto-reconnect: ICE restart re-offer first; if the peer is truly broken we
+// rebuild it wholesale — session stays 'active' server-side so no new host
+// approval and no re-join needed.
+let vReconnectTries = 0, vDiscTimer = null, sessStart = 0, sessT = null, vAutoDropped = false;
+function viewerReconnect() {
+    if (!vPc) return;
+    vReconnectTries++;
+    if (vReconnectTries > 10) { vStatus('Connection lost — close and connect again'); return; }
+    vStatus('Reconnecting… (attempt ' + vReconnectTries + ')');
+    vDbg('reconnect x' + vReconnectTries);
+    if (vReconnectTries <= 3) viewerReoffer();
+    else {
+        try { vPc.close(); } catch (e) {}
+        vPc = null; vDc = null;
+        setTimeout(() => { if (vJoinedCode) startViewerPeer(); }, 1500);
+    }
+}
+function startSessionTimer() {
+    if (sessStart) return;
+    sessStart = Date.now();
+    sessT = setInterval(() => {
+        const s = Math.floor((Date.now() - sessStart) / 1000);
+        const t = $('sessTimer');
+        if (t) t.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    }, 1000);
+}
 async function viewerReoffer() {
     if (!vPc) return;
     try {
@@ -872,6 +905,9 @@ function exitViewer(delay = 0) {
         stopViewerPoll();
         if (vPc) { try { vPc.close(); } catch (e) {} vPc = null; }
         vDc = null; vCh = null; vJoinedCode = null; vChanName = null; vChanToken = null;
+        sessStart = 0; if (sessT) { clearInterval(sessT); sessT = null; }
+        vReconnectTries = 0; vAutoDropped = false;
+        if (vDiscTimer) { clearTimeout(vDiscTimer); vDiscTimer = null; }
         ctl = null; rxFile = null; $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
         $('viewerPane').classList.add('hidden');
         $('remoteVideo').srcObject = null;
@@ -953,7 +989,14 @@ function startStats() {
             const now = Date.now();
             const kbps = lastStatAt ? Math.round((bytesNow - lastBytes) * 8 / (now - lastStatAt)) : 0;
             lastBytes = bytesNow; lastStatAt = now;
-            $('statOverlay').textContent = rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+            const bars = rtt < 80 ? '▂▄▆█' : rtt < 160 ? '▂▄▆' : rtt < 300 ? '▂▄' : '▂';
+            $('statOverlay').textContent = bars + '  ' + rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps';
+            // adaptive quality — sustained bad link drops the host to SD once
+            if (!vAutoDropped && rtt > 350 && ctl && ctl.readyState === 'open') {
+                vAutoDropped = true;
+                ctlSend({ t: 'quality', mode: 'sd' });
+                vDbg('slow link — quality auto-lowered');
+            }
         } catch (e) {}
     }, 2000);
 }

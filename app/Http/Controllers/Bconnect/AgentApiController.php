@@ -12,7 +12,7 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.3.4';
+    const AGENT_LATEST_WINDOWS = '1.3.5';
     const AGENT_LATEST_ANDROID = '1.3.4';
 
     protected function findByCode(string $code): ?RemoteSession
@@ -279,7 +279,7 @@ class AgentApiController extends Controller
             // clear the previous viewer so the busy-check below passes and a
             // fresh viewer_token is minted for this join
             $session->update(['status' => 'connecting', 'ended_at' => null,
-                'viewer_token' => null, 'viewer_joined_at' => null, 'viewer_name' => null]);
+                'viewer_token' => null, 'viewer_joined_at' => null, 'viewer_name' => null, 'viewer_note' => null]);
         }
 
         // Unattended access: a correct PIN skips host approval entirely.
@@ -318,6 +318,7 @@ class AgentApiController extends Controller
             'viewer_token' => Str::random(48),
             'viewer_joined_at' => now(),
             'viewer_name' => Str::limit((string) $r->input('name', ''), 60, '') ?: null,
+            'viewer_note' => Str::limit((string) $r->input('note', ''), 140, '') ?: null,
             'status' => $session->status === 'waiting' ? 'connecting' : $session->status,
         ]);
 
@@ -328,6 +329,7 @@ class AgentApiController extends Controller
             $this->queueSignal($session->session_code, 'h', [
                 'kind' => 'join-request',
                 'name' => $session->viewer_name ?: 'Someone',
+                'note' => $session->viewer_note,
             ]);
         }
 
@@ -373,6 +375,7 @@ class AgentApiController extends Controller
             'ok' => true,
             'status' => $session->status,
             'viewer' => $session->viewer?->user?->name ?: $session->viewer_name,
+            'viewer_note' => $session->viewer_note,
             'pin_set' => $session->device_id
                 ? (bool) \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')->where('device_id', $session->device_id)->value('pin_hash')
                 : false,

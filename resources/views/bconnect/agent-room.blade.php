@@ -9,6 +9,8 @@
                 Code: <code class="text-slate-300">{{ $session->session_code }}</code>
                 • <span id="connStatus" class="text-amber-400">Waiting for host approval…</span>
                 <span id="latencyBadge" class="hidden text-slate-500">• <span id="latencyVal">—</span> ms</span>
+                <span id="qualBadge" class="hidden text-slate-500" title="Connection quality"></span>
+                <span id="timeBadge" class="hidden text-slate-500 tabular-nums">• 00:00</span>
             </p>
             <p id="debugLine" class="text-[10px] text-slate-600 font-mono truncate"></p>
         </div>
@@ -198,6 +200,7 @@ async function startPeer() {
         video.srcObject = e.streams[0];
         $('statOverlay')?.classList.remove('hidden');
         startStats();
+        startSessionTimer();
         document.getElementById('waitOverlay').classList.add('hidden');
         if (CAN_CONTROL) document.getElementById('clickHint').classList.remove('hidden');
         setStatus('Connected', 'text-green-400');
@@ -212,14 +215,13 @@ async function startPeer() {
 
     pc.onconnectionstatechange = () => {
         dbg('peer ' + pc.connectionState);
-        if (pc.connectionState === 'connected') { wStage(92, 'Almost there…'); setStatus('Connected', 'text-green-400'); }
-        if (pc.connectionState === 'failed' && pc) {
-            setStatus('Reconnecting…', 'text-amber-400');
-            try { pc.restartIce(); } catch (e) {}
+        if (pc.connectionState === 'connected') { wStage(92, 'Almost there…'); setStatus('Connected', 'text-green-400'); connTries = 0; if (discTimer) { clearTimeout(discTimer); discTimer = null; } }
+        if (pc.connectionState === 'failed') attemptReconnect();
+        if (pc.connectionState === 'disconnected') {
+            setStatus('Unstable — watching…', 'text-amber-400');
+            discTimer = setTimeout(() => { if (pc && pc.connectionState === 'disconnected') attemptReconnect(); }, 6000);
         }
-        if (['disconnected', 'closed'].includes(pc.connectionState)) {
-            setStatus('Connection lost', 'text-red-400');
-        }
+        if (pc.connectionState === 'closed') setStatus('Connection lost', 'text-red-400');
     };
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
@@ -266,6 +268,30 @@ function startPing() {
     setInterval(() => {
         if (dc && dc.readyState === 'open') dc.send(JSON.stringify({ t: 'ping', ts: performance.now() }));
     }, 3000);
+}
+
+// Auto-reconnect — session stays 'active' server-side, so no new host
+// approval: ICE restart first, then a full peer rebuild.
+let connTries = 0, discTimer = null;
+function attemptReconnect() {
+    if (!pc) return;
+    connTries++;
+    if (connTries > 10) {
+        setStatus('Connection lost — reload to retry', 'text-red-400');
+        document.getElementById('waitTitle').textContent = 'Connection lost';
+        document.getElementById('waitSub').textContent = 'The session could not be re-established. Reload this page to try again.';
+        document.getElementById('waitProgWrap').style.display = 'none';
+        document.getElementById('waitOverlay').classList.remove('hidden');
+        return;
+    }
+    setStatus('Reconnecting… (attempt ' + connTries + ')', 'text-amber-400');
+    if (connTries <= 3) {
+        try { pc.restartIce(); } catch (e) {}
+    } else {
+        try { pc.close(); } catch (e) {}
+        pc = null;
+        setTimeout(() => startPeer(), 1500);
+    }
 }
 
 async function onSignal(m) {
@@ -328,7 +354,24 @@ $('chatSend').onclick = () => {
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
 
-let stTimer = null, stBytes = 0, stAt = 0;
+let stTimer = null, stBytes = 0, stAt = 0, sessStart = 0, sessT = null, autoDropped = false;
+function startSessionTimer() {
+    if (sessStart) return;
+    sessStart = Date.now();
+    sessT = setInterval(() => {
+        const s = Math.floor((Date.now() - sessStart) / 1000);
+        const t = $('timeBadge');
+        if (t) { t.classList.remove('hidden'); t.textContent = '• ' + String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+    }, 1000);
+}
+function qualBars(rtt) {
+    const b = $('qualBadge'); if (!b) return;
+    b.classList.remove('hidden');
+    const bars = rtt < 80 ? '▂▄▆█' : rtt < 160 ? '▂▄▆ ' : rtt < 300 ? '▂▄  ' : '▂   ';
+    b.textContent = '• ' + bars;
+    b.style.color = rtt < 160 ? '#34d399' : rtt < 300 ? '#fbbf24' : '#f87171';
+    b.title = 'Link quality (' + rtt + 'ms)';
+}
 function startStats() {
     stopStats();
     stTimer = setInterval(async () => {
@@ -343,6 +386,12 @@ function startStats() {
             const kbps = stAt ? Math.round((bytesNow - stBytes) * 8 / (now - stAt)) : 0;
             stBytes = bytesNow; stAt = now;
             const el = $('statOverlay'); if (el) el.textContent = (progTxt ? progTxt + '  ·  ' : '') + rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps' + (progTxt ? '  (tap = cancel)' : '');
+            qualBars(rtt);
+            if (!autoDropped && $('qualitySel').value === 'auto' && rtt > 350 && connected) {
+                autoDropped = true;
+                ctlSend({ t: 'quality', mode: 'sd' });
+                addChat('System', 'Network is slow — quality lowered to SD automatically.', false);
+            }
         } catch (e) {}
     }, 2000);
 }

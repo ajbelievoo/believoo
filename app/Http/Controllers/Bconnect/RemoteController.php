@@ -333,6 +333,7 @@ class RemoteController extends Controller {
             'ok' => true,
             'status' => $session->status,
             'viewer' => $session->viewer?->user?->name,
+            'viewer_note' => $session->viewer_note,
             'viewer_joined_at' => $session->viewer_joined_at?->toIso8601String(),
         ]);
     }

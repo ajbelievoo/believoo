@@ -67,6 +67,7 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <p class="hint">Enter the code shown on the remote computer or phone running the BMyDesk Agent.</p>
         <input class="name-input" id="nameInput" maxlength="40" placeholder="Your name (optional)" autocomplete="name">
         <input class="code-input" id="codeInput" maxlength="8" placeholder="CODE" autocomplete="off" spellcheck="false" value="{{ $prefillCode ?? '' }}">
+        <input class="name-input" id="noteInput" maxlength="120" placeholder="Purpose — e.g. fixing printer (optional)" style="margin-top:10px">
         <input class="name-input" id="pinInput" maxlength="12" inputmode="numeric" placeholder="PIN — only for unattended devices" style="margin-top:10px;font-family:monospace;letter-spacing:3px">
         <br>
         <button class="btn" id="joinBtn">Connect</button>
@@ -86,6 +87,8 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <div class="lbl"><span id="hostLabel">Remote device</span> <code style="color:var(--cyan)" id="codeEcho"></code></div>
         <div style="display:flex;gap:8px;align-items:center;">
             <span class="badge" id="connBadge">connecting</span>
+            <span class="badge" id="qualBadge" title="Connection quality" style="display:none;letter-spacing:2px;">▂▄▆█</span>
+            <span class="badge" id="timeBadge" style="display:none;font-variant-numeric:tabular-nums;">00:00</span>
             <span class="badge" id="latBadge" style="display:none"><span id="latVal">—</span> ms</span>
             <button class="endbtn" id="fileBtn" title="Send file" style="background:#1e293b;color:#e2e8f0;display:none;">📎</button>
             <button class="endbtn" id="chatBtn" title="Chat" style="background:#1e293b;color:#e2e8f0;display:none;">💬</button>
@@ -201,7 +204,7 @@ async function join() {
     dbg('joining ' + code);
     const r = await fetch(API + '/' + code + '/join', { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ name: $('nameInput').value.trim() || 'Guest', pin: $('pinInput').value.trim() || undefined }) }).catch(() => null);
+        body: JSON.stringify({ name: $('nameInput').value.trim() || 'Guest', note: $('noteInput').value.trim() || undefined, pin: $('pinInput').value.trim() || undefined }) }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     if (!d.ok) {
         $('joinErr').textContent = d.error || 'Could not reach the device.';
@@ -216,7 +219,7 @@ async function join() {
     $('codeEcho').textContent = code;
     $('joinCard').classList.add('hidden'); $('stage').classList.remove('hidden');
     dbg('joined'); setBadge('requesting');
-    gProgReset(); gJoinedAt = Date.now();
+    gProgReset(); gJoinedAt = Date.now(); connTries = 0; autoDropped = false;
     gStage(15, 'Waiting for host approval…', 'The host will see your request.');
     initChannel();
     startViewerPoll();
@@ -240,7 +243,7 @@ function initChannel() {
     channel.bind('pusher:subscription_succeeded', () => {
         dbg('subscribed');
         gStage(45, 'Waiting for host approval…');
-        whisper('join-request', { name: $('nameInput').value.trim() || 'Guest' });
+        whisper('join-request', { name: $('nameInput').value.trim() || 'Guest', note: $('noteInput').value.trim() || undefined });
         dbg('join-request sent');
     });
     channel.bind('pusher:subscription_error', () => { dbg('sub error (poll fallback active)'); gStage(Math.max(gPct, 30), 'Connecting over relay…'); });
@@ -306,6 +309,7 @@ async function startPeer() {
         $('remoteVideo').srcObject = e.streams[0];
         $('statOverlay').style.display = 'block';
         startStats();
+        startSessionTimer();
         $('waitOverlay').classList.add('hidden');
         $('clickHint').style.display = 'block';
         setBadge('connected', true); connected = true;
@@ -315,9 +319,14 @@ async function startPeer() {
     pc.onicecandidate = e => { if (e.candidate) sendSignal({ kind: 'ice', candidate: e.candidate }); };
     pc.onconnectionstatechange = () => {
         dbg('peer ' + pc.connectionState);
-        if (pc.connectionState === 'connected') { gStage(92, 'Almost there…'); setBadge('connected', true); }
-        if (pc.connectionState === 'failed' && pc) { setBadge('reconnecting'); try { pc.restartIce(); } catch (e) {} }
-        if (['disconnected', 'closed'].includes(pc.connectionState)) setBadge('lost');
+        if (pc.connectionState === 'connected') { gStage(92, 'Almost there…'); setBadge('connected', true); connTries = 0; if (discTimer) { clearTimeout(discTimer); discTimer = null; } }
+        if (pc.connectionState === 'failed') attemptReconnect();
+        if (pc.connectionState === 'disconnected') {
+            setBadge('unstable');
+            // brief hiccups heal on their own — only rebuild if it stays dead
+            discTimer = setTimeout(() => { if (pc && pc.connectionState === 'disconnected') attemptReconnect(); }, 6000);
+        }
+        if (pc.connectionState === 'closed') setBadge('lost');
     };
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
@@ -349,6 +358,34 @@ async function startPeer() {
             $('waitOverlay').classList.remove('hidden');
         }
     }, 25000);
+}
+
+// Auto-reconnect — the session stays 'active' server-side so no new host
+// approval is needed: first try an ICE restart, then rebuild the whole peer.
+let connTries = 0, discTimer = null;
+function attemptReconnect() {
+    if (!pc) return;
+    connTries++;
+    if (connTries > 10) {
+        setBadge('lost');
+        $('waitTitle').textContent = 'Connection lost';
+        $('waitSub').textContent = 'Could not re-establish the stream. Go back and connect again.';
+        $('waitProgWrap').style.display = 'none';
+        $('waitOverlay').classList.remove('hidden');
+        return;
+    }
+    setBadge('reconnecting ' + connTries);
+    $('waitTitle').textContent = 'Reconnecting… (attempt ' + connTries + ')';
+    $('waitSub').textContent = 'Network hiccup — re-establishing the stream. No new approval needed.';
+    $('waitProgWrap').style.display = '';
+    $('waitOverlay').classList.remove('hidden');
+    if (connTries <= 3) {
+        try { pc.restartIce(); } catch (e) {}
+    } else {
+        try { pc.close(); } catch (e) {}
+        pc = null;
+        setTimeout(() => { if (CODE && VTOKEN) startPeer(); }, 1500);
+    }
 }
 
 async function onSignal(m) {
@@ -410,8 +447,25 @@ $('chatSend').onclick = () => {
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
 
-// ── Stats overlay (rtt/fps/bitrate) ──
-let stTimer = null, stBytes = 0, stAt = 0;
+// ── Stats overlay (rtt/fps/bitrate) + quality bars + session timer ──
+let stTimer = null, stBytes = 0, stAt = 0, sessStart = 0, sessT = null, autoDropped = false;
+function startSessionTimer() {
+    if (sessStart) return;
+    sessStart = Date.now();
+    sessT = setInterval(() => {
+        const s = Math.floor((Date.now() - sessStart) / 1000);
+        const t = $('timeBadge');
+        if (t) { t.style.display = 'inline-block'; t.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+    }, 1000);
+}
+function qualBars(rtt) {
+    const b = $('qualBadge'); if (!b) return;
+    b.style.display = 'inline-block';
+    if (rtt < 80)       { b.textContent = '▂▄▆█'; b.style.color = '#34d399'; b.title = 'Excellent connection (' + rtt + 'ms)'; }
+    else if (rtt < 160) { b.textContent = '▂▄▆ '; b.style.color = '#34d399'; b.title = 'Good connection (' + rtt + 'ms)'; }
+    else if (rtt < 300) { b.textContent = '▂▄  '; b.style.color = '#fbbf24'; b.title = 'Fair connection (' + rtt + 'ms)'; }
+    else                { b.textContent = '▂   '; b.style.color = '#f87171'; b.title = 'Poor connection (' + rtt + 'ms)'; }
+}
 function startStats() {
     stopStats();
     stTimer = setInterval(async () => {
@@ -426,6 +480,13 @@ function startStats() {
             const kbps = stAt ? Math.round((bytesNow - stBytes) * 8 / (now - stAt)) : 0;
             stBytes = bytesNow; stAt = now;
             $('statOverlay').textContent = (progTxt ? progTxt + '  ·  ' : '') + rtt + 'ms · ' + fps + 'fps · ' + kbps + 'kbps' + (progTxt ? '  (tap = cancel)' : '');
+            qualBars(rtt);
+            // adaptive quality — sustained bad link drops the stream to SD once
+            if (!autoDropped && $('qualitySel').value === 'auto' && rtt > 350 && connected) {
+                autoDropped = true;
+                ctlSend({ t: 'quality', mode: 'sd' });
+                addChat('System', 'Network is slow — quality lowered to SD automatically.', false);
+            }
         } catch (e) {}
     }, 2000);
 }
@@ -607,7 +668,7 @@ function renderRecent() {
     box.innerHTML = '<span style="color:#475569;font-size:11px;">Devices: </span>' + list.map(c =>
         `<a href="#" data-c="${c.code}" style="color:#22d3ee;font-size:11px;font-family:monospace;margin:0 5px;text-decoration:none;">${c.label ? c.label + ' · ' : ''}${c.code}</a>`).join('')
         + ` <a href="#" id="saveDevLink" style="color:#475569;font-size:11px;text-decoration:none;margin-left:4px;">☆ name &amp; save</a>`;
-    box.querySelectorAll('a[data-c]').forEach(a => a.onclick = e => { e.preventDefault(); $('codeInput').value = a.dataset.c; });
+    box.querySelectorAll('a[data-c]').forEach(a => a.onclick = e => { e.preventDefault(); $('codeInput').value = a.dataset.c; join(); });
     const sl = $('saveDevLink');
     if (sl) sl.onclick = e => {
         e.preventDefault();
