@@ -33,6 +33,7 @@ class MeetingController extends Controller {
             'password' => 'nullable|string|max:60',
             'waiting_room' => 'nullable|boolean',
             'recurrence' => 'nullable|in:daily,weekly',
+            'max_participants' => 'nullable|integer|min:2|max:500',
         ]);
         $room = 'bc-' . uniqid();
         $meeting = Meeting::create([
@@ -47,6 +48,7 @@ class MeetingController extends Controller {
             'password' => $data['password'] ? \Illuminate\Support\Facades\Hash::make($data['password']) : null,
             'waiting_room' => !empty($data['waiting_room']),
             'recurrence' => $data['recurrence'] ?? null,
+            'max_participants' => $data['max_participants'] ?? null,
         ]);
 
         // Notify project members about scheduled meeting
@@ -92,8 +94,20 @@ class MeetingController extends Controller {
             }
         }
 
-        // Attendance — joined
+        // Attendance — joined (with capacity check for non-hosts)
         if ($meeting->ended_at === null) {
+            if (!$isHost && $meeting->max_participants) {
+                $already = \DB::table('bconnect_meeting_participants')
+                    ->where('meeting_id', $meeting->id)->where('member_id', $member->id)
+                    ->where('status', 'joined')->exists();
+                if (!$already) {
+                    $in = \DB::table('bconnect_meeting_participants')
+                        ->where('meeting_id', $meeting->id)->where('status', 'joined')->count();
+                    if ($in >= $meeting->max_participants) {
+                        return view('bconnect.meeting-gate', ['meeting' => $meeting, 'room' => $room, 'kind' => 'full']);
+                    }
+                }
+            }
             \DB::table('bconnect_meeting_participants')->updateOrInsert(
                 ['meeting_id' => $meeting->id, 'member_id' => $member->id],
                 ['name' => $member->user->name ?? 'Guest', 'status' => 'joined', 'joined_at' => now(), 'left_at' => null, 'updated_at' => now(), 'created_at' => now()]
@@ -102,7 +116,8 @@ class MeetingController extends Controller {
 
         $canRecord = \App\Services\BconnectPlanService::canUseRecording($companyId);
         $canAi = \App\Services\BconnectPlanService::canUseAi($companyId);
-        return view('bconnect.room', compact('room', 'meeting', 'canRecord', 'canAi', 'isHost', 'member'));
+        $isRecording = !empty($meeting->recording_status) && $meeting->recording_status !== 'stopped';
+        return view('bconnect.room', compact('room', 'meeting', 'canRecord', 'canAi', 'isHost', 'member', 'isRecording'));
     }
 
     public function checkPassword(Request $r, $room) {
@@ -145,6 +160,25 @@ class MeetingController extends Controller {
         $meeting = Meeting::where('company_id', $r->input('bconnect_company_id'))->where('room_id', $room)->firstOrFail();
         if ($meeting->created_by !== $r->input('bconnect_member')->id) abort(403);
         \DB::table('bconnect_meeting_participants')->where('id', $pid)->where('meeting_id', $meeting->id)->update(['status' => 'denied', 'left_at' => now()]);
+        return response()->json(['ok' => true]);
+    }
+
+    public function admitAll(Request $r, $room) {
+        $meeting = Meeting::where('company_id', $r->input('bconnect_company_id'))->where('room_id', $room)->firstOrFail();
+        if ($meeting->created_by !== $r->input('bconnect_member')->id) abort(403);
+        $n = \DB::table('bconnect_meeting_participants')->where('meeting_id', $meeting->id)->where('status', 'waiting')
+            ->update(['status' => 'joined', 'joined_at' => now()]);
+        return response()->json(['ok' => true, 'admitted' => $n]);
+    }
+
+    // Denied attendee asks to be let back into the lobby.
+    public function rejoin(Request $r, $room) {
+        $meeting = Meeting::where('company_id', $r->input('bconnect_company_id'))->where('room_id', $room)->firstOrFail();
+        $member = $r->input('bconnect_member');
+        \DB::table('bconnect_meeting_participants')
+            ->where('meeting_id', $meeting->id)->where('member_id', $member->id)
+            ->where('status', 'denied')
+            ->update(['status' => 'waiting', 'left_at' => null, 'updated_at' => now()]);
         return response()->json(['ok' => true]);
     }
 
