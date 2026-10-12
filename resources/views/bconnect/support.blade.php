@@ -41,6 +41,11 @@ $companyId = request()->input('bconnect_company_id');
 
         <div class="bc-card p-6">
             <h3 class="font-bold mb-4 text-white">My Recent Support Tickets</h3>
+            <div class="flex flex-wrap gap-2 mb-4">
+                @foreach(['' => 'All', 'open' => 'Open', 'in_progress' => 'In progress', 'testing' => 'Testing', 'resolved' => 'Resolved', 'closed' => 'Closed'] as $k => $label)
+                <a href="{{ route('bconnect.support', $k ? ['status' => $k] : []) }}" class="px-3 py-1 rounded-full text-xs border transition {{ ($status ?? null) === ($k ?: null) ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' : 'border-slate-700 text-slate-400 hover:border-slate-500' }}">{{ $label }}</a>
+                @endforeach
+            </div>
             @if($tickets->count())
                 <div class="overflow-x-auto">
                     <table class="bc-table w-full">
@@ -58,6 +63,7 @@ $companyId = request()->input('bconnect_company_id');
                         </tbody>
                     </table>
                 </div>
+                <div class="mt-4">{{ $tickets->links() }}</div>
             @else
                 <div class="text-center py-8 text-slate-500">
                     <i class="fas fa-ticket-alt text-3xl mb-3 opacity-50"></i>

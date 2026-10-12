@@ -131,14 +131,14 @@ class TicketController extends Controller {
         $reporter = $r->input('bconnect_member');
         $ticketUrl = route('bconnect.tickets.show', $ticket->id, false);
         BconnectMail::toMember($reporter,
-            'Ticket received: ' . $ticket->title,
+            'Ticket received: ' . $ticket->title . ' [#' . $ticket->id . ']',
             'Your ticket has been created',
             ['Hi ' . ($reporter->user->name ?? 'there') . ',', 'We received your ticket <strong>' . e($ticket->title) . '</strong>. Our team typically replies within 24 hours.'],
             url('https://bmydesk.believoo.com' . $ticketUrl),
             'View Ticket'
         );
         BconnectMail::toCompanyAdmins($r->input('bconnect_company_id'),
-            'New Bmydesk ticket: ' . $ticket->title,
+            'New Bmydesk ticket: ' . $ticket->title . ' [#' . $ticket->id . ']',
             'New ticket created',
             ['A new ticket has been created in your workspace.', 'Title: <strong>' . e($ticket->title) . '</strong><br>Priority: ' . e($ticket->priority) . '<br>Type: ' . e($ticket->type)],
             url('https://bmydesk.believoo.com' . $ticketUrl),
@@ -189,7 +189,7 @@ class TicketController extends Controller {
         if ($ticket->assignee && $ticket->assignee->id != $commenter->id) $recipients->push($ticket->assignee);
         foreach ($recipients as $member) {
             BconnectMail::toMember($member,
-                'New comment on: ' . $ticket->title,
+                'New comment on: ' . $ticket->title . ' [#' . $ticket->id . ']',
                 'A new comment has been added',
                 ['Hi ' . ($member->user->name ?? 'there') . ',', 'There is a new comment on ticket <strong>' . e($ticket->title) . '</strong>:', '<blockquote style="border-left:4px solid #00b7ff;padding-left:12px;margin:12px 0;color:#334155;">' . e($data['message']) . '</blockquote>'],
                 url('https://bmydesk.believoo.com' . $ticketUrl),

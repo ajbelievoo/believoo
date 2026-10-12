@@ -104,7 +104,7 @@ class BconnectMailTickets extends Command
 
         \App\Models\Bconnect\TicketComment::create([
             'ticket_id' => $ticket->id,
-            'member_id' => $ticket->reporter_id,
+            'member_id' => $ticket->reporter_id ?: null,
             'message' => "[email reply from {$name} <{$email}>]\n\n" . Str::limit($text, 8000, ''),
             'is_internal' => false,
         ]);
