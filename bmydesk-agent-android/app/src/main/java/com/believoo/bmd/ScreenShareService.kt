@@ -49,7 +49,7 @@ class ScreenShareService : Service() {
                     ?: run { events?.onError("No projection data"); return START_NOT_STICKY }
                 startCapture(data)
             }
-            ACTION_STOP -> { host?.stop(); stopSelf() }
+            ACTION_STOP -> { RemoteControlService.blocked = false; host?.stop(); stopSelf() }
         }
         return START_STICKY
     }
@@ -67,7 +67,7 @@ class ScreenShareService : Service() {
         val notif: Notification = Notification.Builder(this, chanId)
             .setContentTitle("BMyDesk — screen sharing")
             .setContentText("Your screen is being shared in a remote session")
-            .setSmallIcon(android.R.drawable.presence_video_online)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
@@ -93,6 +93,8 @@ class ScreenShareService : Service() {
                 override fun onChat(from: String, text: String) { events?.onChat(from, text) }
                 override fun onClip(text: String) { events?.onClip(text) }
                 override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
+                // viewer's quality toggle actually retunes this capture
+                override fun onQuality(mode: String) { h.setQuality(mode) }
             }
             h.startCapture(resultData, m.widthPixels, m.heightPixels, 15)
         }

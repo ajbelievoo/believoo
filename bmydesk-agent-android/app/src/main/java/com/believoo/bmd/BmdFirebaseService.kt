@@ -72,7 +72,8 @@ class BmdFirebaseService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val n = NotificationCompat.Builder(this, chId)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xfffb7185.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pi)

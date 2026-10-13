@@ -21,6 +21,8 @@ class CtlChannel(private val gson: Gson = Gson()) {
         fun onClip(text: String) {}
         fun onFile(name: String, data: ByteArray) {}
         fun onFileProgress(received: Int, total: Int) {}
+        fun onQuality(mode: String) {}
+        fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {}
     }
 
     var sink: Sink? = null
@@ -57,12 +59,19 @@ class CtlChannel(private val gson: Gson = Gson()) {
                 "cmd-out" -> sink?.onChat("Host ▸", m.get("out")?.asString ?: "(no output)")
                 "view-only" -> sink?.onChat("System", if (m.get("on")?.asBoolean == true)
                     "Host locked remote input (view-only mode)" else "Host re-enabled remote input")
+                // fs-list is a host→viewer REPLY (dir listing); fs-list-req/fs-get are
+                // viewer→host requests an Android host can't serve yet
+                "fs-list" -> sink?.onFsList(
+                    m.get("path")?.asString ?: "",
+                    m.getAsJsonArray("items"),
+                    m.get("err")?.asString)
+                "quality" -> sink?.onQuality(m.get("mode")?.asString ?: "auto")
                 // host-side actions — Android can't exec shell/reboot/browse files
                 "cmd", "reboot", "screen", "lock", "fs-get", "procs", "kill" -> send(JsonObject().apply {
                     addProperty("t", "cmd-out")
                     addProperty("out", "'${m.get("t")?.asString}' is not supported on this host")
                 })
-                "fs-list", "fs-list-req" -> send(JsonObject().apply {
+                "fs-list-req" -> send(JsonObject().apply {
                     addProperty("t", "fs-list")
                     addProperty("path", "")
                     add("items", com.google.gson.JsonArray())
@@ -102,6 +111,13 @@ class CtlChannel(private val gson: Gson = Gson()) {
     fun sendScreen() = send(JsonObject().apply { addProperty("t", "screen") })
     fun sendReboot() = send(JsonObject().apply { addProperty("t", "reboot") })
     fun sendQuality(mode: String) = send(JsonObject().apply { addProperty("t", "quality"); addProperty("mode", mode) })
+
+    // host → viewer: input is locked for this session (view-only accept)
+    fun sendViewOnly(on: Boolean) = send(JsonObject().apply { addProperty("t", "view-only"); addProperty("on", on) })
+
+    // viewer → host: remote file explorer
+    fun sendFsListReq(path: String) = send(JsonObject().apply { addProperty("t", "fs-list-req"); addProperty("path", path) })
+    fun sendFsGet(path: String) = send(JsonObject().apply { addProperty("t", "fs-get"); addProperty("path", path) })
 
     fun sendFile(name: String, data: ByteArray, chunk: Int = 16384) {
         val d = dc ?: return

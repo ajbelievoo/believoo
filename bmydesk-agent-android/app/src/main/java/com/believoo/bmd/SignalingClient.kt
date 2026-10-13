@@ -31,7 +31,7 @@ class SignalingClient(
     interface Listener {
         fun onConnected()
         fun onDisconnected()
-        fun onJoinRequest(name: String, note: String? = null)
+        fun onJoinRequest(name: String, note: String? = null, vdevice: String? = null)
         fun onSignal(payload: JsonObject)
         fun onEnd()
         fun onSubscribed() {}
@@ -94,7 +94,7 @@ class SignalingClient(
             override fun onEvent(event: PusherEvent) {
                 val data = gson.fromJson(event.data ?: "{}", JsonObject::class.java)
                 when (event.eventName) {
-                    "client-join-request" -> listener?.onJoinRequest(data.get("name")?.asString ?: "Someone", data.get("note")?.asString)
+                    "client-join-request" -> listener?.onJoinRequest(data.get("name")?.asString ?: "Someone", data.get("note")?.asString, data.get("vdevice")?.asString)
                     "client-join-accept" -> listener?.onJoinAccept()
                     "client-join-reject" -> listener?.onJoinReject()
                     "client-signal" -> listener?.onSignal(data)

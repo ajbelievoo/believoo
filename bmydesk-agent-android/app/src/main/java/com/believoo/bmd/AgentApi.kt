@@ -143,6 +143,18 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         }
     }
 
+    /** "Always trust this device" — future joins from vdevice auto-accept. */
+    fun trust(code: String, token: String, viewerDevice: String, viewerName: String?) {
+        runCatching {
+            val body = mutableMapOf<String, String>("viewer_device" to viewerDevice)
+            viewerName?.let { body["viewer_name"] = it }
+            val req = Request.Builder().url("$base/$code/trust")
+                .post(gson.toJson(body).toRequestBody(json))
+                .header("Authorization", "Bearer $token").build()
+            http.newCall(req).execute().close()
+        }
+    }
+
     fun status(code: String, token: String): JsonObject? {
         val req = Request.Builder().url("$base/$code/status")
             .header("Authorization", "Bearer $token").build()

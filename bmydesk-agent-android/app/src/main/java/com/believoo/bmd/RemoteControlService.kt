@@ -3,9 +3,9 @@ package com.believoo.bmd
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
-import android.graphics.PointF
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import android.content.Intent
 import com.google.gson.JsonObject
 
@@ -14,16 +14,22 @@ import com.google.gson.JsonObject
  * touch gestures on this device — this is what makes an Android host fully
  * controllable (AnyDesk-style). The user enables it once in system settings;
  * every injection happens only while a remote session is live.
+ *
+ * Handles: move/down/up (tap+drag), wheel (swipe scroll), b=2 (long-press
+ * right-click), and printable keys (SET_TEXT into the focused input field).
  */
 class RemoteControlService : AccessibilityService() {
 
     companion object {
         @Volatile var instance: RemoteControlService? = null
+        // set when the host accepted the session as view-only — every input
+        // message is dropped while this is on, reset on session end.
+        @Volatile var blocked = false
         fun enabled() = instance != null
     }
 
     override fun onServiceConnected() { instance = this }
-    override fun onUnbind(i: Intent?): Boolean { instance = null; return false }
+    override fun onUnbind(i: Intent?): Boolean { instance = null; blocked = false; return false }
     override fun onAccessibilityEvent(e: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
@@ -35,21 +41,33 @@ class RemoteControlService : AccessibilityService() {
     private var downAt = 0L
     private var moved = false
     private var lastMoveAt = 0L
+    private var skipUp = false
+    private var scrW = 0
+    private var scrH = 0
 
     /** Map a normalized (0..1) input message to a real gesture/action. */
     fun handleInput(m: JsonObject, scrW: Int, scrH: Int) {
+        if (blocked) return
         val t = m.get("t")?.asString ?: return
+        this.scrW = scrW; this.scrH = scrH
         val x = (m.get("x")?.asFloat ?: 0f) * scrW
         val y = (m.get("y")?.asFloat ?: 0f) * scrH
         when (t) {
-            "down" -> onDown(x, y)
+            "down" -> onDown(x, y, m.get("b")?.asInt ?: 0)
             "move" -> onMove(x, y)
             "up" -> onUp(x, y)
-            "key" -> onKey(m.get("code")?.asString, m.get("down")?.asBoolean == true)
+            "wheel" -> onWheel(x, y, m.get("dy")?.asFloat ?: 0f)
+            "key" -> onKey(m)
         }
     }
 
-    private fun onDown(x: Float, y: Float) {
+    private fun onDown(x: Float, y: Float, b: Int) {
+        if (b == 2) { // right button → long-press (context menus)
+            longPress(x, y)
+            skipUp = true
+            return
+        }
+        skipUp = false
         lastX = x; lastY = y; moved = false
         downAt = SystemClock.uptimeMillis()
         strokeT0 = downAt
@@ -60,11 +78,11 @@ class RemoteControlService : AccessibilityService() {
 
     private fun onMove(x: Float, y: Float) {
         val sd = strokeDesc ?: return
-        if (Math.abs(x - lastX) + Math.abs(y - lastY) < 4) return
+        if (Math.abs(x - lastX) + Math.abs(y - lastY) < 3) return
         moved = true
-        // throttle stroke continuation ~30ms so the gesture queue stays small
+        // throttle stroke continuation ~20ms so the gesture queue stays small
         val now = SystemClock.uptimeMillis()
-        if (now - lastMoveAt < 30) return
+        if (now - lastMoveAt < 20) return
         lastMoveAt = now
         val seg = Path().apply { moveTo(lastX, lastY); lineTo(x, y) }
         strokeDesc = sd.continueStroke(seg, now - strokeT0, 40, true)
@@ -73,6 +91,7 @@ class RemoteControlService : AccessibilityService() {
     }
 
     private fun onUp(x: Float, y: Float) {
+        if (skipUp) { skipUp = false; return }
         val sd = strokeDesc
         if (sd == null) { tap(x, y); return }
         val dur = SystemClock.uptimeMillis() - downAt
@@ -88,28 +107,111 @@ class RemoteControlService : AccessibilityService() {
         strokeDesc = null
     }
 
+    /** Wheel → swipe. dy>0 (wheel down) scrolls content down = finger goes up. */
+    private fun onWheel(x: Float, y: Float, dy: Float) {
+        val d = (dy / 100f * 350f).coerceIn(-900f, 900f)
+        if (d == 0f) return
+        val y2 = (y - d).coerceIn(1f, scrH.toFloat() - 1f)
+        val p = Path().apply { moveTo(x, y); lineTo(x, y2) }
+        dispatch(GestureDescription.StrokeDescription(p, 0, 320))
+    }
+
     private fun tap(x: Float, y: Float) {
         val p = Path().apply { moveTo(x, y) }
-        val sd = GestureDescription.StrokeDescription(p, 0, 60)
-        dispatch(sd)
+        dispatch(GestureDescription.StrokeDescription(p, 0, 60))
+    }
+
+    private fun longPress(x: Float, y: Float) {
+        val p = Path().apply { moveTo(x, y) }
+        dispatch(GestureDescription.StrokeDescription(p, 0, 650))
     }
 
     private fun dispatch(sd: GestureDescription.StrokeDescription) {
         runCatching { dispatchGesture(GestureDescription.Builder().addStroke(sd).build(), null, null) }
     }
 
-    // Common nav keys map to global actions; the rest is ignored for now —
-    // typed text goes through the clipboard + focused-field SET_TEXT later.
-    private fun onKey(code: String?, down: Boolean) {
-        if (!down) return
+    // ── keys: global actions for nav keys, SET_TEXT for printable chars ──
+    private var shiftHeld = false
+
+    private fun onKey(m: JsonObject) {
+        val code = m.get("code")?.asString
+        // viewers send Shift as its own key event — track its held state so
+        // KeyX can be resolved to the right case/symbol
+        if (code == "ShiftLeft" || code == "ShiftRight") {
+            shiftHeld = m.get("down")?.asBoolean == true
+            return
+        }
+        if (m.get("down")?.asBoolean != true) return
+        val k = m.get("k")?.asString
+        if (!k.isNullOrEmpty()) { typeChar(k[0]); return }
         when (code) {
             "Escape" -> performGlobalAction(GLOBAL_ACTION_BACK)
             "Home" -> performGlobalAction(GLOBAL_ACTION_HOME)
             "End" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
             "F4" -> performGlobalAction(GLOBAL_ACTION_BACK)
+            "Backspace" -> delChar()
+            "Enter" -> newlineOrGo()
             "PageDown" -> performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
             "F6" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
             "F7" -> performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+            else -> codeChar(code, (m.get("shift")?.asBoolean == true) || shiftHeld)
         }
+    }
+
+    private fun codeChar(code: String?, shift: Boolean) {
+        val c = when {
+            code != null && code.length == 4 && code.startsWith("Key") ->
+                code[3].let { if (shift) it else it.lowercaseChar() }
+            code != null && code.length == 6 && code.startsWith("Digit") ->
+                if (shift) "!@#$%^&*()"[code[5] - '0'] else code[5]
+            code == "Space" -> ' '
+            code == "Period" -> if (shift) '>' else '.'
+            code == "Comma" -> if (shift) '<' else ','
+            code == "Minus" -> if (shift) '_' else '-'
+            code == "Equal" -> if (shift) '+' else '='
+            code == "Slash" -> if (shift) '?' else '/'
+            code == "Backslash" -> if (shift) '|' else '\\'
+            code == "Semicolon" -> if (shift) ':' else ';'
+            code == "Quote" -> if (shift) '"' else '\''
+            code == "BracketLeft" -> if (shift) '{' else '['
+            code == "BracketRight" -> if (shift) '}' else ']'
+            code == "Backquote" -> if (shift) '~' else '`'
+            else -> return
+        }
+        typeChar(c)
+    }
+
+    /** SET_TEXT into whichever field has input focus — real typing, not paste. */
+    private fun focusedInput(): AccessibilityNodeInfo? {
+        val root = rootInActiveWindow ?: return null
+        val n = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        return if (n != null && n.isEditable) n else { n?.recycle(); null }
+    }
+
+    private fun setNodeText(n: AccessibilityNodeInfo, text: String) {
+        val args = android.os.Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+        }
+        n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+    }
+
+    private fun typeChar(c: Char) {
+        val n = focusedInput() ?: return
+        runCatching { setNodeText(n, (n.text?.toString() ?: "") + c) }
+        n.recycle()
+    }
+
+    private fun delChar() {
+        val n = focusedInput() ?: return
+        runCatching { setNodeText(n, (n.text?.toString() ?: "").dropLast(1)) }
+        n.recycle()
+    }
+
+    private fun newlineOrGo() {
+        val n = focusedInput()
+        if (n != null && n.isMultiLine) {
+            runCatching { setNodeText(n, (n.text?.toString() ?: "") + "\n") }
+        }
+        n?.recycle()
     }
 }

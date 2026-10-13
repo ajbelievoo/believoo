@@ -71,7 +71,17 @@ class MainActivity : Activity() {
                 override fun onConnected() = ui { setStatus("Viewer connected — sharing screen", "#22c55e"); sessRow.visibility = View.VISIBLE }
                 override fun onDisconnected() = ui { setStatus("Viewer disconnected", "#f59e0b"); sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE }
                 override fun onError(msg: String) = ui { setStatus(msg, "#ef4444") }
-                override fun onCtlReady() = ui { sessRow.visibility = View.VISIBLE; startClipSync() }
+                override fun onCtlReady() = ui {
+                    sessRow.visibility = View.VISIBLE; startClipSync()
+                    // host accepted with "view only" — lock input injection and
+                    // tell the viewer so their UI can reflect it too.
+                    if (pendingViewOnly) {
+                        pendingViewOnly = false
+                        RemoteControlService.blocked = true
+                        service?.ctl()?.sendViewOnly(true)
+                        chatAppend("System", "View-only session — remote control is locked", false)
+                    }
+                }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
@@ -109,6 +119,20 @@ class MainActivity : Activity() {
     // set when the host answers a join request — polled requests older than
     // this are not re-shown (fixes the "accept loop").
     @Volatile private var respondedAtMs = 0L
+    // Accept options — the host can lock input (view-only) or mark the viewer
+    // trusted so future joins skip approval entirely.
+    private lateinit var chkViewOnly: android.widget.CheckBox
+    private lateinit var chkTrust: android.widget.CheckBox
+    @Volatile private var pendingViewOnly = false
+    @Volatile private var pendingTrust = false
+    @Volatile private var pendingVDevice: String? = null
+    @Volatile private var pendingVName: String? = null
+
+    private fun resetAcceptOptions() {
+        pendingViewOnly = false; pendingTrust = false
+        pendingVDevice = null; pendingVName = null
+        runCatching { chkViewOnly.isChecked = false; chkTrust.isChecked = false }
+    }
 
     private fun handleHostSignal(p: JsonObject) {
         when (p.get("kind")?.asString) {
@@ -116,6 +140,8 @@ class MainActivity : Activity() {
             "join-request" -> ui {
                 val nm = p.get("name")?.asString ?: "Someone"
                 val nt = p.get("note")?.asString
+                resetAcceptOptions()
+                pendingVDevice = p.get("vdevice")?.asString; pendingVName = nm
                 reqName.text = "$nm wants to view this device" + (if (nt.isNullOrBlank()) "" else "\n“$nt”")
                 reqBox.visibility = View.VISIBLE
             }
@@ -329,6 +355,16 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#fbbf24")); textSize = 14f; gravity = Gravity.CENTER
         }
         reqBox.addView(reqName)
+        chkViewOnly = android.widget.CheckBox(this).apply {
+            text = "View only — they can't control this device"
+            setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
+        }
+        chkTrust = android.widget.CheckBox(this).apply {
+            text = "Always trust this device — skip approval next time"
+            setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
+        }
+        reqBox.addView(chkViewOnly)
+        reqBox.addView(chkTrust)
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         btnRow.addView(mbtn("✓ Accept", Color.parseColor("#16a34a")) { acceptRequest() })
         btnRow.addView(mbtn("✕ Reject", Color.parseColor("#475569")) { rejectRequest() }, lpGap())
@@ -494,6 +530,7 @@ class MainActivity : Activity() {
         vSessRow.addView(mbtn("📎", Color.parseColor("#1e293b"), 12f) { pickFile() }, lpGap(6))
         vSessRow.addView(mbtn("⌨", Color.parseColor("#1e293b"), 12f) { keysRow.visibility = if (keysRow.visibility == View.VISIBLE) View.GONE else View.VISIBLE }, lpGap(6))
         vSessRow.addView(mbtn("🖥", Color.parseColor("#1e293b"), 12f) { activeCtl()?.sendScreen() }, lpGap(6))
+        vSessRow.addView(mbtn("📂", Color.parseColor("#1e293b"), 12f) { openFs() }, lpGap(6))
         vSessRow.addView(mbtn("⏻", Color.parseColor("#1e293b"), 12f) {
             android.app.AlertDialog.Builder(this@MainActivity)
                 .setMessage("Reboot the REMOTE computer? The host user will be asked to confirm.")
@@ -657,6 +694,101 @@ class MainActivity : Activity() {
         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
         }, 1002)
+    }
+
+    // ── Remote file explorer — drives fs-list-req/fs-get over ctl ──
+    private var fsDialog: android.app.AlertDialog? = null
+    private var fsListBox: LinearLayout? = null
+    private var fsPathView: TextView? = null
+    private var fsPath = ""
+
+    private fun openFs() {
+        if (remoteViewer?.ctl?.open() != true) { toast("No session — connect first"); return }
+        val wrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(28, 20, 28, 8)
+        }
+        fsPathView = TextView(this).apply {
+            text = "…"; setTextColor(Color.parseColor("#7dd3fc")); textSize = 12f
+        }
+        fsListBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        wrap.addView(fsPathView)
+        wrap.addView(ScrollView(this).apply { addView(fsListBox) },
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.55f).toInt()))
+        fsDialog = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Remote files")
+            .setView(wrap)
+            .setNegativeButton("Close", null)
+            .create()
+        fsDialog?.setOnDismissListener { fsDialog = null; fsListBox = null; fsPathView = null }
+        fsDialog?.show()
+        fsPath = ""; fsReq()
+    }
+
+    private fun fsSep(): String = if (fsPath.contains('\\')) "\\" else "/"
+
+    private fun fsReq() {
+        fsPathView?.text = if (fsPath.isBlank()) "This device" else fsPath
+        fsListBox?.removeAllViews()
+        fsListBox?.addView(TextView(this).apply {
+            text = "Loading…"; setTextColor(Color.parseColor("#94a3b8")); setPadding(0, 16, 0, 16)
+        })
+        remoteViewer?.ctl?.sendFsListReq(fsPath)
+    }
+
+    private fun fsParent(p: String): String {
+        val trimmed = p.trimEnd('\\', '/')
+        val sep = fsSep()
+        val idx = trimmed.lastIndexOf(sep)
+        return when {
+            idx > 0 -> trimmed.substring(0, idx)
+            p.startsWith("/") -> "/"
+            else -> ""
+        }
+    }
+
+    private fun fsRow(label: String, onTap: () -> Unit) {
+        fsListBox?.addView(TextView(this).apply {
+            text = label; setTextColor(Color.WHITE); textSize = 14f
+            setPadding(12, 18, 12, 18)
+            setOnClickListener { onTap() }
+        })
+    }
+
+    private fun renderFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {
+        if (fsDialog == null) return
+        fsPath = path
+        fsPathView?.text = if (path.isBlank()) "This device" else path
+        fsListBox?.removeAllViews()
+        if (!err.isNullOrBlank()) {
+            fsListBox?.addView(TextView(this).apply {
+                text = err; setTextColor(Color.parseColor("#fca5a5")); setPadding(0, 16, 0, 16)
+            })
+            return
+        }
+        if (path.isNotBlank()) fsRow("⬅  ..") { fsPath = fsParent(fsPath); fsReq() }
+        items?.forEach { el ->
+            val it = el.asJsonObject
+            val nm = it.get("n")?.asString ?: return@forEach
+            val dir = it.get("d")?.asBoolean == true
+            val sz = it.get("s")?.asLong ?: 0
+            val label = (if (dir) "📁 " else "📄 ") + nm +
+                (if (dir || sz <= 0) "" else "  · ${sz / 1024} KB")
+            fsRow(label) {
+                val full = if (fsPath.isBlank()) nm else fsPath.trimEnd('\\', '/') + fsSep() + nm
+                if (dir) { fsPath = full; fsReq() }
+                else {
+                    chatAppend("System", "Fetching $nm…", false)
+                    remoteViewer?.ctl?.sendFsGet(full)
+                }
+            }
+        }
+        if (fsListBox?.childCount == 0) {
+            fsListBox?.addView(TextView(this).apply {
+                text = "(empty)"; setTextColor(Color.parseColor("#64748b")); setPadding(0, 16, 0, 16)
+            })
+        }
     }
 
     // Received file → Downloads (MediaStore, no permission needed on API 29+;
@@ -881,8 +1013,13 @@ class MainActivity : Activity() {
             override fun onConnected() { ui { setStatus("Realtime connected…", "#f59e0b") } }
             override fun onDisconnected() { ui { setStatus("Realtime lost — reconnecting…", "#ef4444") } }
             override fun onSubscribed() { ui { setStatus("Ready — share your code", "#22c55e") } }
-            override fun onJoinRequest(name: String, note: String?) {
-                ui { reqName.text = "$name wants to view this device" + (if (note.isNullOrBlank()) "" else "\n“$note”"); reqBox.visibility = View.VISIBLE }
+            override fun onJoinRequest(name: String, note: String?, vdevice: String?) {
+                ui {
+                    resetAcceptOptions()
+                    pendingVDevice = vdevice; pendingVName = name
+                    reqName.text = "$name wants to view this device" + (if (note.isNullOrBlank()) "" else "\n“$note”")
+                    reqBox.visibility = View.VISIBLE
+                }
             }
             override fun onSignal(p: JsonObject) { if (sigNew(p)) handleHostSignal(p) }
             override fun onEnd() { ui { endSession() } }
@@ -935,6 +1072,8 @@ class MainActivity : Activity() {
     private fun acceptRequest() {
         reqBox.visibility = View.GONE
         respondedAtMs = System.currentTimeMillis()
+        pendingViewOnly = chkViewOnly.isChecked
+        pendingTrust = chkTrust.isChecked && !pendingVDevice.isNullOrBlank()
         pendingProjection = true
         setStatus("Requesting screen capture permission…", "#f59e0b")
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -978,6 +1117,11 @@ class MainActivity : Activity() {
         startService(svc)
         pendingProjection = false
         respondTo("accept")
+        if (pendingTrust) {
+            val vd = pendingVDevice!!; val vn = pendingVName
+            reg?.let { r -> thread { api.trust(r.code, r.agentToken, vd, vn) } }
+            pendingTrust = false
+        }
         setStatus("Accepted — waiting for stream…", "#22c55e")
         promptAccessibilityOnce()
         endBtn.visibility = View.VISIBLE
@@ -1003,11 +1147,14 @@ class MainActivity : Activity() {
 
     private fun rejectRequest() {
         reqBox.visibility = View.GONE
+        resetAcceptOptions()
         respondTo("reject")
         setStatus("Request rejected", "#f59e0b")
     }
 
     private fun endSession() {
+        RemoteControlService.blocked = false
+        resetAcceptOptions()
         reg?.let { thread { api.end(it.code, it.agentToken) } }
         signaling.send("end", JsonObject())
         runCatching { startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_STOP)) }
@@ -1125,7 +1272,7 @@ class MainActivity : Activity() {
                 signaling.connectViewer(j.channel, j.viewerToken, object : SignalingClient.Listener {
                     override fun onConnected() {}
                     override fun onDisconnected() { vStage(30, "Signaling lost — relay mode active") }
-                    override fun onJoinRequest(name: String, note: String?) {}
+                    override fun onJoinRequest(name: String, note: String?, vdevice: String?) {}
                     override fun onSubscribed() {
                         signaling.sendViewer("join-request", JsonObject().apply {
                             addProperty("name", (android.os.Build.MODEL ?: "Android") + " (app)")
@@ -1221,6 +1368,8 @@ class MainActivity : Activity() {
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
+                override fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) =
+                    ui { renderFsList(path, items, err) }
             }
         }
         remoteViewer!!.start(iceServersFrom(j.iceServers))

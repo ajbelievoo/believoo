@@ -33,6 +33,8 @@ class WebRtcHost(context: Context) {
     private var localTrack: VideoTrack? = null
     private var iceQueue = mutableListOf<IceCandidate>()
     private var remoteSet = false
+    private var capW = 0
+    private var capH = 0
 
     init {
         PeerConnectionFactory.initialize(
@@ -53,6 +55,7 @@ class WebRtcHost(context: Context) {
         videoSource = factory.createVideoSource(true)
         capturer!!.initialize(surfaceHelper, null, videoSource!!.capturerObserver)
         capturer!!.startCapture(width, height, fps)
+        capW = width; capH = height
         localTrack = factory.createVideoTrack("screen", videoSource)
     }
 
@@ -155,6 +158,21 @@ class WebRtcHost(context: Context) {
                 })
             }
         }, constraints)
+    }
+
+    /** Viewer quality toggle — retune the capture instead of leaving it hot. */
+    fun setQuality(mode: String) {
+        if (capW == 0 || capH == 0) return
+        val (scale, fps) = when (mode) {
+            "sd" -> 0.5f to 8
+            "hd" -> 1.0f to 20
+            else -> 1.0f to 15
+        }
+        runCatching {
+            capturer?.changeCaptureFormat(
+                (capW * scale).toInt().coerceAtLeast(320),
+                (capH * scale).toInt().coerceAtLeast(240), fps)
+        }
     }
 
     fun addIce(c: JsonObject) {
