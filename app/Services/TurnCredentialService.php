@@ -16,14 +16,21 @@ class TurnCredentialService
         ];
 
         $host = config('services.turn.host');
+        $tlsHost = config('services.turn.tls_host');
         $secret = config('services.turn.secret');
         if ($host && $secret) {
             $username = (time() + $ttlSeconds) . ':' . $userLabel;
+            $urls = [
+                "turn:{$host}:3478?transport=udp",
+                "turn:{$host}:3478?transport=tcp",
+            ];
+            // TURNS over TLS on 5349 — the fallback for networks that block
+            // UDP entirely (corporate firewalls, captive-portal-ish NATs).
+            if ($tlsHost) {
+                $urls[] = "turns:{$tlsHost}:5349?transport=tcp";
+            }
             $servers[] = [
-                'urls' => [
-                    "turn:{$host}:3478?transport=udp",
-                    "turn:{$host}:3478?transport=tcp",
-                ],
+                'urls' => $urls,
                 'username' => $username,
                 'credential' => base64_encode(hash_hmac('sha1', $username, $secret, true)),
             ];

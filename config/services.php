@@ -67,6 +67,7 @@ return [
 
     'turn' => [
         'host' => env('TURN_HOST'),
+        'tls_host' => env('TURN_TLS_HOST', env('TURN_HOST')),
         'secret' => env('TURN_SECRET'),
     ],
 
