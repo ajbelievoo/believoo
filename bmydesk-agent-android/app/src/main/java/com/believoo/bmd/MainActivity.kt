@@ -68,8 +68,24 @@ class MainActivity : Activity() {
             service = (binder as ScreenShareService.LocalBinder).service
             bound = true
             service?.events = object : ScreenShareService.Events {
-                override fun onConnected() = ui { setStatus("Viewer connected — sharing screen", "#22c55e"); sessRow.visibility = View.VISIBLE }
-                override fun onDisconnected() = ui { setStatus("Viewer disconnected", "#f59e0b"); sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE }
+                override fun onConnected() = ui {
+                    peerLive = true
+                    teardownRunnable?.let { teardownHandler.removeCallbacks(it) }
+                    setStatus("Viewer connected — sharing screen", "#22c55e")
+                    sessRow.visibility = View.VISIBLE
+                }
+                override fun onDisconnected() = ui {
+                    peerLive = false
+                    setStatus("Viewer disconnected", "#f59e0b")
+                    sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
+                    // grace window for the viewer's auto-reconnect — after that
+                    // the capture is torn down so a dead viewer can't leave
+                    // MediaProjection recording forever.
+                    teardownRunnable?.let { teardownHandler.removeCallbacks(it) }
+                    val r = Runnable { if (!peerLive && service != null) endSession() }
+                    teardownRunnable = r
+                    teardownHandler.postDelayed(r, 30_000)
+                }
                 override fun onError(msg: String) = ui { setStatus(msg, "#ef4444") }
                 override fun onCtlReady() = ui {
                     sessRow.visibility = View.VISIBLE; startClipSync()
@@ -96,6 +112,11 @@ class MainActivity : Activity() {
 
     private val signaling = SignalingClient()
     @Volatile private var statusPollRunning = false
+    // host-side teardown: viewer drop gets a reconnect grace window, then the
+    // whole session is ended (capture + FGS) — no orphaned screen recording
+    @Volatile private var peerLive = false
+    private val teardownHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var teardownRunnable: Runnable? = null
     // nonce dedupe — signals arrive via ws AND the HTTP queue; the shared
     // "n" field collapses double delivery.
     private val seenNonces = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -1322,16 +1343,19 @@ class MainActivity : Activity() {
             val self = this
             listener = object : RemoteViewer.Listener {
                 override fun sendSignal(payload: JsonObject) = signaling.sendViewer("signal", payload)
-                override fun onPeerConnected() { vLastPeerOkAt = System.currentTimeMillis(); vConnTries = 0; vStage(92, "Almost there…") }
+                override fun onPeerConnected() {
+                    offerTimeout?.let { sessTicker.removeCallbacks(it) }
+                    vLastPeerOkAt = System.currentTimeMillis(); vConnTries = 0; vStage(92, "Almost there…")
+                }
                 override fun onPeerUnstable() {
                     if (remoteViewer !== self) return
-                    ui { viewerStatus.text = "Unstable — watching…" }
+                    ui { streaming = false; viewerStatus.text = "Unstable — watching…" }
                     val droppedAt = vLastPeerOkAt
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         if (remoteViewer === self && vJoin != null && vLastPeerOkAt == droppedAt) viewerReconnect(self)
                     }, 6000)
                 }
-                override fun onPeerDisconnected() = viewerReconnect(self)
+                override fun onPeerDisconnected() { streaming = false; viewerReconnect(self) }
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
                     // Fresh renderer each session — a released
                     // SurfaceViewRenderer can't be init()ed again, which is
@@ -1356,6 +1380,7 @@ class MainActivity : Activity() {
                     track.addSink(remoteSurface)
                     bindViewerTouch()
                     vStage(100, "Live — touch to control")
+                    startSessTimer()
                 }
                 override fun onError(message: String) = ui { viewerStatus.text = message }
             }
@@ -1368,11 +1393,27 @@ class MainActivity : Activity() {
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
+                override fun onFileProgress(received: Int, total: Int) = ui {
+                    if (total > 0) {
+                        val pct = received * 100 / total
+                        if (pct >= lastFilePct + 25 || (pct == 100 && lastFilePct < 100)) {
+                            lastFilePct = pct
+                            chatAppend("System", "Receiving file… $pct%", false)
+                        }
+                    }
+                }
                 override fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) =
                     ui { renderFsList(path, items, err) }
             }
         }
         remoteViewer!!.start(iceServersFrom(j.iceServers))
+        // if the host never answers this offer (lost in dead-channel land),
+        // rebuild the peer every 25s instead of hanging on 'Negotiating…'
+        val v = remoteViewer!!
+        offerTimeout?.let { sessTicker.removeCallbacks(it) }
+        val rt = Runnable { if (remoteViewer === v && vJoin != null) viewerReconnect(v) }
+        offerTimeout = rt
+        sessTicker.postDelayed(rt, 25_000)
     }
 
     // Touch → input events (same JSON protocol as the web/Electron viewer)
@@ -1385,6 +1426,30 @@ class MainActivity : Activity() {
     private var panX = 0f; private var panY = 0f
     private var lastTX = 0f; private var lastTY = 0f
     private var last2Y = Float.MIN_VALUE; private var lastWheel = 0L
+    // session elapsed timer (mm:ss in the status line once live) + a timeout
+    // that retries the WebRTC offer if the host never answers it
+    private var liveSince = 0L
+    private var offerTimeout: Runnable? = null
+    private var lastFilePct = -1
+    private val sessTicker = android.os.Handler(android.os.Looper.getMainLooper())
+
+    @Volatile private var streaming = false
+    private fun startSessTimer() {
+        streaming = true
+        if (liveSince != 0L) return
+        liveSince = System.currentTimeMillis()
+        sessTicker.postDelayed(object : Runnable {
+            override fun run() {
+                if (remoteViewer == null || liveSince == 0L) return
+                // don't stomp reconnect/status messages while the link is down
+                if (streaming) {
+                    val s = (System.currentTimeMillis() - liveSince) / 1000
+                    viewerStatus.text = "Live — touch to control · %d:%02d".format(s / 60, s % 60)
+                }
+                sessTicker.postDelayed(this, 1000)
+            }
+        }, 1000)
+    }
     // remote frame dims — the video is letterboxed (aspect-fit) inside the
     // view, so raw view coords must be mapped through the visible video rect
     private var vidW = 0; private var vidH = 0; private var vidRot = 0
@@ -1542,6 +1607,8 @@ class MainActivity : Activity() {
         signaling.disconnectViewer()
         remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }
         remoteSurface = null
+        offerTimeout?.let { sessTicker.removeCallbacks(it) }
+        streaming = false; liveSince = 0L; lastFilePct = -1
         fillMode = false; vFitBtn.text = "⛶ Fill"
         vScale = 1f; panX = 0f; panY = 0f; vidW = 0; vidH = 0; vidRot = 0
         exitImmersive()

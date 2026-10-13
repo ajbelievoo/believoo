@@ -13,7 +13,7 @@ class AgentApiController extends Controller
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
     const AGENT_LATEST_WINDOWS = '1.3.12';
-    const AGENT_LATEST_ANDROID = '1.3.14';
+    const AGENT_LATEST_ANDROID = '1.3.15';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -437,7 +437,7 @@ class AgentApiController extends Controller
         }
 
         if ($autoAccept) {
-            $session->update(['status' => 'active']);
+            $session->update(['status' => 'active', 'started_at' => $session->started_at ?? now()]);
             $payload = ['n' => (string) Str::random(10), 'at' => now()->toIso8601String(), 'unattended' => true];
             \Illuminate\Support\Facades\Broadcast::connection(config('broadcasting.default'))
                 ->broadcast(['private-remote-agent.' . $session->session_code], 'client-join-accept', $payload);
@@ -518,7 +518,8 @@ class AgentApiController extends Controller
             ->broadcast(['private-remote-agent.' . $session->session_code],
                 $accept ? 'client-join-accept' : 'client-join-reject', $payload);
         $this->queueSignal($session->session_code, 'v', ['kind' => $accept ? 'accept' : 'reject'] + $payload);
-        $session->update(['status' => $accept ? 'active' : 'rejected']);
+        $session->update(['status' => $accept ? 'active' : 'rejected']
+            + ($accept ? ['started_at' => $session->started_at ?? now()] : []));
         \Illuminate\Support\Facades\Log::info("bmysig {$code} respond " . ($accept ? 'accept' : 'reject'));
         return response()->json(['ok' => true]);
     }
@@ -575,9 +576,16 @@ class AgentApiController extends Controller
             ->broadcast(['private-remote-agent.' . $session->session_code],
                 $kind === 'end' ? 'client-end' : 'client-signal', $payload);
         $this->queueSignal($session->session_code, $isHost ? 'v' : 'h', $payload);
-        \Illuminate\Support\Facades\Log::info("bmysig {$code} {$kind} " . ($isHost ? 'h→v' : 'v→h')
+        // ICE candidates arrive in the hundreds per session — log them at
+        // debug so a busy day doesn't bury the real events.
+        $logLine = "bmysig {$code} {$kind} " . ($isHost ? 'h→v' : 'v→h')
             . (isset($payload['sdp']) ? ' sdp=' . strlen($payload['sdp']) . 'b' : '')
-            . ($payload['candidate'] ? ' ice' : ''));
+            . ($payload['candidate'] ? ' ice' : '');
+        if ($kind === 'ice') {
+            \Illuminate\Support\Facades\Log::debug($logLine);
+        } else {
+            \Illuminate\Support\Facades\Log::info($logLine);
+        }
         if ($kind === 'end') {
             $session->update(['status' => 'ended', 'ended_at' => now()]);
         }
