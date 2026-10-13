@@ -137,6 +137,20 @@ class RemoteViewer(context: Context) {
         if (remoteSet && peer != null) peer!!.addIceCandidate(cand) else iceQueue.add(cand)
     }
 
+    /** Nominated pair RTT in ms (0 if unknown) — for the viewer's link badge. */
+    fun rtt(cb: (Int) -> Unit) {
+        val p = peer ?: return
+        runCatching {
+            p.getStats { report ->
+                val ms = report?.statsMap?.values
+                    ?.filter { it.type == "candidate-pair" }
+                    ?.mapNotNull { (it.members["currentRoundTripTime"] as? Double)?.times(1000)?.toInt() }
+                    ?.firstOrNull() ?: 0
+                cb(ms)
+            }
+        }
+    }
+
     fun sendInput(m: JsonObject) {
         val d = dc ?: return
         if (d.state() == DataChannel.State.OPEN) {

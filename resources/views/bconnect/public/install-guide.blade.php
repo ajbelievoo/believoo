@@ -59,8 +59,8 @@
         </ol>
         <div class="mt-8 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
             <div class="font-bold text-slate-800 mb-1"><i class="fas fa-fingerprint text-green-600 mr-1"></i>Signed &amp; verified</div>
-            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.15 APK SHA-256:</p>
-            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">7b438d14a2f483a71bcc9dd3ffdacdf7fcd356eaeaec086065eafc6b4403eec5</code>
+            <p class="text-slate-600 mb-2">The APK is signed with the official Believoo release certificate. Official v1.3.16 APK SHA-256:</p>
+            <code class="block bg-slate-900 text-cyan-300 text-xs rounded-lg px-3 py-2 break-all select-all">3483dab01abf0fed90909431ec732c477c1d9b8be275bcdb2402ff6d65a6d73c</code>
         </div>
     </div>
 

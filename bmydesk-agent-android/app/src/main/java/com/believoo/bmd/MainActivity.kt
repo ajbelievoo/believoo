@@ -601,6 +601,7 @@ class MainActivity : Activity() {
             keysRow.addView(mbtn(lbl, Color.parseColor("#1e293b"), 11f) { sendKey(code) }, lpGap(4))
         }
         keysRow.addView(mbtn("⌨", Color.parseColor("#1e293b"), 11f) { typeDialog() }, lpGap(4))
+        keysRow.addView(mbtn("⌨Live", Color.parseColor("#334155"), 10f) { toggleLiveKb() }, lpGap(4))
         // shortcut chords — modifier flag travels on the key event itself
         mapOf("Alt+Tab" to ("Tab" to "alt"), "Alt+F4" to ("F4" to "alt"),
               "Ctrl+A" to ("KeyA" to "ctrl"), "Win+D" to ("KeyD" to "meta")).forEach { (lbl, p) ->
@@ -936,6 +937,58 @@ class MainActivity : Activity() {
             .setPositiveButton("Send") { _, _ -> typeText(input.text.toString()) }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    // ── Live soft keyboard: every keystroke streams to the remote ──
+    // A thin EditText bar sits at the top of the viewer; its TextWatcher
+    // diffs the text and sends chars (or Backspaces) in real time — the
+    // same UX as AnyDesk's "show keyboard" on mobile.
+    private var liveKb: android.widget.EditText? = null
+    private var liveKbLen = 0
+
+    private fun toggleLiveKb() {
+        if (liveKb != null) { closeLiveKb(); return }
+        if (remoteViewer == null) { toast("No session"); return }
+        val et = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            hint = "⌨ Live — typing goes to remote"
+            setHintTextColor(Color.parseColor("#64748b"))
+            setTextColor(Color.WHITE); textSize = 13f
+            setBackgroundColor(Color.parseColor("#e60f172a"))
+            setPadding(24, 12, 24, 12)
+        }
+        viewerPane.addView(et, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        liveKbLen = 0
+        et.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val t = s?.toString() ?: ""
+                if (t.length < liveKbLen) {
+                    repeat(liveKbLen - t.length) { sendKey("Backspace") }
+                } else if (t.length > liveKbLen) {
+                    typeText(t.substring(liveKbLen))
+                }
+                liveKbLen = t.length
+            }
+        })
+        et.requestFocus()
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+            .showSoftInput(et, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        liveKb = et
+    }
+
+    private fun closeLiveKb() {
+        liveKb?.let {
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+                .hideSoftInputFromWindow(it.windowToken, 0)
+            viewerPane.removeView(it)
+        }
+        liveKb = null; liveKbLen = 0
     }
 
     // Ask once to enable the accessibility service that injects viewer input.
@@ -1439,6 +1492,7 @@ class MainActivity : Activity() {
     private val sessTicker = android.os.Handler(android.os.Looper.getMainLooper())
 
     @Volatile private var streaming = false
+    @Volatile private var lastRttMs = 0
     private fun startSessTimer() {
         streaming = true
         if (liveSince != 0L) return
@@ -1449,7 +1503,9 @@ class MainActivity : Activity() {
                 // don't stomp reconnect/status messages while the link is down
                 if (streaming) {
                     val s = (System.currentTimeMillis() - liveSince) / 1000
-                    viewerStatus.text = "Live — touch to control · %d:%02d".format(s / 60, s % 60)
+                    if (s % 3 == 0L) remoteViewer?.rtt { ms -> lastRttMs = ms }
+                    viewerStatus.text = "Live — touch to control · %d:%02d".format(s / 60, s % 60) +
+                        (if (lastRttMs > 0) " · ${lastRttMs}ms" else "")
                 }
                 sessTicker.postDelayed(this, 1000)
             }
@@ -1613,7 +1669,8 @@ class MainActivity : Activity() {
         remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }
         remoteSurface = null
         offerTimeout?.let { sessTicker.removeCallbacks(it) }
-        streaming = false; liveSince = 0L; lastFilePct = -1
+        streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0
+        closeLiveKb()
         fillMode = false; vFitBtn.text = "⛶ Fill"
         vScale = 1f; panX = 0f; panY = 0f; vidW = 0; vidH = 0; vidRot = 0
         exitImmersive()
