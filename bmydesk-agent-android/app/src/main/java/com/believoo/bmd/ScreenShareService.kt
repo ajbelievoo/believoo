@@ -35,7 +35,7 @@ class ScreenShareService : Service() {
     }
 
     var events: Events? = null
-    private var host: WebRtcHost? = null
+    @Volatile private var host: WebRtcHost? = null
     var signaling: SignalingClient? = null
     private var iceServers = listOf<PeerConnection.IceServer>()
 
@@ -78,10 +78,20 @@ class ScreenShareService : Service() {
         }
     }
 
+    @Volatile private var pendingOffer: String? = null
+
+    // PeerConnectionFactory + EGL + codec enumeration are heavy (seconds on
+    // emulators / low-end phones) — never on the main thread, or Android ANRs.
     private fun startCapture(resultData: Intent) {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val m = DisplayMetrics(); @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m)
-        host = WebRtcHost(this).also { h ->
+        // keep aspect ratio, cap long side at 1920 so encode stays smooth
+        val longSide = maxOf(m.widthPixels, m.heightPixels).toFloat()
+        val k = if (longSide > 1920f) 1920f / longSide else 1f
+        val cw = ((m.widthPixels * k).toInt() / 2) * 2
+        val ch = ((m.heightPixels * k).toInt() / 2) * 2
+        Thread {
+            val h = WebRtcHost(this)
             h.listener = object : WebRtcHost.Listener {
                 override fun sendSignal(payload: JsonObject) { signaling?.send("signal", payload) }
                 override fun onPeerConnected() { events?.onConnected() }
@@ -96,11 +106,16 @@ class ScreenShareService : Service() {
                 // viewer's quality toggle actually retunes this capture
                 override fun onQuality(mode: String) { h.setQuality(mode) }
             }
-            h.startCapture(resultData, m.widthPixels, m.heightPixels, 15)
-        }
+            h.startCapture(resultData, cw, ch, 24)
+            host = h
+            pendingOffer?.let { pendingOffer = null; h.handleOffer(it, iceServers) }
+        }.start()
     }
 
-    fun answerOffer(offerSdp: String) { host?.handleOffer(offerSdp, iceServers) }
+    fun answerOffer(offerSdp: String) {
+        val h = host
+        if (h == null) pendingOffer = offerSdp else h.handleOffer(offerSdp, iceServers)
+    }
     fun addIce(c: JsonObject) { host?.addIce(c) }
 
     override fun onDestroy() {

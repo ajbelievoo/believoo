@@ -167,6 +167,5 @@ class RemoteViewer(context: Context) {
 
     // Strip SDP lines some libwebrtc/Chrome builds fail to parse.
     private fun sanitizeSdp(s: String): String =
-        s.split("\r?\n").filter { it.isNotEmpty() && !it.startsWith("a=max-message-size") }
-            .joinToString("\r\n")
+        (s.split(Regex("\r?\n")).filter { it.isNotEmpty() }.joinToString("\r\n") + "\r\n")
 }

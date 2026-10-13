@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.12';
+const APP_VERSION = '1.3.13';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -343,7 +343,7 @@ async function captureScreen(sourceId) {
         // one that can carry Windows audio; try it first, silent fallback after
         () => navigator.mediaDevices.getUserMedia({
             audio: { mandatory: { chromeMediaSource: 'desktop' } },
-            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxFrameRate: 30 } },
         }),
         // modern path — setDisplayMediaRequestHandler in main supplies the source
         () => navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: false }),
@@ -352,7 +352,7 @@ async function captureScreen(sourceId) {
         // legacy desktop-capture path, video only
         () => navigator.mediaDevices.getUserMedia({
             audio: false,
-            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } },
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxFrameRate: 30 } },
         }),
     ];
     let lastErr = null;
@@ -452,6 +452,7 @@ async function handleOffer(m) {
         stream.getTracks().forEach(t => pc.addTrack(t, stream));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        tuneVideoSender();
         hostAnswerRobust(cleanSdp(pc.localDescription.sdp));
         hdbg('answer sent');
         iceQueue.forEach(c => pc.addIceCandidate(c).catch(() => {}));
@@ -589,6 +590,21 @@ document.addEventListener('drop', async (e) => {
     sendFile(await f.arrayBuffer(), f.name);
 });
 
+// Screen content needs a much higher bitrate than WebRTC's camera defaults and
+// must keep native resolution (text stays sharp, nothing is cropped). Cap only
+// very large displays, via aspect-preserving downscale on the sender.
+function tuneVideoSender() {
+    const sender = pc?.getSenders().find(s => s.track?.kind === 'video');
+    if (!sender) return;
+    const w = sender.track.getSettings?.().width || 0;
+    const p = sender.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}];
+    const e = p.encodings[0];
+    e.maxBitrate = 8000000; e.maxFramerate = 30;
+    e.scaleResolutionDownBy = w > 2560 ? w / 2560 : 1;
+    p.degradationPreference = 'maintain-resolution';
+    sender.setParameters(p).catch(() => {});
+}
+
 // Viewer picks quality → we retune the outbound video sender live.
 function applyQuality(mode) {
     const sender = pc?.getSenders().find(s => s.track?.kind === 'video');
@@ -597,7 +613,7 @@ function applyQuality(mode) {
     const e = p.encodings[0];
     if (mode === 'sd') { e.maxBitrate = 1200000; e.scaleResolutionDownBy = 2; e.maxFramerate = 20; }
     else if (mode === 'hd') { e.maxBitrate = 9000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
-    else { e.maxBitrate = 4000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    else { e.maxBitrate = 8000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
     sender.setParameters(p).catch(() => {});
     hdbg('quality: ' + mode);
 }

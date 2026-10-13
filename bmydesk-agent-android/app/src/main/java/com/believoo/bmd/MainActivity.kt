@@ -204,6 +204,12 @@ class MainActivity : Activity() {
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1003)
         }
+        // load libwebrtc natives off the UI thread so the first connect can't ANR
+        thread { runCatching {
+            org.webrtc.PeerConnectionFactory.initialize(
+                org.webrtc.PeerConnectionFactory.InitializationOptions.builder(applicationContext)
+                    .setEnableInternalTracer(false).createInitializationOptions())
+        } }
         if (!handleAuthIntent(intent)) register()
         checkUpdate()
         promptBatteryOnce()

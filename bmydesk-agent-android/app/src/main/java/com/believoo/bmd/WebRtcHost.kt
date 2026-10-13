@@ -121,6 +121,15 @@ class WebRtcHost(context: Context) {
         }) ?: run { listener?.onError("peer create failed"); return }
 
         localTrack?.let { peer!!.addTrack(it, listOf("screen")) }
+        // screen content: high bitrate + never trade resolution for fps
+        runCatching {
+            peer!!.senders.firstOrNull { it.track()?.kind() == "video" }?.let { snd ->
+                val prm = snd.parameters
+                prm.encodings.forEach { it.maxBitrateBps = 6_000_000 }
+                prm.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+                snd.parameters = prm
+            }
+        }
         applyOffer(offerSdp, constraints)
     }
 
@@ -196,6 +205,5 @@ class WebRtcHost(context: Context) {
 
     // Strip SDP lines some libwebrtc/Chrome builds fail to parse.
     private fun sanitizeSdp(s: String): String =
-        s.split("\r?\n").filter { it.isNotEmpty() && !it.startsWith("a=max-message-size") }
-            .joinToString("\r\n")
+        (s.split(Regex("\r?\n")).filter { it.isNotEmpty() }.joinToString("\r\n") + "\r\n")
 }
