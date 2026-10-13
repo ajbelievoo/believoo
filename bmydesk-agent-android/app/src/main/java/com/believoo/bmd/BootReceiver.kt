@@ -11,10 +11,8 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         if (i.action != Intent.ACTION_BOOT_COMPLETED) return
-        runCatching {
-            val launch = c.packageManager.getLaunchIntentForPackage(c.packageName)
-                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return
-            c.startActivity(launch)
-        }
+        // startForegroundService from BOOT_COMPLETED is allowed for the
+        // dataSync type — an activity launch from the background is NOT.
+        runCatching { c.startForegroundService(Intent(c, AgentService::class.java)) }
     }
 }

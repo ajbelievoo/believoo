@@ -348,6 +348,20 @@ ipcMain.handle('get-display-size', async () => {
     return { width: d.size.width, height: d.size.height, scale: d.scaleFactor };
 });
 
+// Unattended access needs the agent running after a reboot — the tray menu
+// has the same toggle; this lets the renderer offer it right when a PIN is
+// set instead of hoping the user finds it.
+ipcMain.handle('login-item-get', () => app.getLoginItemSettings().openAtLogin);
+ipcMain.handle('login-item-set', (_e, on) => {
+    app.setLoginItemSettings({ openAtLogin: !!on });
+    // keep the tray checkbox in sync
+    try {
+        const mi = tray?.getContextMenu()?.items?.find(i => i.label === 'Start with Windows');
+        if (mi) mi.checked = !!on;
+    } catch (e) {}
+    return app.getLoginItemSettings().openAtLogin;
+});
+
 // ── Web `code` → nut-js Key mapping ─────────────────────────
 function mapKey(code, key) {
     const { Key } = nut || {};

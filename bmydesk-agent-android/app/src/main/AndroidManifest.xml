@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -37,6 +38,13 @@
             android:name=".ScreenShareService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+
+        <!-- Always-on agent — keeps the device reachable between sessions.
+             dataSync type: it only heartbeats the server, no capture/audio. -->
+        <service
+            android:name=".AgentService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- FCM — server pushes a join-request wake-up to this device -->
         <service

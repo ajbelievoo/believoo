@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.11';
+const APP_VERSION = '1.3.12';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -1398,7 +1398,18 @@ $('pinLink').onclick = async (e) => {
             body: JSON.stringify({ pin }),
         });
         const d = await r.json();
-        if (d.ok) setStatus(d.pin_set ? 'Unattended access ON' : 'Unattended access OFF', d.pin_set ? 'on' : 'wait');
+        if (d.ok) {
+            setStatus(d.pin_set ? 'Unattended access ON' : 'Unattended access OFF', d.pin_set ? 'on' : 'wait');
+            // A PIN is useless if the app isn't running after a reboot —
+            // offer start-at-login right here, once.
+            if (d.pin_set && window.agent?.loginItemGet) {
+                const on = await window.agent.loginItemGet().catch(() => true);
+                if (!on && confirm('Unattended access only works while BMyDesk is running.\n\nStart BMyDesk automatically when Windows starts? (recommended)')) {
+                    await window.agent.loginItemSet(true).catch(() => {});
+                    setStatus('Unattended ON — starts with Windows', 'on');
+                }
+            }
+        }
         else setStatus(d.error || 'PIN failed', 'off');
     } catch (err) { setStatus('PIN update failed', 'off'); }
 };

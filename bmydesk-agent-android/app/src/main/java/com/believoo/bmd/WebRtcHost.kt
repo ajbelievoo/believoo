@@ -58,6 +58,13 @@ class WebRtcHost(context: Context) {
 
     fun handleOffer(offerSdp: String, ice: List<PeerConnection.IceServer>) {
         val constraints = MediaConstraints()
+        // A reconnecting viewer sends a FRESH offer — the old peer (probably a
+        // dead/failed ICE) must be disposed or two peers leak and fight over
+        // the same capture, freezing the stream.
+        peer?.let { old ->
+            runCatching { old.close() }
+            iceQueue.clear(); remoteSet = false
+        }
         peer = factory.createPeerConnection(ice, object : PeerConnection.Observer {
             override fun onIceCandidate(c: IceCandidate) {
                 val o = JsonObject()

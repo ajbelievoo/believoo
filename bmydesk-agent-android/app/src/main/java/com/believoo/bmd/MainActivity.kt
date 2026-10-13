@@ -98,6 +98,9 @@ class MainActivity : Activity() {
     // queued signals carry a server timestamp — drop stale ones so leftovers
     // from a dead pairing can't kill a fresh session
     private fun sigFresh(p: JsonObject): Boolean {
+        // join-request is exempt — the server only queues it at join() time,
+        // and an FCM-woken host may legitimately answer it minutes later.
+        if (p.get("kind")?.asString == "join-request") return true
         val at = p.get("at")?.asString ?: return true
         return runCatching {
             System.currentTimeMillis() - java.time.Instant.parse(at).toEpochMilli() < 45_000
@@ -144,9 +147,26 @@ class MainActivity : Activity() {
         }
         super.onCreate(savedInstanceState)
         buildUi()
+        // Persistent agent — keeps the process (and so the ws/poll loop) alive
+        // even after the user swipes the activity away, and re-surfaces join
+        // requests as heads-up notifications.
+        runCatching { startForegroundService(Intent(this, AgentService::class.java)) }
+        // Android 13+ needs runtime permission or FCM wake notifications never show
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1003)
+        }
         if (!handleAuthIntent(intent)) register()
         checkUpdate()
         promptBatteryOnce()
+    }
+
+    override fun onResume() { foreground = true; super.onResume() }
+    override fun onPause() { foreground = false; super.onPause() }
+
+    companion object {
+        /** AgentService checks this to avoid pinging while the UI is up. */
+        @Volatile var foreground = false
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -843,6 +863,10 @@ class MainActivity : Activity() {
                     getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("fcm_token", null)
                 )
                 reg = r
+                // AgentService reads these to heartbeat + surface requests
+                // while the UI is closed.
+                getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit()
+                    .putString("session_code", r.code).putString("agent_token", r.agentToken).apply()
                 ui { codeView.text = r.code; setStatus("Connecting realtime…", "#f59e0b"); spinner.visibility = View.GONE }
                 connectSignaling(r)
             } catch (e: Exception) {
@@ -879,25 +903,26 @@ class MainActivity : Activity() {
             while (reg != null) {
                 try {
                     api.drainSignals(r.code, r.agentToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleHostSignal(p) }
-                    if (!signaling.hostSubscribed) {
-                        val s = api.status(r.code, r.agentToken)
-                        if (s?.get("ok")?.asBoolean == true) {
-                            val st = s.get("status")?.asString
-                            val vj = s.get("viewer_joined_at")?.asString
-                            // show while the server says 'connecting' — no age
-                            // cutoff (a >2min request still needs an answer)
-                            if (st == "connecting" && vj != null) {
-                                val joinMs = java.time.Instant.parse(vj).toEpochMilli()
-                                if (joinMs > respondedAtMs && reqBox.visibility != View.VISIBLE) {
-                                    ui {
-                                        reqName.text = "Someone wants to view this device"
-                                        reqBox.visibility = View.VISIBLE
-                                        setStatus("Connection request…", "#f59e0b")
-                                    }
+                    // /status runs ALWAYS — an FCM-woken host may have a live ws
+                    // yet still need this path to surface a request that was
+                    // queued while the process was dead.
+                    val s = api.status(r.code, r.agentToken)
+                    if (s?.get("ok")?.asBoolean == true) {
+                        val st = s.get("status")?.asString
+                        val vj = s.get("viewer_joined_at")?.asString
+                        // show while the server says 'connecting' — no age
+                        // cutoff (a >2min request still needs an answer)
+                        if (st == "connecting" && vj != null) {
+                            val joinMs = java.time.Instant.parse(vj).toEpochMilli()
+                            if (joinMs > respondedAtMs && reqBox.visibility != View.VISIBLE) {
+                                ui {
+                                    reqName.text = "Someone wants to view this device"
+                                    reqBox.visibility = View.VISIBLE
+                                    setStatus("Connection request…", "#f59e0b")
                                 }
-                            } else if (st != "connecting" && reqBox.visibility == View.VISIBLE && service == null) {
-                                ui { reqBox.visibility = View.GONE }
                             }
+                        } else if (st != "connecting" && reqBox.visibility == View.VISIBLE && service == null) {
+                            ui { reqBox.visibility = View.GONE }
                         }
                     }
                 } catch (e: Exception) {}

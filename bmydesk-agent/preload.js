@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('agent', {
     sendInput: (msg) => ipcRenderer.send('input-event', msg),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
     setViewMode: (on) => ipcRenderer.invoke('set-view-mode', on),
+    loginItemGet: () => ipcRenderer.invoke('login-item-get'),
+    loginItemSet: (on) => ipcRenderer.invoke('login-item-set', on),
     pickFile: () => ipcRenderer.invoke('pick-file'),
     saveFile: (name, b64) => ipcRenderer.invoke('save-file', name, b64),
     clipboardGet: () => ipcRenderer.invoke('clipboard-get'),
