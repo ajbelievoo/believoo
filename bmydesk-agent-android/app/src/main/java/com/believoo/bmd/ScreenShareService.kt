@@ -49,7 +49,7 @@ class ScreenShareService : Service() {
                     ?: run { events?.onError("No projection data"); return START_NOT_STICKY }
                 startCapture(data)
             }
-            ACTION_STOP -> { RemoteControlService.blocked = false; host?.stop(); stopSelf() }
+            ACTION_STOP -> { RemoteControlService.blocked = false; host?.stop(); host = null; pendingOffer = null; stopSelf() }
         }
         return START_STICKY
     }

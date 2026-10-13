@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.15';
+const APP_VERSION = '1.3.16';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -220,7 +220,7 @@ function startStatusPoll() {
             // Server status is the truth — 'connecting' means a viewer is
             // waiting for our answer regardless of how long ago they joined.
             if (joinMs && joinMs > respondedAt && d.status === 'connecting'
-                && $('reqBox').classList.contains('hidden') && !pc) {
+                && $('reqBox').classList.contains('hidden')) {
                 showJoinReq((d.viewer || 'Someone') +
                     (Date.now() - joinMs > 120000 ? ' (joined ' + Math.round((Date.now() - joinMs) / 60000) + 'm ago)' : ''),
                     d.viewer_note, d.viewer_device);
@@ -245,6 +245,11 @@ function stopStatusPoll() { if (statusPoller) { clearInterval(statusPoller); sta
 // HTTP drain ('join-request' queued server-side), and the /status poll.
 let reqViewerDev = null, lastReqName = '';
 function showJoinReq(name, note, vdevice) {
+    // a NEW viewer is knocking — whatever peer we still hold is a dead leftover
+    // (viewer vanished without an 'end'); drop it or this device stays stuck
+    // until the app is restarted.
+    if (pc) teardown('New connection request…');
+    offering = false; iceQueue = [];
     lastReqName = name || 'Someone';
     reqViewerDev = vdevice || null;
     $('reqName').textContent = lastReqName;
@@ -268,6 +273,7 @@ function connectChannel() {
     ch = getPusher().subscribe(session.channel);
     hdbg('subscribing ' + session.channel.split('.').pop());
     startStatusPoll(); // always on — drains the signal queue + heartbeats the host
+    setTimeout(() => { if (ch && !ch.subscribed && !pc && /Connecting realtime/.test($('statusText')?.textContent || '')) setStatus('Ready — share your code', 'on'); }, 4000);
 
     // watchdog — if subscribe doesn't complete, rebuild the whole connection.
     // (pusher-js reinstates a cancelled pending channel WITHOUT resending the
@@ -878,6 +884,8 @@ function teardown(msg) {
     $('reqBox').classList.add('hidden');
     $('endBtn').classList.add('hidden');
     $('lockEndWrap')?.classList.add('hidden');
+    offering = false; iceQueue = []; perm = { clip: true, files: true, cmd: false };
+    if (session) startStatusPoll(); // never leave the host deaf after a session
     setStatus(msg || 'Ready — share your code', 'wait');
 }
 

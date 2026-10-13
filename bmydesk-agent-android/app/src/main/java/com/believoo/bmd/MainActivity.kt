@@ -1248,9 +1248,14 @@ class MainActivity : Activity() {
         signaling.send("end", JsonObject())
         runCatching { startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_STOP)) }
         runCatching { if (bound) unbindService(conn); bound = false }
+        // drop every per-session handle so the NEXT viewer starts clean
+        // (a stale service/peer used to swallow the next offer until app restart)
+        service = null; waitingOfferSdp = null; pendingProjection = false; peerLive = false
+        teardownRunnable?.let { teardownHandler.removeCallbacks(it) }
+        reqBox.visibility = View.GONE
         endBtn.visibility = View.GONE
         sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
-        setStatus("Session ended", "#f59e0b")
+        setStatus("Ready — share your code", "#22c55e")
     }
 
     // ── Remote Desk (viewer): join another device's session ────────
