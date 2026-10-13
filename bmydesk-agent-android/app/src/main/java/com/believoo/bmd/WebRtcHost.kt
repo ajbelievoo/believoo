@@ -53,7 +53,7 @@ class WebRtcHost(context: Context) {
         })
         surfaceHelper = SurfaceTextureHelper.create("CaptureThread", egl.eglBaseContext)
         videoSource = factory.createVideoSource(true)
-        capturer!!.initialize(surfaceHelper, null, videoSource!!.capturerObserver)
+        capturer!!.initialize(surfaceHelper, appContext, videoSource!!.capturerObserver)
         capturer!!.startCapture(width, height, fps)
         capW = width; capH = height
         localTrack = factory.createVideoTrack("screen", videoSource)
