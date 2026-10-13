@@ -35,24 +35,29 @@ Route::domain('bmydesk.believoo.com')->group(function () {
     Route::get('/support/track', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalTrack'])->name('bconnect.portal.track');
     Route::post('/support/csat', [\App\Http\Controllers\Bconnect\PublicController::class, 'portalCsat'])->name('bconnect.portal.csat');
     // Note: /downloads/* is served directly by nginx (public/downloads/) —
-    // BMyDesk-Agent.apk / BMyDesk-Agent-Setup.exe are symlinks to the latest
-    // builds so links never need version bumps.
-    // /dl/* routes stream through Laravel — needed for the APK's proper
-    // MIME so Android Chrome hands it to the package installer instead of
-    // failing a bare octet-stream fetch.
+    // /dl/* serve LOCAL copies from storage/app/bmydesk-releases — stable
+    // filenames, proper MIME (apk → package installer), and BinaryFileResponse
+    // gives HTTP Range support so interrupted mobile downloads can resume.
+    // CDN versioned copies are archives/backups only — the release flow must
+    // refresh these local files every build.
     Route::get('/dl/agent.apk', function () {
-        $f = 'BMyDesk-Agent-v' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_ANDROID . '.apk';
-        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
+        return response()->download(
+            storage_path('app/bmydesk-releases/BMyDesk-Agent.apk'),
+            'BMyDesk-Agent-v' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_ANDROID . '.apk',
+            ['Content-Type' => 'application/vnd.android.package-archive']
+        );
     })->name('bconnect.dl.apk');
     Route::get('/dl/agent.exe', function () {
-        $f = 'BMyDesk-Agent-Setup-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '.exe';
-        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . $f);
+        return response()->download(
+            storage_path('app/bmydesk-releases/BMyDesk-Agent-Setup.exe'),
+            'BMyDesk-Agent-Setup-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '.exe'
+        );
     })->name('bconnect.dl.exe');
-    // Stable portable-zip alias — pages link here instead of a versioned
-    // filename so bumps never break the link.
     Route::get('/dl/agent-portable.zip', function () {
-        $f = 'BMyDesk Agent-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '-win.zip';
-        return redirect()->away('https://cdn.hitune.in/believoo/downloads/' . rawurlencode($f));
+        return response()->download(
+            storage_path('app/bmydesk-releases/BMyDesk-Agent-portable.zip'),
+            'BMyDesk-Agent-portable-' . \App\Http\Controllers\Bconnect\AgentApiController::AGENT_LATEST_WINDOWS . '.zip'
+        );
     })->name('bconnect.dl.zip');
 });
 
