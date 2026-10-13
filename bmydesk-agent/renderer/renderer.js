@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.14';
+const APP_VERSION = '1.3.15';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -518,22 +518,22 @@ async function onCtlMessage(e) {
         if (typeof e.data === 'string') {
             const m = JSON.parse(e.data);
             if (m.t === 'chat') { addChat(m.from || ctlPeer, m.text, false); }
-            else if (m.t === 'clip') { try { window.agent?.clipboardSet(m.text); } catch (x) {} }
+            else if (m.t === 'clip') { if (!hostGuard(perm.clip, 'clipboard')) return; try { window.agent?.clipboardSet(m.text); } catch (x) {} }
             else if (m.t === 'quality') { applyQuality(m.mode); }
-            else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
+            else if (m.t === 'file-meta') { if (!hostGuard(perm.files, 'file')) { ctlSend({ t: 'file-cancel' }); return; } rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
             else if (m.t === 'file-cancel') { rxFile = null; fileProg(null); addChat('System', 'Transfer cancelled by peer', false); }
             else if (m.t === 'cmd-out') { addChat('Host ▸', m.out || '(no output)', false); }
             else if (m.t === 'view-only') { addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false); }
             else if (m.t === 'fs-list') { renderFsList(m); }
             else if (m.t === 'laser') { try { window.agent?.laser(!m.off, m.x, m.y); } catch (x) {} }
             // host-side actions — ignored while WE are the viewer
-            else if (m.t === 'cmd' && !isViewing()) { handleRemoteCmd(m.cmd); }
+            else if (m.t === 'cmd' && !isViewing() && perm.cmd) { handleRemoteCmd(m.cmd); }
             else if (m.t === 'screen' && !isViewing()) { switchMonitor(); }
-            else if (m.t === 'reboot' && !isViewing()) { remoteReboot(); }
-            else if (m.t === 'lock' && !isViewing()) { remoteLock(); }
-            else if (m.t === 'fs-list-req' && !isViewing()) { handleFsList(m.path); }
-            else if (m.t === 'fs-get' && !isViewing()) { handleFsGet(m.path); }
-            else if (m.t === 'procs' && !isViewing()) { handleProcs(); }
+            else if (m.t === 'reboot' && !isViewing() && perm.cmd) { remoteReboot(); }
+            else if (m.t === 'lock' && !isViewing() && perm.cmd) { remoteLock(); }
+            else if (m.t === 'fs-list-req' && !isViewing() && perm.files) { handleFsList(m.path); }
+            else if (m.t === 'fs-get' && !isViewing() && perm.files) { handleFsGet(m.path); }
+            else if (m.t === 'procs' && !isViewing() && perm.cmd) { handleProcs(); }
             else if (m.t === 'kill' && !isViewing()) { handleKill(m.arg); }
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;
@@ -844,12 +844,16 @@ function b64ToBuf(b64) {
 
 // ── Clipboard sync ──
 let lastClip = '', clipTimer = null;
+// host-granted permissions for the current session (set when accepting a request)
+let perm = { clip: true, files: true, cmd: false };
+function hostGuard(ok, what) { if (!ok && !isViewing()) { hdbg('blocked: ' + what); return false; } return true; }
+
 function startClipSync() {
     if (clipTimer || !window.agent?.clipboardGet) return;
     clipTimer = setInterval(async () => {
         try {
             const t = await window.agent.clipboardGet();
-            if (t && t !== lastClip) { lastClip = t; ctlSend({ t: 'clip', text: t }); }
+            if (t && t !== lastClip && (isViewing() || perm.clip)) { lastClip = t; ctlSend({ t: 'clip', text: t }); }
         } catch (e) {}
     }, 2000);
 }
@@ -890,6 +894,7 @@ function respond(action) {
 $('acceptBtn').onclick = () => {
     $('reqBox').classList.add('hidden'); respondedAt = Date.now();
     viewOnly = !!$('acceptViewOnly')?.checked;
+    perm = { clip: $('permClip')?.checked !== false, files: $('permFiles')?.checked !== false, cmd: !!$('permCmd')?.checked };
     if (viewOnly) $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#f43f5e');
     if ($('acceptTrust')?.checked && reqViewerDev && session) {
         // remember this viewer — future joins auto-accept (revocable via /untrust)

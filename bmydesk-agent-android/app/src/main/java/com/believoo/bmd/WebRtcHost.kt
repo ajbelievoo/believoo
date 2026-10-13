@@ -125,7 +125,7 @@ class WebRtcHost(context: Context) {
         runCatching {
             peer!!.senders.firstOrNull { it.track()?.kind() == "video" }?.let { snd ->
                 val prm = snd.parameters
-                prm.encodings.forEach { it.maxBitrateBps = 6_000_000 }
+                prm.encodings.forEach { it.maxBitrateBps = 8_000_000 }
                 prm.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
                 snd.parameters = prm
             }

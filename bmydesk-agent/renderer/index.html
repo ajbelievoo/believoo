@@ -37,9 +37,9 @@
     .btn-connect { background: linear-gradient(135deg,#f59e0b,#e11d48,#7c3aed); color: #fff; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 800; font-size: 13px; cursor: pointer; }
     .viewer { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; z-index: 10; overflow: hidden; }
     .viewer video { flex: 1 1 0; min-height: 0; width: 100%; height: 0; object-fit: contain; background: #000; }
-    .viewer-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #0f172a; border-bottom: 1px solid rgba(148,163,184,.15); }
+    .viewer-bar { display: flex; flex-wrap: wrap; row-gap: 6px; align-items: center; gap: 6px 10px; padding: 10px 14px; background: #0f172a; border-bottom: 1px solid rgba(148,163,184,.15); }
     .viewer-bar .st { font-size: 12px; color: #94a3b8; }
-    .viewer-bar .end { margin-left: auto; background: #7f1d1d; color: #fecaca; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 700; font-size: 12px; cursor: pointer; }
+    .viewer-bar .end { margin-left: auto; background: #7f1d1d; color: #fecaca; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 700; font-size: 12px; cursor: pointer; flex-shrink: 0; }
     .viewer-overlay { position: absolute; inset: 40px 0 0 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; text-align: center; pointer-events: none; }
     .label { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; }
     .code { font-size: 44px; font-weight: 900; letter-spacing: .22em; color: #fb7185; user-select: all; }
@@ -99,6 +99,15 @@
             </label>
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:2px 0;cursor:pointer;">
                 <input type="checkbox" id="acceptTrust" style="accent-color:#22c55e;"> Always trust this device (skip approval next time)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:2px 0;cursor:pointer;">
+                <input type="checkbox" id="permClip" checked style="accent-color:#22c55e;"> Allow clipboard sync
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:2px 0;cursor:pointer;">
+                <input type="checkbox" id="permFiles" checked style="accent-color:#22c55e;"> Allow file transfer &amp; file browsing
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;margin:2px 0;cursor:pointer;">
+                <input type="checkbox" id="permCmd" style="accent-color:#f43f5e;"> Allow remote commands, task manager &amp; lock/restart
             </label>
             <div class="row">
                 <button class="btn btn-accept" id="acceptBtn">Accept</button>
@@ -183,7 +192,7 @@
     <!-- Viewer mode: remote screen renders here -->
     <div class="viewer hidden" id="viewerPane">
         <div class="viewer-bar">
-            <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
+            <div style="display:flex;flex-direction:column;flex:1 1 160px;min-width:120px;">
                 <span class="st" id="viewerStatus">Connecting…</span>
                 <span id="viewerDebug" style="font-size:10px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
             </div>

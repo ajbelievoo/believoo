@@ -85,9 +85,9 @@ class ScreenShareService : Service() {
     private fun startCapture(resultData: Intent) {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val m = DisplayMetrics(); @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m)
-        // keep aspect ratio, cap long side at 1920 so encode stays smooth
+        // keep aspect ratio, cap long side at 2560 so encode stays smooth
         val longSide = maxOf(m.widthPixels, m.heightPixels).toFloat()
-        val k = if (longSide > 1920f) 1920f / longSide else 1f
+        val k = if (longSide > 2560f) 2560f / longSide else 1f
         val cw = ((m.widthPixels * k).toInt() / 2) * 2
         val ch = ((m.heightPixels * k).toInt() / 2) * 2
         Thread {
