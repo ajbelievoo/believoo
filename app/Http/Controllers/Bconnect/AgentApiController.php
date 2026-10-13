@@ -12,8 +12,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.3.10';
-    const AGENT_LATEST_ANDROID = '1.3.11';
+    const AGENT_LATEST_WINDOWS = '1.3.11';
+    const AGENT_LATEST_ANDROID = '1.3.12';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -325,6 +325,16 @@ class AgentApiController extends Controller
             return response()->json(['ok' => false, 'error' => 'invalid or expired code'], 404);
         }
 
+        // Mobile hosts can be woken from a dead state with an FCM push — a
+        // stale heartbeat only hard-fails when the device has no push token.
+        $hostFcm = null;
+        if ($session->host_kind === 'agent' && $session->device_id) {
+            $hostFcm = \Illuminate\Support\Facades\DB::table('bconnect_agent_devices')
+                ->where('device_id', $session->device_id)->value('fcm_token');
+        }
+        $hostStale = !$session->updated_at || $session->updated_at->lt(now()->subMinutes(3));
+        $hostWaking = $session->host_kind === 'agent' && $hostStale && !empty($hostFcm);
+
         $dead = in_array($session->status, ['ended', 'rejected', 'expired'])
             || ($session->expires_at && $session->expires_at->isPast());
         if ($dead) {
@@ -334,7 +344,7 @@ class AgentApiController extends Controller
             if ($session->host_kind !== 'agent') {
                 return response()->json(['ok' => false, 'error' => 'session ended — ask the host for a new code'], 404);
             }
-            if (!$session->updated_at || $session->updated_at->lt(now()->subMinutes(3))) {
+            if ($hostStale && !$hostWaking) {
                 return response()->json(['ok' => false, 'error' => 'host offline — ask them to open the BMyDesk Agent'], 404);
             }
             // clear the previous viewer so the busy-check below passes and a
@@ -345,10 +355,19 @@ class AgentApiController extends Controller
 
         // A live agent host heartbeats via /status every few seconds — a stale
         // heartbeat on a 'waiting' session means the app was closed/crashed.
-        // Refuse immediately instead of letting the viewer wait forever.
-        if ($session->host_kind === 'agent'
-            && (!$session->updated_at || $session->updated_at->lt(now()->subMinutes(3)))) {
+        // Refuse immediately instead of letting the viewer wait forever —
+        // unless the device is FCM-wakeable (Android), in which case we push
+        // and give it a short window to come online.
+        if ($session->host_kind === 'agent' && $hostStale && !$hostWaking) {
             return response()->json(['ok' => false, 'error' => 'host offline — ask them to open the BMyDesk Agent'], 404);
+        }
+        if ($hostWaking) {
+            \Illuminate\Support\Facades\Cache::put('bmd-wake:' . $session->session_code, true, now()->addMinutes(3));
+            \App\Services\BconnectFcmService::send($hostFcm, [
+                'kind' => 'join-request',
+                'name' => (string) $r->input('name', 'Someone'),
+                'code' => $session->session_code,
+            ]);
         }
 
         // Unattended access: a correct PIN skips host approval entirely.
@@ -444,9 +463,14 @@ class AgentApiController extends Controller
             // host_alive lets a waiting viewer detect the host app closing
             // mid-approval instead of polling a dead session forever.
             if ($session && $this->checkViewerToken($r, $session)) {
+                $fresh = $session->updated_at && $session->updated_at->gt(now()->subMinutes(3));
+                // join() set this when it pushed FCM to a dead Android host —
+                // the viewer should keep waiting through the wake window
+                // instead of instantly reporting "host went offline".
+                $waking = !$fresh && \Illuminate\Support\Facades\Cache::has('bmd-wake:' . $session->session_code);
                 return response()->json(['ok' => true, 'status' => $session->status,
-                    'host_alive' => $session->host_kind !== 'agent'
-                        || ($session->updated_at && $session->updated_at->gt(now()->subMinutes(3)))]);
+                    'host_alive' => $session->host_kind !== 'agent' || $fresh,
+                    'host_waking' => $waking]);
             }
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
         }

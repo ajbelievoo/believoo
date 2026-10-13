@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.10';
+const APP_VERSION = '1.3.11';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -1018,7 +1018,8 @@ function startViewerPoll() {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + vChanToken },
             });
             const sd = await st.json();
-            if (sd.ok && sd.host_alive === false) { vStatus('Host went offline — ask them to reopen the app'); exitViewer(3500); return; }
+            if (sd.ok && sd.host_waking === true) { vStatus('Waking the host\'s device…'); }
+            else if (sd.ok && sd.host_alive === false) { vStatus('Host went offline — ask them to reopen the app'); exitViewer(3500); return; }
             if (sd.ok && sd.status === 'rejected') { vStatus('Host declined the request'); exitViewer(2500); }
             else if (sd.ok && sd.status === 'ended') { vStatus('Session ended by host'); exitViewer(2000); }
             else if (sd.ok && sd.status === 'active' && vAutoAccepted && !vPc) { vDbg('auto-accepted'); startViewerPeer(); }

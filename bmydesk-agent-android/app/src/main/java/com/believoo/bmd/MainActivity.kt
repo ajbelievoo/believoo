@@ -495,6 +495,9 @@ class MainActivity : Activity() {
             applyViewMode()
         }
         vSessRow.addView(vFitBtn, lpGap(6))
+        // pinch-zoom exists but is hard to discover — on-screen zoom controls
+        vSessRow.addView(mbtn("🔍+", Color.parseColor("#1e293b"), 12f) { zoomStep(0.5f) }, lpGap(6))
+        vSessRow.addView(mbtn("🔍−", Color.parseColor("#1e293b"), 12f) { zoomStep(-0.5f) }, lpGap(6))
         // session buttons overflow on narrow phones — scroll them so the
         // Disconnect button is ALWAYS visible at the right edge
         val vSessScroll = android.widget.HorizontalScrollView(this).apply {
@@ -583,6 +586,16 @@ class MainActivity : Activity() {
             it.setScalingType(if (fillMode)
                 org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
                 else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+        }
+    }
+
+    /** Button-driven zoom steps — same transform the pinch gesture applies. */
+    private fun zoomStep(d: Float) {
+        vScale = (vScale + d).coerceIn(1f, 5f)
+        if (vScale <= 1.01f) { panX = 0f; panY = 0f } else clampPan()
+        remoteSurface?.let {
+            it.scaleX = vScale; it.scaleY = vScale
+            it.translationX = panX; it.translationY = panY
         }
     }
 
@@ -1018,6 +1031,11 @@ class MainActivity : Activity() {
                     // client the host still has to press Accept.
                     if (vProgPct in 1 until 60 && vJoinedAtMs > 0) {
                         val waited = (System.currentTimeMillis() - vJoinedAtMs) / 1000
+                        if (waited > 150) {
+                            ui { viewerStatus.text = "Host didn't respond — try again later" }
+                            thread { Thread.sleep(2000); ui { exitViewer() } }
+                            break
+                        }
                         vStage(vProgPct, "Waiting for host approval… ${waited}s" +
                             if (waited > 90) " — host may be away; their app must be open" else "")
                     }
@@ -1025,7 +1043,10 @@ class MainActivity : Activity() {
                     if (remoteViewer == null) {
                         val st = api.status(code, j.viewerToken)
                         val stv = st?.get("status")?.asString
-                        if (st?.get("host_alive")?.asBoolean == false) {
+                        if (st?.get("host_waking")?.asBoolean == true) {
+                            ui { viewerStatus.text = "Waking the host's device…" }
+                        }
+                        else if (st?.get("host_alive")?.asBoolean == false) {
                             ui { viewerStatus.text = "Host went offline — ask them to reopen the app" }
                             thread { Thread.sleep(2500); ui { exitViewer() } }
                         }
@@ -1140,13 +1161,26 @@ class MainActivity : Activity() {
                 }
                 override fun onPeerDisconnected() = viewerReconnect(self)
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
+                    // Fresh renderer each session — a released
+                    // SurfaceViewRenderer can't be init()ed again, which is
+                    // what made every 2nd+ connect render a black screen.
+                    remoteSurface?.let { old ->
+                        viewerPane.removeView(old)
+                        runCatching { old.release() }
+                    }
+                    remoteSurface = org.webrtc.SurfaceViewRenderer(this@MainActivity)
+                    viewerPane.addView(remoteSurface, 0, android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
                     remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, object : org.webrtc.RendererCommon.RendererEvents {
                         override fun onFirstFrameRendered() {}
                         override fun onFrameResolutionChanged(w: Int, h: Int, rot: Int) {
                             vidW = w; vidH = h; vidRot = rot
                         }
                     })
-                    remoteSurface!!.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+                    remoteSurface!!.setScalingType(if (fillMode)
+                        org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
+                        else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     track.addSink(remoteSurface)
                     bindViewerTouch()
                     vStage(100, "Live — touch to control")
@@ -1332,7 +1366,8 @@ class MainActivity : Activity() {
         vJoin = null // stops the viewer poll loop
         remoteViewer?.stop(); remoteViewer = null
         signaling.disconnectViewer()
-        runCatching { remoteSurface?.release() }
+        remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }
+        remoteSurface = null
         fillMode = false; vFitBtn.text = "⛶ Fill"
         vScale = 1f; panX = 0f; panY = 0f; vidW = 0; vidH = 0; vidRot = 0
         exitImmersive()

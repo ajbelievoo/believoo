@@ -114,7 +114,18 @@ ipcMain.handle('get-screen-sources', async () => {
 // the legacy chromeMediaSourceId getUserMedia path is flaky/black on modern
 // Electron, so capture goes through the native display-media pipeline.
 let pickedSourceId = null;
-ipcMain.handle('select-screen-source', (_e, id) => { pickedSourceId = id; return true; });
+// Display the captured source maps to — remote input must land on the same
+// monitor the viewer is watching (and in PHYSICAL pixels, not DIP).
+let capturedDisplayId = null;
+ipcMain.handle('select-screen-source', async (_e, id) => {
+    pickedSourceId = id;
+    try {
+        const sources = await desktopCapturer.getSources({ types: ['screen'] });
+        const src = sources.find(s => s.id === id);
+        capturedDisplayId = src && src.display_id !== undefined ? String(src.display_id) : null;
+    } catch (e) { capturedDisplayId = null; }
+    return true;
+});
 
 app.whenReady().then(() => {
     session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
@@ -364,13 +375,20 @@ ipcMain.on('input-event', async (_e, msg) => {
     const n = loadNut();
     if (!n) return;
     const { mouse, keyboard, Point, Button, Key } = n;
-    const disp = screen.getPrimaryDisplay();
-    const W = disp.size.width, H = disp.size.height;
+    // Map to the display being captured — not always the primary — and
+    // convert DIP bounds to physical pixels for nut.js (Win/X11 cursors
+    // are physical; macOS stays in points).
+    const disp = (capturedDisplayId
+        ? screen.getAllDisplays().find(d => String(d.id) === capturedDisplayId)
+        : null) || screen.getPrimaryDisplay();
+    const sf = process.platform === 'darwin' ? 1 : (disp.scaleFactor || 1);
+    const toX = (x) => Math.round((disp.bounds.x + x * disp.size.width) * sf);
+    const toY = (y) => Math.round((disp.bounds.y + y * disp.size.height) * sf);
 
     try {
         switch (msg.t) {
             case 'move':
-                await mouse.setPosition(new Point(Math.round(msg.x * W), Math.round(msg.y * H)));
+                await mouse.setPosition(new Point(toX(msg.x), toY(msg.y)));
                 break;
             case 'down':
             case 'up': {
