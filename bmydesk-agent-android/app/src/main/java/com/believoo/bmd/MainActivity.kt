@@ -1440,6 +1440,9 @@ class MainActivity : Activity() {
                         override fun onFirstFrameRendered() {}
                         override fun onFrameResolutionChanged(w: Int, h: Int, rot: Int) {
                             vidW = w; vidH = h; vidRot = rot
+                            // wide remote desktop on a portrait phone → rotate so the whole display fills the screen
+                            ui { requestedOrientation = if (w > h) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                 else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
                         }
                     })
                     remoteSurface!!.setScalingType(if (fillMode)
@@ -1456,7 +1459,7 @@ class MainActivity : Activity() {
                 override fun onCtlOpen() = ui {
                     vSessRow.visibility = View.VISIBLE; startClipSync()
                     if (vQuality != "auto") remoteViewer?.ctl?.sendQuality(vQuality)
-                    else if (isMetered()) remoteViewer?.ctl?.sendQuality("sd") // mobile data → SD for smoothness
+
                 }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onClip(text: String) = clipSet(text)
@@ -1682,6 +1685,7 @@ class MainActivity : Activity() {
         streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0
         closeLiveKb()
         fillMode = false; vFitBtn.text = "⛶ Fill"
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         vScale = 1f; panX = 0f; panY = 0f; vidW = 0; vidH = 0; vidRot = 0
         exitImmersive()
         keysRow.visibility = View.GONE
