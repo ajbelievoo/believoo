@@ -917,9 +917,14 @@ class MainActivity : Activity() {
         for (c in t) {
             if (c == '\b') { sendKey("Backspace"); continue }
             val m = charCode(c) ?: continue
-            if (m.second) remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", "ShiftLeft"); addProperty("down", true) })
-            sendKey(m.first)
-            if (m.second) remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", "ShiftLeft"); addProperty("down", false) })
+            // 'k' carries the literal char — desktop hosts type() it directly
+            // (no code→keymap ambiguity), the Android host SET_TEXTs it; the
+            // DOM code + shift flag stay as fallback for older hosts.
+            for (down in listOf(true, false)) remoteViewer?.sendInput(JsonObject().apply {
+                addProperty("t", "key"); addProperty("code", m.first)
+                addProperty("k", c.toString()); addProperty("down", down)
+                if (m.second) addProperty("shift", true)
+            })
         }
     }
 

@@ -530,10 +530,16 @@ class AgentApiController extends Controller
     // fully wedged ws on either end still lets the session complete.
     public function signal(Request $r, string $code)
     {
-        // log every attempt first — auth/kind failures must still be visible
-        \Illuminate\Support\Facades\Log::info("bmysig {$code} SIGIN kind=" . $r->input('kind', '?')
+        // log every attempt first — auth/kind failures must still be visible;
+        // ice goes to debug (hundreds per session)
+        $sigIn = "bmysig {$code} SIGIN kind=" . $r->input('kind', '?')
             . " sdp_len=" . strlen((string) $r->input('sdp', ''))
-            . " tok=" . ($r->bearerToken() || $r->input('agent_token') ? 'y' : 'n'));
+            . " tok=" . ($r->bearerToken() || $r->input('agent_token') ? 'y' : 'n');
+        if ($r->input('kind') === 'ice') {
+            \Illuminate\Support\Facades\Log::debug($sigIn);
+        } else {
+            \Illuminate\Support\Facades\Log::info($sigIn);
+        }
         $session = $this->findByCode($code);
         if (!$session) {
             return response()->json(['ok' => false, 'error' => 'invalid'], 403);
