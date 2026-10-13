@@ -59,7 +59,7 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
                 code = obj.get("session_code").asString,
                 agentToken = obj.get("agent_token").asString,
                 channel = obj.get("channel").asString,
-                expiresAt = obj.get("expires_at")?.asString,
+                expiresAt = obj.get("expires_at").s(),
                 iceServers = obj.getAsJsonArray("ice_servers"),
             )
         }
@@ -85,7 +85,7 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
             val obj = bodyObj(res)
                 ?: throw RuntimeException("Invalid server response (HTTP ${res.code})")
             if (obj.get("ok")?.asBoolean != true) throw errorOf(obj, "login failed", res.code)
-            return LoginResult(obj.get("name").asString, obj.get("company")?.asString, obj.get("member_token").asString)
+            return LoginResult(obj.get("name").asString, obj.get("company").s(), obj.get("member_token").asString)
         }
     }
 
@@ -114,7 +114,7 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
             return JoinResult(
                 viewerToken = obj.get("viewer_token").asString,
                 channel = obj.get("channel").asString,
-                hostLabel = obj.get("host_label")?.asString,
+                hostLabel = obj.get("host_label").s(),
                 iceServers = obj.getAsJsonArray("ice_servers"),
                 autoAccepted = obj.get("auto_accepted")?.asBoolean == true,
             )

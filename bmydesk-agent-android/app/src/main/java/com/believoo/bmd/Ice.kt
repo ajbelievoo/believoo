@@ -19,3 +19,6 @@ fun iceServersFrom(json: JsonArray?): List<PeerConnection.IceServer> {
     if (list.isEmpty()) list.add(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())
     return list
 }
+
+/** Null-safe string read — Gson's asString throws on JsonNull (server sends explicit nulls). */
+fun com.google.gson.JsonElement?.s(): String? = if (this == null || isJsonNull) null else asString

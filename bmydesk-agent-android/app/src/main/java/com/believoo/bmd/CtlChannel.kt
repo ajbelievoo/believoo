@@ -46,30 +46,30 @@ class CtlChannel(private val gson: Gson = Gson()) {
         val bytes = ByteArray(buf.data.remaining()); buf.data.get(bytes)
         if (!buf.binary) {
             val m = runCatching { gson.fromJson(String(bytes), JsonObject::class.java) }.getOrNull() ?: return
-            when (m.get("t")?.asString) {
-                "chat" -> sink?.onChat(m.get("from")?.asString ?: "peer", m.get("text")?.asString ?: "")
-                "clip" -> m.get("text")?.asString?.let { sink?.onClip(it) }
+            when (m.get("t").s()) {
+                "chat" -> sink?.onChat(m.get("from").s() ?: "peer", m.get("text").s() ?: "")
+                "clip" -> m.get("text").s()?.let { sink?.onClip(it) }
                 "file-meta" -> {
-                    rxName = m.get("name")?.asString ?: "file.bin"
+                    rxName = m.get("name").s() ?: "file.bin"
                     rxSize = m.get("size")?.asInt ?: 0
                     rxBuf.reset()
                 }
                 "file-cancel" -> { rxName = null; rxBuf.reset(); sink?.onChat("System", "Transfer cancelled by peer") }
                 // remote-terminal output + host mode notices render in the chat
-                "cmd-out" -> sink?.onChat("Host ▸", m.get("out")?.asString ?: "(no output)")
+                "cmd-out" -> sink?.onChat("Host ▸", m.get("out").s() ?: "(no output)")
                 "view-only" -> sink?.onChat("System", if (m.get("on")?.asBoolean == true)
                     "Host locked remote input (view-only mode)" else "Host re-enabled remote input")
                 // fs-list is a host→viewer REPLY (dir listing); fs-list-req/fs-get are
                 // viewer→host requests an Android host can't serve yet
                 "fs-list" -> sink?.onFsList(
-                    m.get("path")?.asString ?: "",
+                    m.get("path").s() ?: "",
                     m.getAsJsonArray("items"),
-                    m.get("err")?.asString)
-                "quality" -> sink?.onQuality(m.get("mode")?.asString ?: "auto")
+                    m.get("err").s())
+                "quality" -> sink?.onQuality(m.get("mode").s() ?: "auto")
                 // host-side actions — Android can't exec shell/reboot/browse files
                 "cmd", "reboot", "screen", "lock", "fs-get", "procs", "kill" -> send(JsonObject().apply {
                     addProperty("t", "cmd-out")
-                    addProperty("out", "'${m.get("t")?.asString}' is not supported on this host")
+                    addProperty("out", "'${m.get("t").s()}' is not supported on this host")
                 })
                 "fs-list-req" -> send(JsonObject().apply {
                     addProperty("t", "fs-list")

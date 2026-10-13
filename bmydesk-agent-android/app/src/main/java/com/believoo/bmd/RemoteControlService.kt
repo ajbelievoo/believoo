@@ -48,7 +48,7 @@ class RemoteControlService : AccessibilityService() {
     /** Map a normalized (0..1) input message to a real gesture/action. */
     fun handleInput(m: JsonObject, scrW: Int, scrH: Int) {
         if (blocked) return
-        val t = m.get("t")?.asString ?: return
+        val t = m.get("t").s() ?: return
         this.scrW = scrW; this.scrH = scrH
         val x = (m.get("x")?.asFloat ?: 0f) * scrW
         val y = (m.get("y")?.asFloat ?: 0f) * scrH
@@ -134,7 +134,7 @@ class RemoteControlService : AccessibilityService() {
     private var shiftHeld = false
 
     private fun onKey(m: JsonObject) {
-        val code = m.get("code")?.asString
+        val code = m.get("code").s()
         // viewers send Shift as its own key event — track its held state so
         // KeyX can be resolved to the right case/symbol
         if (code == "ShiftLeft" || code == "ShiftRight") {
@@ -142,7 +142,7 @@ class RemoteControlService : AccessibilityService() {
             return
         }
         if (m.get("down")?.asBoolean != true) return
-        val k = m.get("k")?.asString
+        val k = m.get("k").s()
         if (!k.isNullOrEmpty()) { typeChar(k[0]); return }
         when (code) {
             "Escape" -> performGlobalAction(GLOBAL_ACTION_BACK)

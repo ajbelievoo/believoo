@@ -121,7 +121,7 @@ class MainActivity : Activity() {
     // "n" field collapses double delivery.
     private val seenNonces = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private fun sigNew(p: JsonObject): Boolean {
-        val n = p.get("n")?.asString ?: return true
+        val n = p.get("n").s() ?: return true
         if (!seenNonces.add(n)) return false
         if (seenNonces.size > 600) seenNonces.clear()
         return true
@@ -131,8 +131,8 @@ class MainActivity : Activity() {
     private fun sigFresh(p: JsonObject): Boolean {
         // join-request is exempt — the server only queues it at join() time,
         // and an FCM-woken host may legitimately answer it minutes later.
-        if (p.get("kind")?.asString == "join-request") return true
-        val at = p.get("at")?.asString ?: return true
+        if (p.get("kind").s() == "join-request") return true
+        val at = p.get("at").s() ?: return true
         return runCatching {
             System.currentTimeMillis() - java.time.Instant.parse(at).toEpochMilli() < 45_000
         }.getOrDefault(true)
@@ -156,13 +156,13 @@ class MainActivity : Activity() {
     }
 
     private fun handleHostSignal(p: JsonObject) {
-        when (p.get("kind")?.asString) {
+        when (p.get("kind").s()) {
             // queued by the server on join() so relay-mode viewers still reach us
             "join-request" -> ui {
-                val nm = p.get("name")?.asString ?: "Someone"
-                val nt = p.get("note")?.asString
+                val nm = p.get("name").s() ?: "Someone"
+                val nt = p.get("note").s()
                 resetAcceptOptions()
-                pendingVDevice = p.get("vdevice")?.asString; pendingVName = nm
+                pendingVDevice = p.get("vdevice").s(); pendingVName = nm
                 reqName.text = "$nm wants to view this device" + (if (nt.isNullOrBlank()) "" else "\n“$nt”")
                 reqBox.visibility = View.VISIBLE
             }
@@ -799,7 +799,7 @@ class MainActivity : Activity() {
         if (path.isNotBlank()) fsRow("⬅  ..") { fsPath = fsParent(fsPath); fsReq() }
         items?.forEach { el ->
             val it = el.asJsonObject
-            val nm = it.get("n")?.asString ?: return@forEach
+            val nm = it.get("n").s() ?: return@forEach
             val dir = it.get("d")?.asBoolean == true
             val sz = it.get("s")?.asLong ?: 0
             val label = (if (dir) "📁 " else "📄 ") + nm +
@@ -1134,8 +1134,8 @@ class MainActivity : Activity() {
                     // queued while the process was dead.
                     val s = api.status(r.code, r.agentToken)
                     if (s?.get("ok")?.asBoolean == true) {
-                        val st = s.get("status")?.asString
-                        val vj = s.get("viewer_joined_at")?.asString
+                        val st = s.get("status").s()
+                        val vj = s.get("viewer_joined_at").s()
                         // show while the server says 'connecting' — no age
                         // cutoff (a >2min request still needs an answer)
                         if (st == "connecting" && vj != null) {
@@ -1272,7 +1272,7 @@ class MainActivity : Activity() {
     }
 
     private fun handleViewerSignal(j: AgentApi.JoinResult, p: JsonObject) {
-        when (p.get("kind")?.asString) {
+        when (p.get("kind").s()) {
             "accept" -> { vStage(60, "Accepted — starting stream…"); ui { startViewerPeer(j) } }
             "reject" -> { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
             "end" -> { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
@@ -1303,7 +1303,7 @@ class MainActivity : Activity() {
                     api.drainSignals(code, j.viewerToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleViewerSignal(j, p) }
                     if (remoteViewer == null) {
                         val st = api.status(code, j.viewerToken)
-                        val stv = st?.get("status")?.asString
+                        val stv = st?.get("status").s()
                         if (st?.get("host_waking")?.asBoolean == true) {
                             ui { viewerStatus.text = "Waking the host's device…" }
                         }

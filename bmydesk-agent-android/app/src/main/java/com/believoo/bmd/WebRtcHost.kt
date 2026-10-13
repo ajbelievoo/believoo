@@ -103,7 +103,7 @@ class WebRtcHost(context: Context) {
                     override fun onMessage(buf: DataChannel.Buffer) {
                         val bytes = ByteArray(buf.data.remaining()); buf.data.get(bytes)
                         val m = runCatching { gson.fromJson(String(bytes), JsonObject::class.java) }.getOrNull() ?: return
-                        if (m.get("t")?.asString == "ping") {
+                        if (m.get("t").s() == "ping") {
                             m.addProperty("t", "pong")
                             dc.send(DataChannel.Buffer(java.nio.ByteBuffer.wrap(gson.toJson(m).toByteArray()), false))
                         } else {
@@ -185,7 +185,7 @@ class WebRtcHost(context: Context) {
     }
 
     fun addIce(c: JsonObject) {
-        val cand = IceCandidate(c.get("sdpMid")?.asString, c.get("sdpMLineIndex")?.asInt ?: 0, c.get("candidate")?.asString)
+        val cand = IceCandidate(c.get("sdpMid").s(), c.get("sdpMLineIndex")?.asInt ?: 0, c.get("candidate").s())
         if (remoteSet && peer != null) peer!!.addIceCandidate(cand) else iceQueue.add(cand)
     }
 

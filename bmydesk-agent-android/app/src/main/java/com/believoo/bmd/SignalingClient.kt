@@ -94,7 +94,7 @@ class SignalingClient(
             override fun onEvent(event: PusherEvent) {
                 val data = gson.fromJson(event.data ?: "{}", JsonObject::class.java)
                 when (event.eventName) {
-                    "client-join-request" -> listener?.onJoinRequest(data.get("name")?.asString ?: "Someone", data.get("note")?.asString, data.get("vdevice")?.asString)
+                    "client-join-request" -> listener?.onJoinRequest(data.get("name").s() ?: "Someone", data.get("note").s(), data.get("vdevice").s())
                     "client-join-accept" -> listener?.onJoinAccept()
                     "client-join-reject" -> listener?.onJoinReject()
                     "client-signal" -> listener?.onSignal(data)

@@ -106,7 +106,7 @@ class RemoteViewer(context: Context) {
     }
 
     fun onSignal(m: JsonObject) {
-        when (m.get("kind")?.asString) {
+        when (m.get("kind").s()) {
             "answer" -> applyAnswer(m.get("sdp").asString)
             "ice" -> m.getAsJsonObject("candidate")?.let { addIce(it) }
         }
@@ -133,7 +133,7 @@ class RemoteViewer(context: Context) {
     }
 
     fun addIce(c: JsonObject) {
-        val cand = IceCandidate(c.get("sdpMid")?.asString, c.get("sdpMLineIndex")?.asInt ?: 0, c.get("candidate")?.asString)
+        val cand = IceCandidate(c.get("sdpMid").s(), c.get("sdpMLineIndex")?.asInt ?: 0, c.get("candidate").s())
         if (remoteSet && peer != null) peer!!.addIceCandidate(cand) else iceQueue.add(cand)
     }
 

@@ -70,13 +70,13 @@ class AgentService : Service() {
                 if (code != null && token != null) {
                     val s = api.status(code, token)
                     if (s?.get("ok")?.asBoolean == true) {
-                        val st = s.get("status")?.asString
+                        val st = s.get("status").s()
                         if (st == "connecting") {
                             // UI closed → heads-up so the host actually sees it;
                             // UI open → MainActivity's reqBox handles it.
                             if (!MainActivity.foreground && !reqNotified) {
                                 reqNotified = true
-                                notifyRequest(s.get("viewer")?.asString)
+                                notifyRequest(s.get("viewer").s())
                             }
                         } else {
                             reqNotified = false
