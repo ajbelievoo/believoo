@@ -181,6 +181,7 @@ class MainActivity : Activity() {
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             val trace = android.util.Log.getStackTraceString(e)
             android.util.Log.e("BMyDesk", "crash", e)
+            runCatching { com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().recordException(e) }
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 runCatching {
                     android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
