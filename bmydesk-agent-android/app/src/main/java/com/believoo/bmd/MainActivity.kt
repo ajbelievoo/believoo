@@ -152,7 +152,11 @@ class MainActivity : Activity() {
     private fun resetAcceptOptions() {
         pendingViewOnly = false; pendingTrust = false
         pendingVDevice = null; pendingVName = null
-        runCatching { chkViewOnly.isChecked = false; chkTrust.isChecked = false }
+        runCatching {
+            val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+            chkViewOnly.isChecked = sp.getBoolean("def_viewonly", false)
+            chkTrust.isChecked = sp.getBoolean("def_trust", false)
+        }
     }
 
     private fun handleHostSignal(p: JsonObject) {
@@ -215,7 +219,12 @@ class MainActivity : Activity() {
         promptBatteryOnce()
     }
 
-    override fun onResume() { foreground = true; super.onResume() }
+    override fun onResume() {
+        foreground = true; super.onResume()
+        if (getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("keep_awake", false))
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
     override fun onPause() { foreground = false; super.onPause() }
 
     companion object {
@@ -285,6 +294,60 @@ class MainActivity : Activity() {
             .show()
     }
 
+    // ── Settings centre ────────────────────────────────────────────
+    private fun showSettings() {
+        val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        val dark = sp.getBoolean("dark", true)
+        val fg = Color.parseColor(if (dark) "#e2e8f0" else "#0f172a")
+        val sub = Color.parseColor(if (dark) "#94a3b8" else "#64748b")
+        val bgc = Color.parseColor(if (dark) "#0b1220" else "#f1f5f9")
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(14), dp(18), dp(24)); setBackgroundColor(bgc) }
+        fun head(t: String) = root.addView(TextView(this).apply { text = t.uppercase(); setTextColor(Color.parseColor("#fb7185")); textSize = 11f; setPadding(0, dp(18), 0, dp(4)); letterSpacing = 0.1f })
+        fun sw(key: String, def: Boolean, title: String, desc: String) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+            val tv = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tv.addView(TextView(this).apply { text = title; setTextColor(fg); textSize = 14f })
+            tv.addView(TextView(this).apply { text = desc; setTextColor(sub); textSize = 11f })
+            row.addView(tv, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(android.widget.Switch(this).apply { isChecked = sp.getBoolean(key, def); setOnCheckedChangeListener { _, v -> sp.edit().putBoolean(key, v).apply() } })
+            root.addView(row)
+        }
+        fun act(title: String, desc: String, onClick: () -> Unit) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(10), 0, dp(10)); setOnClickListener { onClick() } }
+            row.addView(TextView(this).apply { text = title; setTextColor(fg); textSize = 14f })
+            row.addView(TextView(this).apply { text = desc; setTextColor(sub); textSize = 11f })
+            root.addView(row)
+        }
+        root.addView(TextView(this).apply { text = "⚙ Settings"; setTextColor(fg); textSize = 20f; typeface = Typeface.DEFAULT_BOLD })
+        head("Incoming requests (host)")
+        sw("vibrate_req", true, "Vibrate on request", "Buzz when someone asks to connect")
+        sw("def_viewonly", false, "Accept as view-only by default", "Viewer can watch but not touch")
+        sw("def_trust", false, "Always trust by default", "Skip approval for known devices next time")
+        sw("keep_awake", false, "Keep screen awake", "Prevent sleep while BMyDesk is open")
+        head("When I connect to another device")
+        sw("auto_landscape", true, "Auto-rotate for wide screens", "Landscape for PC desktops, portrait for phones")
+        sw("clip_sync", true, "Clipboard sync", "Copy here, paste there (and back)")
+        act("Default quality: " + (sp.getString("def_quality", "auto") ?: "auto").uppercase(), "Tap to cycle Auto → HD → SD") {
+            val n = when (sp.getString("def_quality", "auto")) { "auto" -> "hd"; "hd" -> "sd"; else -> "auto" }
+            sp.edit().putString("def_quality", n).apply(); toast("Default quality: ${n.uppercase()}")
+        }
+        head("Permissions & reliability")
+        act("Remote-control access", "Open Accessibility settings (needed to let viewers tap/type)") { runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
+        act("Battery optimisation", "Exempt BMyDesk so your code stays reachable") { runCatching { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
+        act("Notifications", "Manage alert settings") {
+            runCatching { startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)) }
+        }
+        head("Device")
+        act("Copy my session code", reg?.code ?: "not registered yet") { reg?.code?.let { clipSet(it); toast("Copied") } }
+        act("Copy device ID", deviceId()) { clipSet(deviceId()); toast("Copied") }
+        act("Check for updates", "Current version v${BuildConfig.VERSION_NAME}") { checkUpdate(); toast("Checking…") }
+        act("Open web workspace", "bmydesk.believoo.com") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com"))) }
+        act("Help & support", "Guides and contact") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/help"))) }
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_NoActionBar_Fullscreen)
+            .setView(ScrollView(this).apply { setBackgroundColor(bgc); addView(root) })
+            .setPositiveButton("Close", null).show()
+    }
+
     // ── UI ─────────────────────────────────────────────────────────
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -325,12 +388,19 @@ class MainActivity : Activity() {
         scroll.addView(col)
         frame.addView(scroll)
 
-        // theme toggle (top-right)
-        col.addView(TextView(this).apply {
-            text = if (dark) "☀ Light mode" else "☾ Dark mode"
-            setTextColor(txtSub); textSize = 12f; gravity = Gravity.END
-            setOnClickListener { prefs.edit().putBoolean("dark", !dark).apply(); recreate() }
-        })
+        // settings + theme toggle (top row)
+        col.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END
+            addView(TextView(this@MainActivity).apply {
+                text = "⚙ Settings"; setTextColor(rose); textSize = 12f; setPadding(0, 0, dp(18), 0)
+                setOnClickListener { showSettings() }
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = if (dark) "☀ Light mode" else "☾ Dark mode"
+                setTextColor(txtSub); textSize = 12f
+                setOnClickListener { prefs.edit().putBoolean("dark", !dark).apply(); recreate() }
+            })
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
         col.addView(TextView(this).apply {
             text = "BMyDesk Agent"
@@ -879,6 +949,7 @@ class MainActivity : Activity() {
         }
     }
     private fun startClipSync() {
+        if (!getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("clip_sync", true)) return
         clipHandler.removeCallbacks(clipTick)
         lastClip = ""
         clipHandler.postDelayed(clipTick, 2500)
@@ -1103,6 +1174,10 @@ class MainActivity : Activity() {
             override fun onDisconnected() { ui { setStatus("Realtime lost — reconnecting…", "#ef4444") } }
             override fun onSubscribed() { ui { setStatus("Ready — share your code", "#22c55e") } }
             override fun onJoinRequest(name: String, note: String?, vdevice: String?) {
+                if (getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("vibrate_req", true))
+                    runCatching {
+                        @Suppress("DEPRECATION") (getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator).vibrate(400)
+                    }
                 ui {
                     resetAcceptOptions()
                     pendingVDevice = vdevice; pendingVName = name
@@ -1446,7 +1521,7 @@ class MainActivity : Activity() {
                         override fun onFrameResolutionChanged(w: Int, h: Int, rot: Int) {
                             vidW = w; vidH = h; vidRot = rot
                             // wide remote desktop on a portrait phone → rotate so the whole display fills the screen
-                            ui { requestedOrientation = if (w > h) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            if (getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("auto_landscape", true)) ui { requestedOrientation = if (w > h) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                                  else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
                         }
                     })
@@ -1463,6 +1538,7 @@ class MainActivity : Activity() {
             ctl.sink = object : CtlChannel.Sink {
                 override fun onCtlOpen() = ui {
                     vSessRow.visibility = View.VISIBLE; startClipSync()
+                    if (vQuality == "auto") getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("def_quality", "auto")?.let { if (it != "auto") { vQuality = it; vQualityBtn.text = it.replaceFirstChar { c -> c.uppercase() } } }
                     if (vQuality != "auto") remoteViewer?.ctl?.sendQuality(vQuality)
 
                 }

@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.16';
+const APP_VERSION = '1.3.17';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -20,6 +20,17 @@ let pcConfig = { iceServers: [
 let session = null;      // {session_code, agent_token, channel}
 let pusher = null, ch = null, pc = null, stream = null, dcIn = null;
 let iceQueue = [];
+
+// ── Settings store (persisted, every key is honoured somewhere below) ──
+const CFG_DEFAULTS = { sound: true, flash: true, permClip: true, permFiles: true, permCmd: false, viewOnlyDef: false,
+    watermark: true, autoPrivacy: false, quality: 'auto', clipViewer: true };
+function cfg(k) {
+    try { const v = JSON.parse(localStorage.getItem('bmd_cfg') || '{}'); return k in v ? v[k] : CFG_DEFAULTS[k]; } catch (e) { return CFG_DEFAULTS[k]; }
+}
+function cfgSet(k, val) {
+    let v = {}; try { v = JSON.parse(localStorage.getItem('bmd_cfg') || '{}'); } catch (e) {}
+    v[k] = val; localStorage.setItem('bmd_cfg', JSON.stringify(v));
+}
 
 function setStatus(text, mode = 'wait') {
     $('statusText').textContent = text;
@@ -255,12 +266,15 @@ function showJoinReq(name, note, vdevice) {
     $('reqName').textContent = lastReqName;
     const ne = $('reqNote');
     if (ne) { ne.style.display = note ? 'block' : 'none'; ne.textContent = note ? '“' + note + '”' : ''; }
-    const vo = $('acceptViewOnly'); if (vo) vo.checked = false; // fresh choice per request
+    const vo = $('acceptViewOnly'); if (vo) vo.checked = !!cfg('viewOnlyDef'); // defaults come from Settings
+    if ($('permClip')) $('permClip').checked = !!cfg('permClip');
+    if ($('permFiles')) $('permFiles').checked = !!cfg('permFiles');
+    if ($('permCmd')) $('permCmd').checked = !!cfg('permCmd');
     const tr = $('acceptTrust'); if (tr) { tr.checked = false; tr.parentElement.style.display = vdevice ? '' : 'none'; }
     $('reqBox').classList.remove('hidden');
-    window.agent.attention(name);
+    if (cfg('flash')) window.agent.attention(name);
     setStatus('Connection request…', 'wait');
-    try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play().catch(()=>{}); } catch(e){}
+    if (cfg('sound')) try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play().catch(()=>{}); } catch(e){}
 }
 
 function connectChannel() {
@@ -513,7 +527,9 @@ function wireCtl(ch) {
         ['viewOnlyBtn', 'hostMonBtn', 'fsToggleBtn'].forEach(id => { const b = $(id); if (b) b.style.display = v ? 'none' : ''; });
         if (!v && viewOnly) ctlSend({ t: 'view-only', on: true }); // host accepted view-only
         // persistent on-screen badge — the host always sees who is watching
-        if (!v) { try { window.agent?.watermark(true, lastReqName || 'remote viewer'); } catch (e) {} }
+        if (!v && cfg('watermark')) { try { window.agent?.watermark(true, lastReqName || 'remote viewer'); } catch (e) {} }
+        if (!v && cfg('autoPrivacy') && !privacyOn) { try { privacyOn = true; window.agent.privacyScreen(true); $('privacyBtn') && ($('privacyBtn').style.background = '#f43f5e'); } catch (e) {} }
+        if (v && cfg('quality') !== 'auto') { $('qualitySel').value = cfg('quality'); ctlSend({ t: 'quality', mode: cfg('quality') }); }
     };
     ctl.onclose = () => { $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden'); };
 }
@@ -859,7 +875,7 @@ function startClipSync() {
     clipTimer = setInterval(async () => {
         try {
             const t = await window.agent.clipboardGet();
-            if (t && t !== lastClip && (isViewing() || perm.clip)) { lastClip = t; ctlSend({ t: 'clip', text: t }); }
+            if (t && t !== lastClip && (isViewing() ? cfg('clipViewer') : perm.clip)) { lastClip = t; ctlSend({ t: 'clip', text: t }); }
         } catch (e) {}
     }, 2000);
 }
@@ -1257,7 +1273,7 @@ $('copyLink').onclick = async (e) => {
 // Ctrl+C while viewing → send clipboard text to host (clipboard sync)
 document.addEventListener('keydown', async (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && ctl && ctl.readyState === 'open'
-        && window.agent?.clipboardGet && !$('viewerPane').classList.contains('hidden')) {
+        && window.agent?.clipboardGet && cfg('clipViewer') && !$('viewerPane').classList.contains('hidden')) {
         try { const t = await window.agent.clipboardGet(); if (t) ctlSend({ t: 'clip', text: t }); } catch (x) {}
     }
 });
@@ -1501,3 +1517,40 @@ window.agent.onAuth?.(({ token, name }) => {
 register();
 checkUpdate();
 setInterval(checkUpdate, 3600000);
+
+
+// ══ Settings centre UI ══
+(function () {
+    const pane = $('settingsPane'); if (!pane) return;
+    const map = { cfgSound: 'sound', cfgFlash: 'flash', cfgPermClip: 'permClip', cfgPermFiles: 'permFiles', cfgPermCmd: 'permCmd',
+        cfgViewOnlyDef: 'viewOnlyDef', cfgWatermark: 'watermark', cfgAutoPrivacy: 'autoPrivacy', cfgClipViewer: 'clipViewer' };
+    function open() {
+        Object.entries(map).forEach(([id, k]) => { $(id).checked = !!cfg(k); });
+        $('cfgLockEnd').checked = localStorage.getItem('bmd_lock_on_end') === '1';
+        $('cfgQuality').value = cfg('quality');
+        $('cfgTheme').value = document.body.classList.contains('light') ? 'light' : 'dark';
+        $('cfgCode').textContent = session?.session_code || '—';
+        $('cfgDevId').textContent = deviceId();
+        $('cfgVer').textContent = 'v' + APP_VERSION;
+        window.agent?.loginItemGet?.().then(v => { $('cfgAutostart').checked = !!v; }).catch(() => {});
+        pane.classList.remove('hidden');
+    }
+    $('gearBtn').onclick = open;
+    $('settingsClose').onclick = () => pane.classList.add('hidden');
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') pane.classList.add('hidden'); });
+    $('stabs').querySelectorAll('button').forEach(b => b.onclick = () => {
+        $('stabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        pane.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === b.dataset.p));
+    });
+    Object.entries(map).forEach(([id, k]) => { $(id).onchange = () => cfgSet(k, $(id).checked); });
+    $('cfgLockEnd').onchange = () => { localStorage.setItem('bmd_lock_on_end', $('cfgLockEnd').checked ? '1' : '0'); const c = $('lockEndChk'); if (c) c.checked = $('cfgLockEnd').checked; };
+    $('cfgQuality').onchange = () => cfgSet('quality', $('cfgQuality').value);
+    $('cfgTheme').onchange = () => { localStorage.setItem('bmydesk_theme', $('cfgTheme').value); applyTheme($('cfgTheme').value); };
+    $('cfgAutostart').onchange = () => window.agent?.loginItemSet?.($('cfgAutostart').checked).catch(() => {});
+    $('cfgCopyCode').onclick = () => window.agent.clipboardSet(session?.session_code || '');
+    $('cfgCopyDev').onclick = () => window.agent.clipboardSet(deviceId());
+    $('cfgClearRecent').onclick = () => { localStorage.removeItem('bmydesk_recent'); renderRecent(); };
+    $('cfgCheckUpd').onclick = () => { checkUpdate(); $('cfgCheckUpd').textContent = 'Checking…'; setTimeout(() => $('cfgCheckUpd').textContent = 'Check for update', 2000); };
+    $('cfgOpenWeb').onclick = () => window.agent.openExternal('https://bmydesk.believoo.com');
+    $('cfgOpenHelp').onclick = () => window.agent.openExternal('https://bmydesk.believoo.com/help');
+})();

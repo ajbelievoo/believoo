@@ -65,9 +65,97 @@
     .btn-end { width: 100%; background: #7f1d1d; color: #fecaca; margin-top: 14px; }
     .foot { margin-top: auto; padding-top: 16px; font-size: 10.5px; color: #475569; text-align: center; }
     .hidden { display: none !important; }
+
+    /* ── Settings centre ── */
+    .gear { position: absolute; top: 14px; right: 56px; background: none; border: 1px solid rgba(148,163,184,.3); color: #94a3b8; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 15px; }
+    body.light .gear { border-color: #cbd5e1; color: #475569; }
+    .gear:hover, .theme-toggle:hover { border-color: #fb7185; color: #fb7185; }
+    .spane { position: fixed; inset: 0; z-index: 30; background: #0b1220; display: flex; flex-direction: column; }
+    body.light .spane { background: #f1f5f9; }
+    .spane.hidden { display: none; }
+    .shead { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid rgba(148,163,184,.15); }
+    .shead h2 { font-size: 15px; font-weight: 800; flex: 1; }
+    .shead button { background: none; border: 1px solid rgba(148,163,184,.3); color: inherit; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12px; }
+    .stabs { display: flex; gap: 4px; padding: 10px 14px 0; overflow-x: auto; border-bottom: 1px solid rgba(148,163,184,.15); }
+    .stabs button { background: none; border: 0; color: #94a3b8; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .stabs button.on { color: #fb7185; border-bottom-color: #fb7185; }
+    .sbody { flex: 1; overflow-y: auto; padding: 14px 18px 26px; }
+    .sgrp { background: #0f172a; border: 1px solid rgba(148,163,184,.12); border-radius: 14px; padding: 4px 14px; margin-bottom: 14px; }
+    body.light .sgrp { background: #fff; border-color: #e2e8f0; }
+    .sgrp h4 { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: #64748b; padding: 12px 0 4px; }
+    .srow { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(148,163,184,.1); }
+    .srow:last-child { border-bottom: 0; }
+    .srow .t { flex: 1; } .srow .t b { display: block; font-size: 12.5px; } .srow .t span { font-size: 11px; color: #64748b; }
+    .srow select, .srow input[type=text] { background: #131c2e; border: 1px solid rgba(148,163,184,.25); color: inherit; border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+    body.light .srow select { background: #f1f5f9; }
+    .sw { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+    .sw input { opacity: 0; width: 0; height: 0; }
+    .sw i { position: absolute; inset: 0; background: #334155; border-radius: 22px; transition: .2s; cursor: pointer; }
+    .sw i::after { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+    .sw input:checked + i { background: linear-gradient(135deg,#f59e0b,#e11d48,#7c3aed); }
+    .sw input:checked + i::after { transform: translateX(16px); }
+    .sbtn { background: #1e293b; border: 0; color: #e2e8f0; border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .sbtn.danger { background: #7f1d1d; color: #fecaca; }
+    .spane .pane { display: none; } .spane .pane.on { display: block; }
 </style>
 </head>
 <body>
+<button class="gear" id="gearBtn" title="Settings">⚙</button>
+
+<div class="spane hidden" id="settingsPane">
+  <div class="shead"><h2>⚙ Settings</h2><button id="settingsClose">Close ✕</button></div>
+  <div class="stabs" id="stabs">
+    <button data-p="general" class="on">General</button><button data-p="security">Security</button><button data-p="remote">Remote</button><button data-p="devices">Devices</button><button data-p="about">About</button>
+  </div>
+  <div class="sbody">
+    <div class="pane on" data-pane="general">
+      <div class="sgrp"><h4>Startup &amp; appearance</h4>
+        <div class="srow"><div class="t"><b>Start with Windows</b><span>Keep this device reachable after every reboot</span></div><label class="sw"><input type="checkbox" id="cfgAutostart" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>Theme</b><span>Dark or light interface</span></div><select id="cfgTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+      </div>
+      <div class="sgrp"><h4>Notifications</h4>
+        <div class="srow"><div class="t"><b>Sound on connection request</b><span>Play a chime when someone asks to connect</span></div><label class="sw"><input type="checkbox" id="cfgSound" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>Flash taskbar &amp; bring to front</b><span>Get your attention even if the app is minimized</span></div><label class="sw"><input type="checkbox" id="cfgFlash" data-cfg><i></i></label></div>
+      </div>
+    </div>
+    <div class="pane" data-pane="security">
+      <div class="sgrp"><h4>When you ACCEPT a request — default permissions</h4>
+        <div class="srow"><div class="t"><b>Clipboard sync</b><span>Pre-tick “Allow clipboard” on the accept prompt</span></div><label class="sw"><input type="checkbox" id="cfgPermClip" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>File transfer &amp; browsing</b><span>Pre-tick “Allow file transfer”</span></div><label class="sw"><input type="checkbox" id="cfgPermFiles" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>Commands, task manager, lock/restart</b><span>Off by default — powerful</span></div><label class="sw"><input type="checkbox" id="cfgPermCmd" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>Accept as view-only by default</b><span>Viewer can watch but not click or type</span></div><label class="sw"><input type="checkbox" id="cfgViewOnlyDef" data-cfg><i></i></label></div>
+      </div>
+      <div class="sgrp"><h4>During a session</h4>
+        <div class="srow"><div class="t"><b>Show “remote session” watermark</b><span>Visible banner while someone is connected</span></div><label class="sw"><input type="checkbox" id="cfgWatermark" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>Privacy screen while connected</b><span>Blank this PC’s local display automatically during a session</span></div><label class="sw"><input type="checkbox" id="cfgAutoPrivacy" data-cfg><i></i></label></div>
+        <div class="srow"><div class="t"><b>Lock this PC when the session ends</b><span>Re-secure the workstation automatically</span></div><label class="sw"><input type="checkbox" id="cfgLockEnd" data-cfg><i></i></label></div>
+      </div>
+    </div>
+    <div class="pane" data-pane="remote">
+      <div class="sgrp"><h4>When YOU connect to another device</h4>
+        <div class="srow"><div class="t"><b>Default stream quality</b><span>Auto adapts; HD = sharpest, SD = fastest on slow links</span></div>
+          <select id="cfgQuality"><option value="auto">Auto</option><option value="hd">HD</option><option value="sd">SD</option></select></div>
+        <div class="srow"><div class="t"><b>Share my clipboard with the remote device</b><span>Copy here → paste there</span></div><label class="sw"><input type="checkbox" id="cfgClipViewer" data-cfg><i></i></label></div>
+      </div>
+    </div>
+    <div class="pane" data-pane="devices">
+      <div class="sgrp"><h4>This device</h4>
+        <div class="srow"><div class="t"><b>Session code</b><span id="cfgCode">—</span></div><button class="sbtn" id="cfgCopyCode">Copy</button></div>
+        <div class="srow"><div class="t"><b>Device ID</b><span id="cfgDevId" style="font-family:monospace">—</span></div><button class="sbtn" id="cfgCopyDev">Copy</button></div>
+      </div>
+      <div class="sgrp"><h4>Remembered</h4>
+        <div class="srow"><div class="t"><b>Recent partner codes</b><span>Quick-connect list on the home screen</span></div><button class="sbtn danger" id="cfgClearRecent">Clear</button></div>
+      </div>
+    </div>
+    <div class="pane" data-pane="about">
+      <div class="sgrp"><h4>BMyDesk Agent</h4>
+        <div class="srow"><div class="t"><b>Version</b><span id="cfgVer">—</span></div><button class="sbtn" id="cfgCheckUpd">Check for update</button></div>
+        <div class="srow"><div class="t"><b>Web workspace</b><span>bmydesk.believoo.com</span></div><button class="sbtn" id="cfgOpenWeb">Open</button></div>
+        <div class="srow"><div class="t"><b>Help &amp; support</b><span>Guides, tickets, contact</span></div><button class="sbtn" id="cfgOpenHelp">Open</button></div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="wrap">
     <button class="theme-toggle" id="themeBtn" title="Toggle theme">☾</button>
     <div class="brand">
