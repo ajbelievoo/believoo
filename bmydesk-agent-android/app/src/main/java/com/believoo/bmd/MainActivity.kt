@@ -991,12 +991,15 @@ class MainActivity : Activity() {
         liveKb = null; liveKbLen = 0
     }
 
-    // Ask once to enable the accessibility service that injects viewer input.
+    // Ask to enable the accessibility service that injects viewer input —
+    // re-asks every 24h while it's still off, because a dismissed prompt
+    // used to leave every session permanently view-only with no way back.
     private fun promptAccessibilityOnce() {
         if (RemoteControlService.enabled()) return
         val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("access_prompted", false)) return
-        prefs.edit().putBoolean("access_prompted", true).apply()
+        val last = prefs.getLong("access_prompted_at", 0L)
+        if (System.currentTimeMillis() - last < 24 * 3600_000L) return
+        prefs.edit().putLong("access_prompted_at", System.currentTimeMillis()).apply()
         ui {
             android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
                 .setTitle("Enable remote control?")
