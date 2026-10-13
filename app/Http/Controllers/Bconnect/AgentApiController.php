@@ -13,7 +13,7 @@ class AgentApiController extends Controller
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
     const AGENT_LATEST_WINDOWS = '1.3.13';
-    const AGENT_LATEST_ANDROID = '1.3.20';
+    const AGENT_LATEST_ANDROID = '1.3.21';
 
     protected function findByCode(string $code): ?RemoteSession
     {
