@@ -71,12 +71,6 @@
                             <dd class="font-bold text-slate-900 dark:text-white">{{ $settings['company_incorporation_date'] }}</dd>
                         </div>
                         @endif
-                        @if($settings['company_pan'] ?? false)
-                        <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
-                            <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">PAN</dt>
-                            <dd class="font-mono font-bold text-slate-900 dark:text-white">{{ $settings['company_pan'] }}</dd>
-                        </div>
-                        @endif
                         @if($settings['company_tan'] ?? false)
                         <div class="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
                             <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">TAN</dt>
