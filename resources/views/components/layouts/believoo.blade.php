@@ -1027,9 +1027,6 @@
         if (!empty($settings['company_gstin'])) {
             $identifiers[] = ['@type' => 'PropertyValue', 'propertyID' => 'GSTIN', 'value' => $settings['company_gstin']];
         }
-        if (!empty($settings['company_pan'])) {
-            $identifiers[] = ['@type' => 'PropertyValue', 'propertyID' => 'PAN', 'value' => $settings['company_pan']];
-        }
         if ($identifiers) {
             $schema['identifier'] = count($identifiers) === 1 ? $identifiers[0] : $identifiers;
         }
@@ -1869,7 +1866,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center">
                     @if($settings['company_cin'] ?? false)<span>CIN: {{ $settings['company_cin'] }}</span>@endif
-                    @if($settings['company_pan'] ?? false)<span>PAN: {{ $settings['company_pan'] }}</span>@endif
+                    {{-- RAZORPAY-REVIEW: PAN hidden from public footer --}}
                     @if($settings['company_gstin'] ?? false)<span>GSTIN: {{ $settings['company_gstin'] }}</span>@endif
                 </div>
             </div>
