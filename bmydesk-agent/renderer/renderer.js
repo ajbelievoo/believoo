@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.17';
+const APP_VERSION = '1.3.18';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -24,6 +24,15 @@ let iceQueue = [];
 // ── Settings store (persisted, every key is honoured somewhere below) ──
 const CFG_DEFAULTS = { sound: true, flash: true, permClip: true, permFiles: true, permCmd: false, viewOnlyDef: false,
     watermark: true, autoPrivacy: false, quality: 'auto', clipViewer: true };
+// ── Session history (local) ──
+let histCur = null;
+function histStart(dir, who) { histCur = { dir, who: who || 'Unknown', at: Date.now() }; }
+function histEnd() {
+    if (!histCur) return;
+    let h = []; try { h = JSON.parse(localStorage.getItem('bmd_hist') || '[]'); } catch (e) {}
+    h.unshift({ ...histCur, dur: Math.round((Date.now() - histCur.at) / 1000) });
+    localStorage.setItem('bmd_hist', JSON.stringify(h.slice(0, 50))); histCur = null;
+}
 function cfg(k) {
     try { const v = JSON.parse(localStorage.getItem('bmd_cfg') || '{}'); return k in v ? v[k] : CFG_DEFAULTS[k]; } catch (e) { return CFG_DEFAULTS[k]; }
 }
@@ -529,6 +538,7 @@ function wireCtl(ch) {
         // persistent on-screen badge — the host always sees who is watching
         if (!v && cfg('watermark')) { try { window.agent?.watermark(true, lastReqName || 'remote viewer'); } catch (e) {} }
         if (!v && cfg('autoPrivacy') && !privacyOn) { try { privacyOn = true; window.agent.privacyScreen(true); $('privacyBtn') && ($('privacyBtn').style.background = '#f43f5e'); } catch (e) {} }
+        if (v && !histCur) histStart('out', vJoinedCode);
         if (v && cfg('quality') !== 'auto') { $('qualitySel').value = cfg('quality'); ctlSend({ t: 'quality', mode: cfg('quality') }); }
     };
     ctl.onclose = () => { $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden'); };
@@ -882,6 +892,7 @@ function startClipSync() {
 function stopClipSync() { if (clipTimer) { clearInterval(clipTimer); clipTimer = null; } }
 
 function teardown(msg) {
+    if (histCur && histCur.dir === 'in') histEnd();
     resetPrivacy();
     stopClipSync();
     viewOnly = false; $('viewOnlyBtn') && ($('viewOnlyBtn').style.background = '#1e293b');
@@ -928,6 +939,7 @@ $('acceptBtn').onclick = () => {
         }); } catch (e) {}
         addChat('System', 'Trusted ' + lastReqName + ' — will auto-accept next time', false);
     }
+    histEnd(); histStart('in', lastReqName);
     respond('accept'); setStatus(viewOnly ? 'Accepted (view-only) — waiting for stream…' : 'Accepted — waiting for stream…', 'on');
 };
 $('rejectBtn').onclick = () => { $('reqBox').classList.add('hidden'); respondedAt = Date.now(); respond('reject'); setStatus('Request rejected', 'wait'); };
@@ -1241,6 +1253,7 @@ function bindViewerInput() {
 
 function exitViewer(delay = 0) {
     const doIt = () => {
+        if (histCur && histCur.dir === 'out') histEnd();
         try { viewerSignal({ kind: 'end' }); } catch (e) {}
         stopViewerPoll();
         if (vPc) { try { vPc.close(); } catch (e) {} vPc = null; }
@@ -1533,8 +1546,34 @@ setInterval(checkUpdate, 3600000);
         $('cfgDevId').textContent = deviceId();
         $('cfgVer').textContent = 'v' + APP_VERSION;
         window.agent?.loginItemGet?.().then(v => { $('cfgAutostart').checked = !!v; }).catch(() => {});
+        renderTrusted(); renderHistory();
         pane.classList.remove('hidden');
     }
+    function fmtDur(sec) { return sec >= 3600 ? Math.floor(sec / 3600) + 'h ' + Math.floor(sec % 3600 / 60) + 'm' : sec >= 60 ? Math.floor(sec / 60) + 'm ' + (sec % 60) + 's' : sec + 's'; }
+    function renderHistory() {
+        let h = []; try { h = JSON.parse(localStorage.getItem('bmd_hist') || '[]'); } catch (e) {}
+        $('histList').innerHTML = h.length ? h.map(x => `<div class="srow"><div class="t"><b>${x.dir === 'in' ? '⬇ ' : '⬆ '}${String(x.who).replace(/</g, '&lt;')}</b><span>${x.dir === 'in' ? 'Connected to your PC' : 'You connected to them'} · ${new Date(x.at).toLocaleString()} · ${fmtDur(x.dur)}</span></div></div>`).join('')
+            : '<div class="srow"><div class="t"><span>No sessions yet.</span></div></div>';
+    }
+    async function renderTrusted() {
+        const box = $('trustedList'); if (!session) { box.innerHTML = '<div class="srow"><div class="t"><span>Not registered yet.</span></div></div>'; return; }
+        try {
+            const r = await fetch(`${API}/${session.session_code}/trusted`, { headers: { Accept: 'application/json', Authorization: 'Bearer ' + session.agent_token } });
+            const d = await r.json(); const list = d.trusted || [];
+            box.innerHTML = list.length ? list.map(t => `<div class="srow"><div class="t"><b>${String(t.viewer_name || 'Unnamed device').replace(/</g, '&lt;')}</b><span style="font-family:monospace">${String(t.viewer_device_id).slice(0, 14)}…</span></div><button class="sbtn danger" data-rm="${String(t.viewer_device_id).replace(/"/g, '')}">Remove</button></div>`).join('')
+                : '<div class="srow"><div class="t"><span>No trusted devices — everyone needs your approval.</span></div></div>';
+            box.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+                await fetch(`${API}/${session.session_code}/untrust`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ agent_token: session.agent_token, viewer_device: b.dataset.rm }) });
+                renderTrusted();
+            });
+        } catch (e) { box.innerHTML = '<div class="srow"><div class="t"><span>Could not load.</span></div></div>'; }
+    }
+    $('cfgClearHist').onclick = () => { localStorage.removeItem('bmd_hist'); renderHistory(); };
+    $('cfgUntrustAll').onclick = async () => {
+        if (!session || !confirm('Remove ALL trusted devices?')) return;
+        await fetch(`${API}/${session.session_code}/untrust`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ agent_token: session.agent_token }) });
+        renderTrusted();
+    };
     $('gearBtn').onclick = open;
     $('settingsClose').onclick = () => pane.classList.add('hidden');
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') pane.classList.add('hidden'); });

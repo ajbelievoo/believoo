@@ -105,7 +105,7 @@
 <div class="spane hidden" id="settingsPane">
   <div class="shead"><h2>⚙ Settings</h2><button id="settingsClose">Close ✕</button></div>
   <div class="stabs" id="stabs">
-    <button data-p="general" class="on">General</button><button data-p="security">Security</button><button data-p="remote">Remote</button><button data-p="devices">Devices</button><button data-p="about">About</button>
+    <button data-p="general" class="on">General</button><button data-p="security">Security</button><button data-p="remote">Remote</button><button data-p="devices">Devices</button><button data-p="history">History</button><button data-p="about">About</button>
   </div>
   <div class="sbody">
     <div class="pane on" data-pane="general">
@@ -143,9 +143,17 @@
         <div class="srow"><div class="t"><b>Session code</b><span id="cfgCode">—</span></div><button class="sbtn" id="cfgCopyCode">Copy</button></div>
         <div class="srow"><div class="t"><b>Device ID</b><span id="cfgDevId" style="font-family:monospace">—</span></div><button class="sbtn" id="cfgCopyDev">Copy</button></div>
       </div>
+      <div class="sgrp"><h4>Trusted devices (connect without approval)</h4>
+        <div id="trustedList"></div>
+        <div class="srow"><div class="t"><span>Revoke access for everyone</span></div><button class="sbtn danger" id="cfgUntrustAll">Remove all</button></div>
+      </div>
       <div class="sgrp"><h4>Remembered</h4>
         <div class="srow"><div class="t"><b>Recent partner codes</b><span>Quick-connect list on the home screen</span></div><button class="sbtn danger" id="cfgClearRecent">Clear</button></div>
       </div>
+    </div>
+    <div class="pane" data-pane="history">
+      <div class="sgrp"><h4>Recent sessions</h4><div id="histList"></div>
+        <div class="srow"><div class="t"><span>Stored only on this PC</span></div><button class="sbtn danger" id="cfgClearHist">Clear history</button></div></div>
     </div>
     <div class="pane" data-pane="about">
       <div class="sgrp"><h4>BMyDesk Agent</h4>
