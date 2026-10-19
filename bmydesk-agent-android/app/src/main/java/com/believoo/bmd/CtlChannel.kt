@@ -22,6 +22,7 @@ class CtlChannel(private val gson: Gson = Gson()) {
         fun onFile(name: String, data: ByteArray) {}
         fun onFileProgress(received: Int, total: Int) {}
         fun onQuality(mode: String) {}
+        fun onViewOnly(on: Boolean) {}
         fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {}
     }
 
@@ -57,8 +58,10 @@ class CtlChannel(private val gson: Gson = Gson()) {
                 "file-cancel" -> { rxName = null; rxBuf.reset(); sink?.onChat("System", "Transfer cancelled by peer") }
                 // remote-terminal output + host mode notices render in the chat
                 "cmd-out" -> sink?.onChat("Host ▸", m.get("out").s() ?: "(no output)")
-                "view-only" -> sink?.onChat("System", if (m.get("on")?.asBoolean == true)
-                    "Host locked remote input (view-only mode)" else "Host re-enabled remote input")
+                "view-only" -> { val on = m.get("on")?.asBoolean == true
+                    sink?.onViewOnly(on)
+                    sink?.onChat("System", if (on) "Host locked remote input (view-only mode)"
+                        else "Host re-enabled remote input") }
                 // fs-list is a host→viewer REPLY (dir listing); fs-list-req/fs-get are
                 // viewer→host requests an Android host can't serve yet
                 "fs-list" -> sink?.onFsList(

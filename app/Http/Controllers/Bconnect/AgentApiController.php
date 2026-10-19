@@ -12,8 +12,8 @@ class AgentApiController extends Controller
 {
     // Bump these when new agent builds are published — apps poll /version and
     // prompt the user to update.
-    const AGENT_LATEST_WINDOWS = '1.3.19';
-    const AGENT_LATEST_ANDROID = '1.3.26';
+    const AGENT_LATEST_WINDOWS = '1.3.20';
+    const AGENT_LATEST_ANDROID = '1.3.27';
 
     protected function findByCode(string $code): ?RemoteSession
     {
@@ -697,6 +697,34 @@ class AgentApiController extends Controller
         $session->update([
             'guest_rating' => $data['rating'],
             'guest_feedback' => $data['feedback'] ?? null,
+        ]);
+        return response()->json(['ok' => true]);
+    }
+
+    // POST /{code}/app-rate — "how was the app" rating when an agent quits.
+    // Agent-token auth (host devices rate the app itself); viewer CSAT stays
+    // on /rate which is session-scoped.
+    public function appRate(Request $r, string $code)
+    {
+        $session = $this->findByCode($code);
+        if (!$session || !$this->checkToken($r, $session)) {
+            return response()->json(['ok' => false, 'error' => 'invalid'], 403);
+        }
+        $data = $r->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'feedback' => 'nullable|string|max:500',
+            'platform' => 'nullable|string|max:20',
+            'version' => 'nullable|string|max:20',
+        ]);
+        \Illuminate\Support\Facades\DB::table('bmydesk_app_ratings')->insert([
+            'device_id' => $session->device_id,
+            'session_code' => $session->session_code,
+            'platform' => $data['platform'] ?? null,
+            'version' => $data['version'] ?? null,
+            'rating' => $data['rating'],
+            'feedback' => $data['feedback'] ?? null,
+            'ip' => $r->ip(),
+            'created_at' => now(), 'updated_at' => now(),
         ]);
         return response()->json(['ok' => true]);
     }

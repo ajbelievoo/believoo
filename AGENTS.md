@@ -216,6 +216,15 @@ Examples:
 - **Crash auto-resume**: uncaught exception → `crashed` pref + `setAlarmClock` relaunch (~0.6s). `resume_code` is stored while a viewer session is live → `resumeAfterCrash()` rejoins it. No more dead crash dialog.
 - **First-run permissions**: `ensureRuntimePermissions()` asks once for notifications, camera, mic, location, files/media (`perms_asked_v1` pref).
 
+### BMyDesk quality/permissions/PIN/CSAT (added 2026-10-19, agent v1.3.27 / desktop v1.3.20)
+
+- **Quality**: `auto`/`sd`/`hd`/`fhd` everywhere — Android `WebRtcHost.setQuality` retunes `ScreenCapturerAndroid.changeCaptureFormat`; Electron `applyQuality` uses `RTCRtpSender.setParameters`; web guests/host-room/agent-room `qualitySel` sends `{t:'quality',mode}` on `ctl`. Auto is default; the RTT auto-drop only runs while mode==auto.
+- **View-only is the default grant**: `def_viewonly`/viewOnlyDef default true; accept dialog + mid-session toggle let the host flip control on/off (`RemoteControlService.blocked` on Android, input-gate on Electron). Viewers get a `view-only` ctl msg → badge.
+- **Unattended PIN**: `pin_set` surfaces from `/status`; Android status-poll detects `active`+`service==null` joins and runs a consent dialog → MediaProjection → session (fixes PIN/trusted joins parking forever). Electron PIN is a real modal (`prompt()` doesn't exist in the renderer).
+- **Battery**: exemption re-check every 24h + OEM autostart intents; Accessibility guide dialog explains enabling "BMyDesk Agent" for remote input (view-only without it).
+- **Quit CSAT**: Android back-press rating dialog; Electron `close` → `csat-check` IPC → renderer overlay → `csat-done` hides window (30s fallback). Both POST `/{code}/app-rate` (table `bmydesk_app_ratings`, 1/week cadence).
+- **rsync warning**: `/opt/build/apps/bmydesk-agent-android` contains remote-only files (`gradlew`, `gradle/`, `local.properties`) NOT in the source tree — `rsync --delete` wiped them once. Sync with `rsync -az` (no delete) or exclude those paths; wrapper restored pointing at cached gradle-8.10.2.
+
 ## PlayGame site (added 2026-10-07)
 
 - `playgame.believoo.com` = new Laravel+React gaming site. Backend `/www/wwwroot/playgame-app`,

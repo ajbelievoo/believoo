@@ -163,6 +163,18 @@ class AgentApi(private val base: String = "https://bmydesk.believoo.com/api/v1/b
         }.getOrNull()
     }
 
+    /** App-experience rating from the quit popup ("how was the app"). */
+    fun appRate(code: String, token: String, rating: Int, feedback: String?, platform: String) {
+        runCatching {
+            val body = mutableMapOf<String, Any>("rating" to rating, "platform" to platform, "version" to BuildConfig.VERSION_NAME)
+            feedback?.let { body["feedback"] = it }
+            val req = Request.Builder().url("$base/$code/app-rate")
+                .post(gson.toJson(body).toRequestBody(json))
+                .header("Authorization", "Bearer $token").build()
+            http.newCall(req).execute().close()
+        }
+    }
+
     fun end(code: String, token: String) {
         runCatching {
             val req = Request.Builder().url("$base/$code/end")

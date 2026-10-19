@@ -43,6 +43,10 @@ class MainActivity : Activity() {
     private var pendingProjection = false
     private var waitingOfferSdp: String? = null
     private var pullRef: PullRefreshLayout? = null
+    private lateinit var pinLink: TextView
+    @Volatile private var pinSet = false
+    @Volatile private var unattendedPrompted = false
+    @Volatile private var unattendedConsent = false
 
     // Viewer mode (Remote Desk — connect to another code)
     private var remoteViewer: RemoteViewer? = null
@@ -94,8 +98,7 @@ class MainActivity : Activity() {
                     // tell the viewer so their UI can reflect it too.
                     if (pendingViewOnly) {
                         pendingViewOnly = false
-                        RemoteControlService.blocked = true
-                        service?.ctl()?.sendViewOnly(true)
+                        setViewOnlyLive(true)
                         chatAppend("System", "View-only session — remote control is locked", false)
                     }
                 }
@@ -155,7 +158,7 @@ class MainActivity : Activity() {
         pendingVDevice = null; pendingVName = null
         runCatching {
             val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
-            chkViewOnly.isChecked = sp.getBoolean("def_viewonly", false)
+            chkViewOnly.isChecked = sp.getBoolean("def_viewonly", true) // default: watch first, grant control deliberately
             chkTrust.isChecked = sp.getBoolean("def_trust", false)
         }
     }
@@ -220,7 +223,7 @@ class MainActivity : Activity() {
         // registers and rejoins whatever session a crash interrupted.
         if (!handleDeepLink(intent)) { register(); resumeAfterCrash() }
         checkUpdate()
-        promptBatteryOnce()
+        checkBatteryExemption()
     }
 
     override fun onResume() {
@@ -347,26 +350,87 @@ class MainActivity : Activity() {
     }
 
     // Unattended access — let trusted viewers connect with code+PIN, no
-    // approval needed. Empty entry removes the PIN (approval required again).
+    // approval needed. The dialog explains WHAT the pin does (with an example)
+    // because a bare prompt left users setting pins they didn't understand.
     private fun promptUnattendedPin() {
         val code = reg?.code ?: return
         val tok = reg?.agentToken ?: return
         val input = android.widget.EditText(this).apply {
-            hint = "4-12 digit PIN (empty = remove)"
+            hint = "4–12 digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Unattended access")
-            .setMessage("Viewers who know this device's code + PIN can connect without approval.")
+            .setTitle("Unattended access PIN" + (if (pinSet) " — currently ON" else ""))
+            .setMessage(
+                "A PIN lets someone connect to this device WITHOUT you tapping Accept — " +
+                "they only need your code + PIN.\n\n" +
+                "Example: set PIN 4821 on your office PC; from home you enter its code + 4821 " +
+                "and connect instantly, even at 2 AM.\n\n" +
+                "⚠ Anyone who knows the code + PIN gets in — treat it like a password. " +
+                "The device still asks for one-tap screen-share consent (Android requirement).")
             .setView(input)
-            .setPositiveButton("Save") { _, _ ->
-                val pin = input.text.toString().trim()
-                thread {
-                    val ok = api.setPin(code, tok, pin)
-                    ui { setStatus(if (ok) (if (pin.isBlank()) "Unattended access OFF" else "Unattended access ON") else "PIN update failed", if (ok && pin.isNotBlank()) "#22c55e" else "#f59e0b") }
-                }
-            }
+            .setPositiveButton("Save") { _, _ -> savePin(code, tok, input.text.toString().trim()) }
+            .setNeutralButton("Remove PIN") { _, _ -> savePin(code, tok, "") }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun savePin(code: String, tok: String, pin: String) {
+        if (pin.isNotBlank() && !pin.matches(Regex("^[0-9]{4,12}$"))) {
+            toast("PIN must be 4–12 digits"); return
+        }
+        thread {
+            val ok = api.setPin(code, tok, pin)
+            if (ok) pinSet = pin.isNotBlank()
+            ui {
+                refreshPinLabel()
+                setStatus(if (ok) (if (pin.isBlank()) "Unattended access OFF" else "Unattended access ON — share code + PIN")
+                    else "PIN update failed", if (ok && pin.isNotBlank()) "#22c55e" else "#f59e0b")
+            }
+        }
+    }
+
+    private fun refreshPinLabel() {
+        runCatching {
+            pinLink.text = if (pinSet) "🔒 Unattended access PIN — ON ✓" else "🔒 Set unattended-access PIN"
+            pinLink.setTextColor(Color.parseColor(if (pinSet) "#22c55e" else "#475569"))
+        }
+    }
+
+    // PIN/trusted auto-accept already passed server-side — Android's only
+    // remaining gate is the MediaProjection consent, so ask for it directly.
+    // Without this prompt the viewer's offer parked forever (auto-accept
+    // looked "connected" but nothing ever streamed).
+    private fun promptUnattendedConsent(name: String) {
+        if (unattendedPrompted) return
+        unattendedPrompted = true
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Unattended connection")
+            .setMessage("$name connected with your PIN / trusted access.\n\n" +
+                "Android needs one tap to allow screen sharing — tap Allow to start the session.")
+            .setPositiveButton("Allow") { _, _ ->
+                unattendedPrompted = false
+                unattendedConsent = true
+                respondedAtMs = System.currentTimeMillis()
+                pendingProjection = true
+                setStatus("Requesting screen capture permission…", "#f59e0b")
+                val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                startActivityForResult(mpm.createScreenCaptureIntent(), 1001)
+            }
+            .setNegativeButton("End session") { _, _ -> unattendedPrompted = false; endSession() }
+            .setOnCancelListener { unattendedPrompted = false }
+            .show()
+    }
+
+    // Viewer-side PIN hint — most users never need it; explain when they do.
+    private fun showPinHelp() {
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("What is the PIN?")
+            .setMessage("Leave it EMPTY for normal connections — the host just taps Accept.\n\n" +
+                "The PIN is only for UNATTENDED devices: the host sets a secret PIN on their " +
+                "device so trusted people can connect anytime, without anyone being there to accept.\n\n" +
+                "Example: your office PC has PIN 4821 → from home you type its code + 4821 and you're in instantly.")
+            .setPositiveButton("Got it", null)
             .show()
     }
 
@@ -397,19 +461,19 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply { text = "⚙ Settings"; setTextColor(fg); textSize = 20f; typeface = Typeface.DEFAULT_BOLD })
         head("Incoming requests (host)")
         sw("vibrate_req", true, "Vibrate on request", "Buzz when someone asks to connect")
-        sw("def_viewonly", false, "Accept as view-only by default", "Viewer can watch but not touch")
+        sw("def_viewonly", true, "Accept as view-only by default", "Viewer can watch but not touch — untick to default to full control")
         sw("def_trust", false, "Always trust by default", "Skip approval for known devices next time")
         sw("keep_awake", false, "Keep screen awake", "Prevent sleep while BMyDesk is open")
         head("When I connect to another device")
         sw("auto_landscape", true, "Auto-rotate for wide screens", "Landscape for PC desktops, portrait for phones")
         sw("clip_sync", true, "Clipboard sync", "Copy here, paste there (and back)")
-        act("Default quality: " + (sp.getString("def_quality", "auto") ?: "auto").uppercase(), "Tap to cycle Auto → HD → SD") {
-            val n = when (sp.getString("def_quality", "auto")) { "auto" -> "hd"; "hd" -> "sd"; else -> "auto" }
-            sp.edit().putString("def_quality", n).apply(); toast("Default quality: ${n.uppercase()}")
+        act("Default quality: " + qLabel(sp.getString("def_quality", "auto") ?: "auto"), "Tap to cycle Auto → HD → Full HD → SD") {
+            val n = when (sp.getString("def_quality", "auto")) { "auto" -> "hd"; "hd" -> "fhd"; "fhd" -> "sd"; else -> "auto" }
+            sp.edit().putString("def_quality", n).apply(); toast("Default quality: ${qLabel(n)}")
         }
         head("Permissions & reliability")
-        act("Remote-control access", "Open Accessibility settings (needed to let viewers tap/type)") { runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
-        act("Battery optimisation", "Exempt BMyDesk so your code stays reachable") { runCatching { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
+        act("Remote-control access", if (RemoteControlService.enabled()) "ON ✓ — viewers can control this device" else "OFF — viewers can only watch (tap to fix)") { showAccessibilityGuide() }
+        act("Battery optimisation", "Keep BMyDesk reachable in background — tap to fix") { checkBatteryExemption(true) }
         act("Notifications", "Manage alert settings") {
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)) }
         }
@@ -534,7 +598,7 @@ class MainActivity : Activity() {
         }
         reqBox.addView(reqName)
         chkViewOnly = android.widget.CheckBox(this).apply {
-            text = "View only — they can't control this device"
+            text = "View only — watch but can't control\n(unticked = full control — they can tap & type)"
             setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
         }
         chkTrust = android.widget.CheckBox(this).apply {
@@ -600,6 +664,12 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
         }
         remoteCard.addView(remotePinInput)
+        remoteCard.addView(TextView(this).apply {
+            text = "ⓘ PIN is only for unattended devices — tap to learn more"
+            setTextColor(Color.parseColor("#475569")); textSize = 11f
+            setPadding(4, 8, 4, 0)
+            setOnClickListener { showPinHelp() }
+        })
         col.addView(remoteCard)
 
         // ── Account: sign in with BMyDesk workspace credentials ──
@@ -649,12 +719,13 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#64748b")); textSize = 12f; gravity = Gravity.CENTER
             setPadding(0, 24, 0, 0)
         })
-        col.addView(TextView(this).apply {
+        pinLink = TextView(this).apply {
             text = "🔒 Set unattended-access PIN"
             setTextColor(Color.parseColor("#475569")); textSize = 12f; gravity = Gravity.CENTER
             setPadding(0, 10, 0, 0)
             setOnClickListener { promptUnattendedPin() }
-        })
+        }
+        col.addView(pinLink)
         col.addView(TextView(this).apply {
             text = "⧉ Share invite link"
             setTextColor(Color.parseColor("#475569")); textSize = 12f; gravity = Gravity.CENTER
@@ -681,6 +752,10 @@ class MainActivity : Activity() {
         }
         sessRow.addView(mbtn("💬 Chat", Color.parseColor("#1e293b"), 12f) { toggleChat() })
         sessRow.addView(mbtn("📎 Send file", Color.parseColor("#1e293b"), 12f) { pickFile() }, lpGap())
+        // mid-session control switch — accepted view-only but want to hand over
+        // the keyboard? or took control back? one tap, no rejoin needed.
+        viewOnlyLiveBtn = mbtn("👁 View only", Color.parseColor("#1e293b"), 12f) { toggleViewOnlyLive() }
+        sessRow.addView(viewOnlyLiveBtn, lpGap())
         col.addView(sessRow)
 
         // ── Fullscreen viewer pane (remote screen + touch control) ──
@@ -715,10 +790,10 @@ class MainActivity : Activity() {
                 .setPositiveButton("Reboot") { _, _ -> activeCtl()?.sendReboot() }
                 .setNegativeButton("Cancel", null).show()
         }, lpGap(6))
-        // quality toggle — cycles Auto → SD → HD; on slow nets SD is smoother
+        // quality toggle — cycles Auto → SD → HD → FHD; on slow nets SD is smoother
         vQualityBtn = mbtn("Auto", Color.parseColor("#1e293b"), 12f) {
-            vQuality = when (vQuality) { "auto" -> "sd"; "sd" -> "hd"; else -> "auto" }
-            vQualityBtn.text = vQuality.replaceFirstChar { it.uppercase() }
+            vQuality = when (vQuality) { "auto" -> "sd"; "sd" -> "hd"; "hd" -> "fhd"; else -> "auto" }
+            vQualityBtn.text = qLabel(vQuality)
             remoteViewer?.ctl?.sendQuality(vQuality)
         }
         vSessRow.addView(vQualityBtn, lpGap(6))
@@ -813,6 +888,7 @@ class MainActivity : Activity() {
     private lateinit var vFitBtn: Button
     private var vQuality = "auto"
     private var fillMode = false
+    private fun qLabel(q: String) = when (q) { "sd" -> "SD"; "hd" -> "HD"; "fhd" -> "FHD"; else -> "Auto" }
 
     /** Switch the surface between whole-screen fit and edge-cropped fill. */
     private fun applyViewMode() {
@@ -842,6 +918,28 @@ class MainActivity : Activity() {
     private fun toggleChat() {
         chatPanel.visibility = if (chatPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         chatCount = 0
+    }
+
+    // ── Host-side control switch: view-only ↔ full control, mid-session ──
+    private lateinit var viewOnlyLiveBtn: Button
+    @Volatile private var viewOnlyLive = false
+
+    private fun setViewOnlyLive(on: Boolean) {
+        viewOnlyLive = on
+        RemoteControlService.blocked = on
+        service?.ctl()?.sendViewOnly(on)
+        if (::viewOnlyLiveBtn.isInitialized) {
+            viewOnlyLiveBtn.text = if (on) "✏️ Allow control" else "👁 View only"
+            viewOnlyLiveBtn.background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (on) "#f43f5e" else "#1e293b"))
+                cornerRadius = dp(14).toFloat()
+            }
+        }
+    }
+    private fun toggleViewOnlyLive() {
+        setViewOnlyLive(!viewOnlyLive)
+        chatAppend("System", if (viewOnlyLive) "Remote input blocked — viewer is view-only"
+            else "Remote input enabled — viewer has full control", false)
     }
 
     private fun chatAppend(from: String, text: String, mine: Boolean) {
@@ -1039,6 +1137,7 @@ class MainActivity : Activity() {
 
     // ── Special keys + typing to the remote ──
     private fun sendKey(code: String) {
+        if (vLocked) return
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", true) })
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", false) })
     }
@@ -1158,41 +1257,86 @@ class MainActivity : Activity() {
         val last = prefs.getLong("access_prompted_at", 0L)
         if (System.currentTimeMillis() - last < 24 * 3600_000L) return
         prefs.edit().putLong("access_prompted_at", System.currentTimeMillis()).apply()
+        ui { showAccessibilityGuide() }
+    }
+
+    // The toggle is buried deep in settings — show exactly where "BMyDesk
+    // Agent" lives instead of dumping users into a huge list with no context.
+    private fun showAccessibilityGuide() {
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Enable remote control — 4 steps")
+            .setMessage(
+                "Remote control lets a viewer tap, type and scroll on this device.\n\n" +
+                "1. Tap \"Open settings\" below\n" +
+                "2. Find \"BMyDesk Agent\" in the list (under Downloaded/Installed services)\n" +
+                "3. Switch it ON\n" +
+                "4. Tap \"Allow\" on the confirmation dialog\n\n" +
+                "Example path: Settings → Accessibility → Downloaded apps → BMyDesk Agent → ON\n\n" +
+                "Without it, sessions stay view-only.")
+            .setPositiveButton("Open settings") { _, _ ->
+                runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            }
+            .setNegativeButton("Later", null)
+            .show()
+    }
+
+    // Battery optimization kills background agents — keep prompting (once a
+    // day) until the exemption is actually ON, then never again. On Xiaomi/
+    // Oppo/Vivo/etc. the stock toggle isn't enough — those phones also need
+    // the OEM "autostart/background" switch, so we surface it when present.
+    private fun checkBatteryExemption(fromSettings: Boolean = false) {
+        val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val exempt = android.os.Build.VERSION.SDK_INT < 23 ||
+            runCatching { pm.isIgnoringBatteryOptimizations(packageName) }.getOrDefault(false)
+        if (exempt) { if (fromSettings) toast("Battery exemption already ON ✓"); return }
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        if (!fromSettings && System.currentTimeMillis() - prefs.getLong("batt_prompt_at", 0L) < 24 * 3600_000L) return
+        prefs.edit().putLong("batt_prompt_at", System.currentTimeMillis()).apply()
         ui {
-            android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle("Enable remote control?")
-                .setMessage("Viewers can tap and control this device if you enable the BMyDesk accessibility service. Without it sessions are view-only.\n\nTurn on 'BMyDesk Agent' in the list that opens.")
-                .setPositiveButton("Enable") { _, _ ->
-                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            val dlg = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Keep BMyDesk reachable in background")
+                .setMessage("Battery optimization can pause the agent — your code then looks offline and unattended access stops working.\n\n" +
+                    "Step 1: tap \"Exempt now\" and choose Allow on the system dialog.\n" +
+                    (if (oemAutostartIntent() != null) "Step 2: this phone also needs \"Autostart\" enabled — tap \"Autostart settings\".\n" else "") +
+                    "\nTakes ~10 seconds.")
+                .setPositiveButton("Exempt now") { _, _ ->
+                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:$packageName"))) }
+                        .onFailure { runCatching { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
                 }
-                .setNegativeButton("View only", null)
-                .show()
+                .setNegativeButton("Later", null)
+            if (oemAutostartIntent() != null) dlg.setNeutralButton("Autostart settings") { _, _ -> openOemAutostart() }
+            dlg.show()
         }
     }
 
-    // Battery optimization kills background agents — ask once to exempt.
-    private fun promptBatteryOnce() {
-        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("batt_prompted", false)) return
-        prefs.edit().putBoolean("batt_prompted", true).apply()
-        thread {
-            Thread.sleep(4000) // let registration settle first
-            ui {
-                runCatching {
-                    val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
-                    if (android.os.Build.VERSION.SDK_INT >= 23 && !pm.isIgnoringBatteryOptimizations(packageName)) {
-                        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                            .setTitle("Keep BMyDesk reachable")
-                            .setMessage("Battery optimization can put the agent to sleep. Exempt it so your code stays reachable?")
-                            .setPositiveButton("Exempt") { _, _ ->
-                                runCatching { startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:$packageName"))) }
-                            }
-                            .setNegativeButton("Later", null)
-                            .show()
-                    }
-                }
-            }
-        }
+    // OEM-specific autostart/background screens (stock Android has no such
+    // thing). First resolvable intent wins; null = nothing extra to do.
+    private fun oemAutostartIntent(): Intent? {
+        val tries = listOf(
+            // Xiaomi / MIUI — the biggest offender for killed background apps
+            Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+            // Oppo / Realme (ColorOS)
+            Intent().setComponent(ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")),
+            Intent().setComponent(ComponentName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity")),
+            // Vivo / iQOO
+            Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")),
+            Intent().setComponent(ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")),
+            // Huawei / Honor
+            Intent().setComponent(ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")),
+            Intent().setComponent(ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity")),
+            // OnePlus
+            Intent().setComponent(ComponentName("com.oneplus.security", "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity")),
+            // Samsung (sleeping-apps battery screen)
+            Intent().setComponent(ComponentName("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity")),
+            // Asus
+            Intent().setComponent(ComponentName("com.asus.mobilemanager", "com.asus.mobilemanager.autostart.AutoStartActivity")),
+        )
+        return tries.firstOrNull { runCatching { it.resolveActivity(packageManager) != null }.getOrDefault(false) }
+    }
+    private fun openOemAutostart() {
+        val i = oemAutostartIntent()
+        if (i != null) runCatching { startActivity(i) }
+        else runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }
     }
 
     private fun ui(block: () -> Unit) = runOnUiThread(block)
@@ -1348,6 +1492,8 @@ class MainActivity : Activity() {
                     if (s?.get("ok")?.asBoolean == true) {
                         val st = s.get("status").s()
                         val vj = s.get("viewer_joined_at").s()
+                        val pset = s.get("pin_set")?.asBoolean == true
+                        if (pset != pinSet) { pinSet = pset; ui { refreshPinLabel() } }
                         // show while the server says 'connecting' — no age
                         // cutoff (a >2min request still needs an answer)
                         if (st == "connecting" && vj != null) {
@@ -1358,6 +1504,17 @@ class MainActivity : Activity() {
                                     reqBox.visibility = View.VISIBLE
                                     setStatus("Connection request…", "#f59e0b")
                                 }
+                            }
+                        } else if (st == "active" && service == null && !pendingProjection && vj != null) {
+                            // Unattended join (PIN or trusted device) — the
+                            // server already accepted; Android still needs the
+                            // one-tap MediaProjection consent. Without this
+                            // branch the viewer's offer parked forever — the
+                            // "PIN doesn't work" bug.
+                            val joinMs = runCatching { java.time.Instant.parse(vj).toEpochMilli() }.getOrDefault(0L)
+                            if (joinMs > respondedAtMs && System.currentTimeMillis() - joinMs < 120_000
+                                && reqBox.visibility != View.VISIBLE && !unattendedPrompted) {
+                                ui { promptUnattendedConsent(s.get("viewer").s() ?: "A viewer") }
                             }
                         } else if (st != "connecting" && reqBox.visibility == View.VISIBLE && service == null) {
                             ui { reqBox.visibility = View.GONE }
@@ -1413,8 +1570,10 @@ class MainActivity : Activity() {
         if (requestCode != 1001) return
         if (resultCode != RESULT_OK || data == null) {
             pendingProjection = false
-            respondTo("reject")
-            setStatus("Capture permission denied", "#ef4444")
+            // an auto-accepted (PIN/trusted) session can't be 'rejected' —
+            // the server already made it active; deny = end it outright.
+            if (unattendedConsent) { unattendedConsent = false; endSession() }
+            else { respondTo("reject"); setStatus("Capture permission denied", "#ef4444") }
             return
         }
         // start FGS first (Android 14 requirement) then hand over the projection intent
@@ -1426,6 +1585,7 @@ class MainActivity : Activity() {
         startService(svc)
         pendingProjection = false
         respondTo("accept")
+        unattendedConsent = false
         if (pendingTrust) {
             val vd = pendingVDevice!!; val vn = pendingVName
             reg?.let { r -> thread { api.trust(r.code, r.agentToken, vd, vn) } }
@@ -1462,7 +1622,10 @@ class MainActivity : Activity() {
     }
 
     private fun endSession() {
+        setViewOnlyLive(false)
         RemoteControlService.blocked = false
+        unattendedPrompted = false
+        unattendedConsent = false
         resetAcceptOptions()
         reg?.let { thread { api.end(it.code, it.agentToken) } }
         signaling.send("end", JsonObject())
@@ -1683,7 +1846,7 @@ class MainActivity : Activity() {
             ctl.sink = object : CtlChannel.Sink {
                 override fun onCtlOpen() = ui {
                     vSessRow.visibility = View.VISIBLE; startClipSync()
-                    if (vQuality == "auto") getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("def_quality", "auto")?.let { if (it != "auto") { vQuality = it; vQualityBtn.text = it.replaceFirstChar { c -> c.uppercase() } } }
+                    if (vQuality == "auto") getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("def_quality", "auto")?.let { if (it != "auto") { vQuality = it; vQualityBtn.text = qLabel(it) } }
                     if (vQuality != "auto") remoteViewer?.ctl?.sendQuality(vQuality)
 
                 }
@@ -1701,6 +1864,9 @@ class MainActivity : Activity() {
                 }
                 override fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) =
                     ui { renderFsList(path, items, err) }
+                // host flipped us to watch-only mid-session — the status line
+                // says so and local input stops being sent (host drops it anyway)
+                override fun onViewOnly(on: Boolean) = ui { vLocked = on }
             }
         }
         remoteViewer!!.start(iceServersFrom(j.iceServers))
@@ -1732,6 +1898,7 @@ class MainActivity : Activity() {
 
     @Volatile private var streaming = false
     @Volatile private var lastRttMs = 0
+    @Volatile private var vLocked = false // host put this session in view-only
     private fun startSessTimer() {
         streaming = true
         if (liveSince != 0L) return
@@ -1743,7 +1910,8 @@ class MainActivity : Activity() {
                 if (streaming) {
                     val s = (System.currentTimeMillis() - liveSince) / 1000
                     if (s % 3 == 0L) remoteViewer?.rtt { ms -> lastRttMs = ms }
-                    viewerStatus.text = "Live — touch to control · %d:%02d".format(s / 60, s % 60) +
+                    viewerStatus.text = (if (vLocked) "👁 View-only — watch only · %d:%02d"
+                        else "Live — touch to control · %d:%02d").format(s / 60, s % 60) +
                         (if (lastRttMs > 0) " · ${lastRttMs}ms" else "")
                 }
                 sessTicker.postDelayed(this, 1000)
@@ -1772,6 +1940,7 @@ class MainActivity : Activity() {
     }
 
     private fun sendMouse(t: String, x: Float, y: Float, b: Int = 0) {
+        if (vLocked) return
         val v = remoteSurface ?: return
         val p = mapTouch(v.width.toFloat(), v.height.toFloat(), x, y) ?: Pair(x / v.width, y / v.height)
         remoteViewer?.sendInput(JsonObject().apply {
@@ -1910,7 +2079,7 @@ class MainActivity : Activity() {
         remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }
         remoteSurface = null
         offerTimeout?.let { sessTicker.removeCallbacks(it) }
-        streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0
+        streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0; vLocked = false
         closeLiveKb()
         fillMode = false; vFitBtn.text = "⛶ Fill"
         requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -1920,6 +2089,47 @@ class MainActivity : Activity() {
         viewerPane.visibility = View.GONE
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
         vProgReset()
+    }
+
+    // Back exits the remote view first; on the home card offer a quick
+    // "how was the app" rating before quitting (once a week max — never naggy).
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (viewerPane.visibility == View.VISIBLE) { exitViewer(); return }
+        maybeRateThenExit()
+    }
+
+    private fun maybeRateThenExit() {
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        if (System.currentTimeMillis() < prefs.getLong("rate_next_at", 0L)) { finish(); return }
+        prefs.edit().putLong("rate_next_at", System.currentTimeMillis() + 7L * 24 * 3600_000L).apply()
+        var stars = 0
+        val wrap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(4), dp(20), 0) }
+        val starRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        val starTvs = (1..5).map {
+            TextView(this).apply {
+                text = "☆"; textSize = 32f
+                setTextColor(Color.parseColor("#fbbf24")); setPadding(dp(7), 0, dp(7), 0)
+            }
+        }
+        fun paintStars() { starTvs.forEachIndexed { i, tv -> tv.text = if (i < stars) "★" else "☆" } }
+        starTvs.forEachIndexed { i, tv -> tv.setOnClickListener { stars = i + 1; paintStars() }; starRow.addView(tv) }
+        val fbInput = android.widget.EditText(this).apply {
+            hint = "Anything to add? (optional)"; textSize = 13f
+            setHintTextColor(Color.parseColor("#64748b")); setTextColor(Color.WHITE)
+        }
+        wrap.addView(starRow); wrap.addView(fbInput)
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("How was BMyDesk?")
+            .setView(wrap)
+            .setPositiveButton("Submit & exit") { _, _ ->
+                val r = stars; val fb = fbInput.text.toString().trim().ifBlank { null }
+                if (r > 0) reg?.let { rr -> thread { api.appRate(rr.code, rr.agentToken, r, fb, "android") } }
+                finish()
+            }
+            .setNeutralButton("Just exit") { _, _ -> finish() }
+            .setNegativeButton("Stay", null)
+            .show()
     }
 
     override fun onDestroy() {

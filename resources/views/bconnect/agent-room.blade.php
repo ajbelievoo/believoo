@@ -28,7 +28,7 @@
             <button id="laserBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Laser pointer"><i class="fas fa-location-arrow mr-1"></i></button>
             <button id="fsOpenBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Browse remote files"><i class="fas fa-folder-open mr-1"></i></button>
             <select id="qualitySel" title="Quality" class="bc-btn bc-btn-secondary text-sm hidden" style="padding:4px 8px;">
-                <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
+                <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option><option value="fhd">Full HD</option>
             </select>
             <button id="fullscreenBtn" class="bc-btn bc-btn-secondary text-sm"><i class="fas fa-expand mr-1"></i>Fullscreen</button>
             <input type="file" id="fileInput" class="hidden">

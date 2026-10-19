@@ -214,6 +214,7 @@ function applyQuality(mode) {
     const e = p.encodings[0];
     if (mode === 'sd') { e.maxBitrate = 1200000; e.scaleResolutionDownBy = 2; e.maxFramerate = 20; }
     else if (mode === 'hd') { e.maxBitrate = 9000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    else if (mode === 'fhd') { e.maxBitrate = 14000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
     else { e.maxBitrate = 4000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
     sender.setParameters(p).catch(() => {});
     dbg('quality: ' + mode);

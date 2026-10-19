@@ -26,5 +26,7 @@ contextBridge.exposeInMainWorld('agent', {
     installUpdate: () => ipcRenderer.send('update-install'),
     onAuth: (cb) => ipcRenderer.on('agent-auth', (_e, d) => cb(d)),
     onConnect: (cb) => ipcRenderer.on('agent-connect', (_e, d) => cb(d)),
+    onCsat: (cb) => ipcRenderer.on('csat-check', () => cb()),
+    csatDone: () => ipcRenderer.send('csat-done'),
     platform: process.platform,
 });

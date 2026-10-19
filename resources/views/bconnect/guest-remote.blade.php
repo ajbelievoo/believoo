@@ -69,12 +69,17 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
         <input class="code-input" id="codeInput" maxlength="8" placeholder="CODE" autocomplete="off" spellcheck="false" value="{{ $prefillCode ?? '' }}">
         <input class="name-input" id="noteInput" maxlength="120" placeholder="Purpose — e.g. fixing printer (optional)" style="margin-top:10px">
         <input class="name-input" id="pinInput" maxlength="12" inputmode="numeric" placeholder="PIN — only for unattended devices" style="margin-top:10px;font-family:monospace;letter-spacing:3px">
+        <p class="hint" style="margin-top:6px;text-align:left;">ⓘ Leave the PIN empty for a normal connection — the host taps Accept. It's only needed if the host gave you an unattended-access PIN (connects instantly, no approval).</p>
         <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;text-align:left;font-size:12px;color:#94a3b8;cursor:pointer;">
             <input type="checkbox" id="consentCk" style="margin-top:2px;accent-color:#22d3ee;">
             <span>I understand the remote user may see and control this device's screen during the session, and the session may be logged by the workspace.</span>
         </label>
         <br>
         <button class="btn" id="joinBtn">Connect</button>
+        <p class="hint" style="margin-top:14px;">For the best performance — lower latency and full control — use the BMyDesk app:
+            <a href="/dl/agent.apk" style="color:var(--cyan);text-decoration:none;">Android</a> ·
+            <a href="/dl/agent.exe" style="color:var(--cyan);text-decoration:none;">Windows</a>
+        </p>
         <div id="recentRow" style="margin-top:12px;display:none;text-align:center;"></div>
         <div class="err" id="joinErr"></div>
         <div class="dbg" id="joinDbg"></div>
@@ -121,8 +126,9 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             <button class="endbtn" id="laserBtn" title="Laser pointer — move mouse to point" style="background:#1e293b;color:#e2e8f0;display:none;">🔴</button>
             <button class="endbtn" id="fsOpenBtn" title="Browse remote files" style="background:#1e293b;color:#e2e8f0;display:none;">📂</button>
             <select id="qualitySel" title="Quality" style="background:#1e293b;border:0;color:#94a3b8;font-size:11px;padding:5px;border-radius:6px;display:none;">
-                <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option>
+                <option value="auto">Auto</option><option value="sd">SD</option><option value="hd">HD</option><option value="fhd">Full HD</option>
             </select>
+            <span id="vonlyBadge" title="The host set this session to view-only — your input is locked" style="display:none;background:#7f1d1d;color:#fecaca;font-size:11px;padding:4px 8px;border-radius:6px;">👁 view-only</span>
             <button class="endbtn" id="endBtn">End session</button>
             <input type="file" id="fileInput" style="display:none">
             <input type="text" id="mobKbd" autocomplete="off" autocorrect="off" autocapitalize="none" style="position:fixed;bottom:-60px;left:0;width:2px;height:2px;opacity:.01;border:0;z-index:-1">
@@ -466,7 +472,7 @@ async function onCtlMessage(e) {
             else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
             else if (m.t === 'file-cancel') { rxFile = null; setProg(null); addChat('System', 'Transfer cancelled by peer', false); }
             else if (m.t === 'cmd-out') addChat('Host ▸', m.out || '(no output)', false);
-            else if (m.t === 'view-only') addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
+            else if (m.t === 'view-only') { addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false); $('vonlyBadge').style.display = m.on ? 'inline-block' : 'none'; }
             else if (m.t === 'fs-list') renderFsList(m);
         } else if (rxFile) {
             rxFile.chunks.push(e.data); rxFile.got += e.data.byteLength;

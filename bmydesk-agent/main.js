@@ -94,9 +94,24 @@ function createWindow() {
     });
     win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
     win.on('close', (e) => {
-        if (!isQuitting && tray) { e.preventDefault(); win.hide(); }
+        if (!isQuitting && tray) {
+            e.preventDefault();
+            // "How was the app?" — ask the renderer once; it replies
+            // 'csat-done' right away (not due) or after the rating overlay.
+            if (!csatArmed) {
+                csatArmed = true; csatAnswered = false;
+                try { win.webContents.send('csat-check'); }
+                catch (err) { csatAnswered = true; }
+                // dead renderer / ignored prompt — never trap the close
+                setTimeout(() => { if (!csatAnswered) { csatArmed = false; win?.hide(); } }, 30000);
+            } else win.hide();
+        }
     });
 }
+
+// quit-CSAT handshake — see the close handler above
+let csatArmed = false, csatAnswered = false;
+ipcMain.on('csat-done', () => { csatAnswered = true; csatArmed = false; win?.hide(); });
 
 app.whenReady().then(() => {
     if (!gotLock) return; // another instance owns the protocol — it got the argv

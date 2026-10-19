@@ -172,15 +172,25 @@ class WebRtcHost(context: Context) {
     /** Viewer quality toggle — retune the capture instead of leaving it hot. */
     fun setQuality(mode: String) {
         if (capW == 0 || capH == 0) return
-        val (scale, fps) = when (mode) {
-            "sd" -> 0.5f to 8
-            "hd" -> 1.0f to 20
-            else -> 1.0f to 15
+        val (scale, fps, kbps) = when (mode) {
+            "sd" -> Triple(0.5f, 8, 1500)
+            "hd" -> Triple(1.0f, 20, 9000)
+            "fhd" -> Triple(1.0f, 30, 14000)
+            else -> Triple(1.0f, 15, 8000) // auto
         }
         runCatching {
             capturer?.changeCaptureFormat(
                 (capW * scale).toInt().coerceAtLeast(320),
                 (capH * scale).toInt().coerceAtLeast(240), fps)
+        }
+        // cap the encoder bitrate to match — 'fhd' needs headroom or text
+        // smears, 'sd' must stay small or the point of the mode is lost.
+        runCatching {
+            peer?.senders?.firstOrNull { it.track()?.kind() == "video" }?.let { snd ->
+                val prm = snd.parameters
+                prm.encodings.forEach { it.maxBitrateBps = kbps * 1000 }
+                snd.parameters = prm
+            }
         }
     }
 

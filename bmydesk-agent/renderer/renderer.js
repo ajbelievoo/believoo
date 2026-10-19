@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.19';
+const APP_VERSION = '1.3.20';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -22,7 +22,7 @@ let pusher = null, ch = null, pc = null, stream = null, dcIn = null;
 let iceQueue = [];
 
 // ── Settings store (persisted, every key is honoured somewhere below) ──
-const CFG_DEFAULTS = { sound: true, flash: true, permClip: true, permFiles: true, permCmd: false, viewOnlyDef: false,
+const CFG_DEFAULTS = { sound: true, flash: true, permClip: true, permFiles: true, permCmd: false, viewOnlyDef: true,
     watermark: true, autoPrivacy: false, quality: 'auto', clipViewer: true };
 // ── Session history (local) ──
 let histCur = null;
@@ -249,6 +249,15 @@ function startStatusPoll() {
             if (d.status !== 'connecting' && $('reqBox') && !$('reqBox').classList.contains('hidden') && !pc) {
                 $('reqBox').classList.add('hidden');
             }
+            // unattended join (PIN / trusted device): the server already
+            // accepted — the offer arrives next; auto-pick the first display
+            // instead of blocking on the screen picker.
+            if (joinMs && joinMs > respondedAt && d.status === 'active' && !pc && Date.now() - joinMs < 120000) {
+                unattendedJoin = true;
+                setStatus('Unattended viewer connecting…', 'wait');
+            }
+            // PIN badge under the code — live status, not just after saving
+            if (typeof d.pin_set === 'boolean' && d.pin_set !== pinSet) { pinSet = d.pin_set; refreshPinLink(); }
             // drain queued signals — this is the full ws-free signaling path
             const sr = await fetch(`${API}/${session.session_code}/signals`, {
                 headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
@@ -264,7 +273,11 @@ function stopStatusPoll() { if (statusPoller) { clearInterval(statusPoller); sta
 // One place that surfaces "someone wants in" — used by the ws whisper, the
 // HTTP drain ('join-request' queued server-side), and the /status poll.
 let reqViewerDev = null, lastReqName = '';
+// auto-accepted join (PIN/trusted) in flight — consumed by pickScreen so an
+// unattended viewer never stalls on the display picker.
+let unattendedJoin = false;
 function showJoinReq(name, note, vdevice) {
+    unattendedJoin = false; // a manual knock supersedes any stale auto-accept flag
     // a NEW viewer is knocking — whatever peer we still hold is a dead leftover
     // (viewer vanished without an 'end'); drop it or this device stays stuck
     // until the app is restarted.
@@ -352,6 +365,9 @@ function dispatchHostSignal(m) {
 async function pickScreen() {
     const sources = await window.agent.getScreenSources();
     const box = $('screenPick');
+    // unattended (PIN/trusted) join — nobody is at the keyboard to pick a
+    // display, so take the primary one automatically.
+    if (unattendedJoin) { unattendedJoin = false; return sources[0]?.id; }
     if (sources.length <= 1) return sources[0]?.id;
     box.innerHTML = '';
     box.classList.remove('hidden');
@@ -555,7 +571,11 @@ async function onCtlMessage(e) {
             else if (m.t === 'file-meta') { if (!hostGuard(perm.files, 'file')) { ctlSend({ t: 'file-cancel' }); return; } rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
             else if (m.t === 'file-cancel') { rxFile = null; fileProg(null); addChat('System', 'Transfer cancelled by peer', false); }
             else if (m.t === 'cmd-out') { addChat('Host ▸', m.out || '(no output)', false); }
-            else if (m.t === 'view-only') { addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false); }
+            else if (m.t === 'view-only') {
+                addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
+                const b = $('vOnlyBadge'); if (b) b.style.display = m.on ? 'inline-block' : 'none';
+                if (m.on) vStatus('View-only — you can watch but not control');
+            }
             else if (m.t === 'fs-list') { renderFsList(m); }
             else if (m.t === 'laser') { try { window.agent?.laser(!m.off, m.x, m.y); } catch (x) {} }
             // host-side actions — ignored while WE are the viewer
@@ -645,6 +665,7 @@ function applyQuality(mode) {
     const e = p.encodings[0];
     if (mode === 'sd') { e.maxBitrate = 1200000; e.scaleResolutionDownBy = 2; e.maxFramerate = 20; }
     else if (mode === 'hd') { e.maxBitrate = 9000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
+    else if (mode === 'fhd') { e.maxBitrate = 14000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
     else { e.maxBitrate = 8000000; e.scaleResolutionDownBy = 1; e.maxFramerate = 30; }
     sender.setParameters(p).catch(() => {});
     hdbg('quality: ' + mode);
@@ -1443,12 +1464,25 @@ $('saveDeviceLink').onclick = async (e) => {
 
 // Unattended access — set a device PIN; viewers with code+PIN connect
 // without approval. PIN is stored server-side keyed by device_id.
-$('pinLink').onclick = async (e) => {
+// NOTE: window.prompt() does NOT exist in Electron — this is a real modal.
+let pinSet = false;
+function refreshPinLink() {
+    const l = $('pinLink'); if (l) l.textContent = pinSet ? '🔒 unattended access — ON ✓' : '🔒 unattended access';
+}
+$('pinLink').onclick = (e) => {
     e.preventDefault();
     if (!session) return;
-    const pin = prompt('Set unattended-access PIN (4-12 digits).\nLeave empty to REMOVE unattended access:', '');
-    if (pin === null) return;
-    if (pin !== '' && !/^[0-9]{4,12}$/.test(pin)) { setStatus('PIN must be 4-12 digits', 'off'); return; }
+    $('pinInput').value = ''; $('pinErr').textContent = '';
+    $('pinDlg').classList.remove('hidden');
+    $('pinInput').focus();
+};
+$('pinCancel').onclick = () => $('pinDlg').classList.add('hidden');
+$('pinSave').onclick = () => savePin($('pinInput').value.trim());
+$('pinRemove').onclick = () => savePin('');
+$('pinInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') savePin($('pinInput').value.trim()); });
+async function savePin(pin) {
+    if (!session) return;
+    if (pin !== '' && !/^[0-9]{4,12}$/.test(pin)) { $('pinErr').textContent = 'PIN must be 4–12 digits'; return; }
     try {
         const r = await fetch(`${API}/${session.session_code}/set-pin`, {
             method: 'POST',
@@ -1457,6 +1491,8 @@ $('pinLink').onclick = async (e) => {
         });
         const d = await r.json();
         if (d.ok) {
+            $('pinDlg').classList.add('hidden');
+            pinSet = !!d.pin_set; refreshPinLink();
             setStatus(d.pin_set ? 'Unattended access ON' : 'Unattended access OFF', d.pin_set ? 'on' : 'wait');
             // A PIN is useless if the app isn't running after a reboot —
             // offer start-at-login right here, once.
@@ -1468,9 +1504,9 @@ $('pinLink').onclick = async (e) => {
                 }
             }
         }
-        else setStatus(d.error || 'PIN failed', 'off');
-    } catch (err) { setStatus('PIN update failed', 'off'); }
-};
+        else $('pinErr').textContent = d.error || 'PIN failed';
+    } catch (err) { $('pinErr').textContent = 'PIN update failed'; }
+}
 
 // Manual "new code" — clears the device identity so the next register mints
 // a fresh code. Without this, the code stays permanent (AnyDesk-style).
@@ -1601,3 +1637,37 @@ setInterval(checkUpdate, 3600000);
     $('cfgOpenWeb').onclick = () => window.agent.openExternal('https://bmydesk.believoo.com');
     $('cfgOpenHelp').onclick = () => window.agent.openExternal('https://bmydesk.believoo.com/help');
 })();
+
+// ═══════════ "How was the app?" — quit-time rating (main.js asks us on
+// window close; we answer 'csat-done' immediately if not due, or after the
+// user submits/skips the overlay). Once a week max — never naggy. ═══════════
+let csatStars = 0;
+function csatPaint() {
+    $('csatStars').querySelectorAll('span').forEach(s => {
+        s.textContent = parseInt(s.dataset.s) <= csatStars ? '★' : '☆';
+    });
+}
+$('csatStars').querySelectorAll('span').forEach(s => {
+    s.onclick = () => { csatStars = parseInt(s.dataset.s); csatPaint(); };
+});
+function csatFinish() {
+    $('csatOverlay').classList.add('hidden');
+    if (csatStars > 0 && session) {
+        fetch(`${API}/${session.session_code}/app-rate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': 'Bearer ' + session.agent_token },
+            body: JSON.stringify({ rating: csatStars, feedback: $('csatText').value.trim() || undefined, platform: window.agent?.platform || 'desktop' }),
+        }).catch(() => {});
+    }
+    csatStars = 0; csatPaint();
+    try { window.agent.csatDone(); } catch (e) {}
+}
+$('csatSubmit').onclick = csatFinish;
+$('csatSkip').onclick = csatFinish;
+window.agent?.onCsat?.(() => {
+    const next = parseInt(localStorage.getItem('bmd_rate_next_at') || '0', 10);
+    if (Date.now() < next) { try { window.agent.csatDone(); } catch (e) {} return; }
+    // asked → mark the window so it can't re-fire on the next close this week
+    localStorage.setItem('bmd_rate_next_at', String(Date.now() + 7 * 864e5));
+    $('csatOverlay').classList.remove('hidden');
+});
