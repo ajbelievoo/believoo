@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -109,6 +110,14 @@ class MainActivity : Activity() {
                         pendingViewOnly = false
                         setViewOnlyLive(true)
                         chatAppend("System", "View-only session — remote control is locked", false)
+                    }
+                    // without the accessibility service the viewer can only
+                    // WATCH — surface that clearly on both ends
+                    if (!RemoteControlService.enabled()) {
+                        setStatus("⚠ Remote control OFF — enable Accessibility for input", "#f59e0b")
+                        chatAppend("System", "Viewer can't control: enable BMyDesk in Settings → Accessibility. " +
+                            "Tap the bubble → 🔓 to unlock after enabling.", false)
+                        service?.ctl()?.sendChat("system", "⚠ Host hasn't enabled remote-control (Accessibility off) — you can only watch. Ask them to enable BMyDesk in Settings → Accessibility.")
                     }
                 }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
@@ -807,7 +816,7 @@ class MainActivity : Activity() {
         remoteSurface = org.webrtc.SurfaceViewRenderer(this)
         viewerPane.addView(remoteSurface, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
-        val vBar = LinearLayout(this).apply {
+        vBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             setPadding(20, 10, 20, 10); setBackgroundColor(Color.parseColor("#b30f172a")) // translucent float over video
         }
@@ -869,6 +878,8 @@ class MainActivity : Activity() {
             (resources.displayMetrics.widthPixels * 0.40f).toInt(),
             LinearLayout.LayoutParams.WRAP_CONTENT))
         vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { confirmExitViewer() }, lpGap(8))
+        // collapse the bar into the floating button — remote goes full-screen
+        vBar.addView(mbtn("▾", Color.parseColor("#334155"), 12f) { collapseVBar() }, lpGap(6))
         // touchpad cursor — a drawn pointer floating over the remote frame
         padCursor = object : View(this) {
             override fun onDraw(cv: android.graphics.Canvas) {
@@ -893,6 +904,53 @@ class MainActivity : Activity() {
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP))
+        // floating session button — the toolbar collapses into this so the
+        // remote screen is edge-to-edge; tap to fan the controls back out,
+        // they auto-collapse again after a few idle seconds
+        viewerFab = ImageView(this).apply {
+            setImageResource(R.mipmap.ic_launcher)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#0f172a"))
+                setStroke(dp(2), Color.parseColor("#e11d48"))
+            }
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            elevation = 12f; visibility = View.GONE
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                dp(46), dp(46), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(10); marginEnd = dp(10)
+            }
+        }
+        run {
+            var dx = 0f; var dy = 0f; var moved = false
+            viewerFab.setOnTouchListener { v, ev ->
+                val lp = v.layoutParams as android.widget.FrameLayout.LayoutParams
+                when (ev.action) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        dx = ev.rawX; dy = ev.rawY; moved = false; true
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        if (Math.abs(ev.rawX - dx) + Math.abs(ev.rawY - dy) > 12) moved = true
+                        if (moved) {
+                            lp.topMargin = (lp.topMargin + (ev.rawY - dy)).toInt()
+                                .coerceIn(0, viewerPane.height - v.height)
+                            lp.marginEnd = (lp.marginEnd - (ev.rawX - dx)).toInt()
+                                .coerceIn(0, viewerPane.width - v.width)
+                            dx = ev.rawX; dy = ev.rawY
+                            v.layoutParams = lp
+                        }
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP -> {
+                        if (!moved) expandVBar()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+        viewerPane.addView(viewerFab)
         // special-keys row — sits under the viewer bar, toggled by ⌨
         keysRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; visibility = View.GONE
@@ -953,6 +1011,9 @@ class MainActivity : Activity() {
         setContentView(frame)
     }
 
+    private lateinit var vBar: LinearLayout
+    private lateinit var viewerFab: ImageView
+    private var vBarHideRunnable: Runnable? = null
     private lateinit var vSessRow: LinearLayout
     private lateinit var keysRow: LinearLayout
     private lateinit var vQualityBtn: Button
@@ -1010,6 +1071,7 @@ class MainActivity : Activity() {
     private fun setViewOnlyLive(on: Boolean) {
         viewOnlyLive = on
         RemoteControlService.blocked = on
+        SessionBubbleService.viewOnlyState = on
         service?.ctl()?.sendViewOnly(on)
         if (::viewOnlyLiveBtn.isInitialized) {
             viewOnlyLiveBtn.text = if (on) "✏️ Allow control" else "👁 View only"
@@ -1261,9 +1323,19 @@ class MainActivity : Activity() {
 
     private fun toast(t: String) = android.widget.Toast.makeText(this, t, android.widget.Toast.LENGTH_SHORT).show()
 
+    // taps land but do nothing while the host has the session in view-only —
+    // say WHY (throttled) instead of looking dead
+    private var lockToastAt = 0L
+    private fun lockedHint() {
+        val now = System.currentTimeMillis()
+        if (now - lockToastAt < 4000) return
+        lockToastAt = now
+        toast("👁 View-only — the host locked control. Ask them to tap 🔓 in the floating menu.")
+    }
+
     // ── Special keys + typing to the remote ──
     private fun sendKey(code: String) {
-        if (vLocked) return
+        if (vLocked) { lockedHint(); return }
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", true) })
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", false) })
     }
@@ -2018,6 +2090,12 @@ class MainActivity : Activity() {
                     }
                     vStage(100, "Live — touch to control")
                     startSessTimer()
+                    // once live, fold the toolbar into the floating button —
+                    // the remote screen gets the whole display
+                    vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }
+                    val hide = Runnable { collapseVBar() }
+                    vBarHideRunnable = hide
+                    sessTicker.postDelayed(hide, 3000)
                 }
                 override fun onError(message: String) = ui { viewerStatus.text = message }
             }
@@ -2124,7 +2202,7 @@ class MainActivity : Activity() {
     }
 
     private fun sendMouse(t: String, x: Float, y: Float, b: Int = 0) {
-        if (vLocked) return
+        if (vLocked) { lockedHint(); return }
         val v = remoteSurface ?: return
         val p = mapTouch(v.width.toFloat(), v.height.toFloat(), x, y) ?: Pair(x / v.width, y / v.height)
         remoteViewer?.sendInput(JsonObject().apply {
@@ -2145,7 +2223,7 @@ class MainActivity : Activity() {
     private var padMoveAt = 0L
 
     private fun sendPad(t: String, b: Int = 0) {
-        if (vLocked) return
+        if (vLocked) { lockedHint(); return }
         remoteViewer?.sendInput(JsonObject().apply {
             addProperty("t", t); addProperty("x", padCurX); addProperty("y", padCurY); addProperty("b", b)
         })
@@ -2188,6 +2266,8 @@ class MainActivity : Activity() {
         }
         if (!ok) { toast("Peer doesn't support calls — update the other app"); return }
         if (isMic) micOn = next else camOn = next
+        SessionBubbleService.micState = micOn
+        SessionBubbleService.camState = camOn
         // self-preview PIP while our own camera is on (Zoom-style self view)
         if (!isMic) showSelfCam(
             if (next) (if (viewer) remoteViewer?.camVideoTrack() else service?.peer()?.camVideoTrack()) else null)
@@ -2503,16 +2583,32 @@ class MainActivity : Activity() {
         if (remoteViewer != null || vJoin != null) { viewerPane.visibility = View.VISIBLE; enterImmersive() }
     }
 
-    // bubble toolbar taps land here — no UI needed for mic/cam/end
+    // ── viewer toolbar ↔ floating button — full-screen remote, controls on tap ──
+    private fun expandVBar() {
+        vBar.visibility = View.VISIBLE
+        viewerFab.visibility = View.GONE
+        vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }
+        val r = Runnable { collapseVBar() }
+        vBarHideRunnable = r
+        sessTicker.postDelayed(r, 7000) // idle → back to full-screen
+    }
+
+    private fun collapseVBar() {
+        if (remoteViewer == null || !streaming) return // keep bar while connecting/reconnecting
+        vBar.visibility = View.GONE
+        viewerFab.visibility = View.VISIBLE
+    }
+
+    // bubble toolbar taps land here — no UI needed for mic/cam/ctl/end
     private fun onBubbleAction(cmd: String) {
         ui {
             when (cmd) {
-                "mic", "cam" -> {
-                    toggleCall(cmd, viewer = remoteViewer != null)
-                    SessionBubbleService.micState = micOn
-                    SessionBubbleService.camState = camOn
-                }
+                "mic", "cam" -> toggleCall(cmd, viewer = remoteViewer != null)
+                "ctl" -> toggleViewOnlyLive() // host unlocks/locks remote control from the bubble
             }
+            SessionBubbleService.micState = micOn
+            SessionBubbleService.camState = camOn
+            SessionBubbleService.viewOnlyState = viewOnlyLive
         }
     }
 
@@ -2560,6 +2656,8 @@ class MainActivity : Activity() {
         exitImmersive()
         keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
+        vBar.visibility = View.VISIBLE; viewerFab.visibility = View.GONE
+        vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }; vBarHideRunnable = null
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
         chatLog.removeAllViews(); chatTickRows.clear(); unseenChatIds.clear()
         vProgReset()

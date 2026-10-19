@@ -39,8 +39,9 @@ class SessionBubbleService : Service() {
     private var wm: WindowManager? = null
     private var bubble: View? = null
     private var menu: View? = null
-    private var micOn = false
-    private var camOn = false
+    private val micOn get() = micState
+    private val camOn get() = camState
+    private val ctlOn get() = !viewOnlyState
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundNotif()
@@ -170,14 +171,18 @@ class SessionBubbleService : Service() {
         }
         row.addView(menuBtn("⌂", 0xFF334155.toInt()) { runCatching { resumeIntent().send() } })
         row.addView(menuBtn("🎙", if (micOn) 0xFF15803D.toInt() else 0xFF334155.toInt()) {
-            micOn = !micOn; paintMenu(row); actionListener?.invoke("mic")
+            actionListener?.invoke("mic"); paintMenu(row)
         })
         row.addView(menuBtn("📹", if (camOn) 0xFF15803D.toInt() else 0xFF334155.toInt()) {
-            camOn = !camOn; paintMenu(row); actionListener?.invoke("cam")
+            actionListener?.invoke("cam"); paintMenu(row)
+        })
+        // host-side control lock — 🔓 = viewer can control, 👁 = view-only
+        row.addView(menuBtn(if (ctlOn) "🔓" else "👁", if (ctlOn) 0xFF15803D.toInt() else 0xFF7F1D1D.toInt()) {
+            actionListener?.invoke("ctl"); paintMenu(row)
         })
         row.addView(menuBtn("✕", 0xFFDC2626.toInt()) { runCatching { confirmIntent().send() }; toggleMenu(bLp) })
 
-        val mw = (4 * 48 * d + 24 * d).toInt()
+        val mw = (5 * 48 * d + 24 * d).toInt()
         val mx = (bLp.x + bLp.width / 2 - mw / 2).coerceIn(0,
             resources.displayMetrics.widthPixels - mw)
         val my = (bLp.y - (64 * d).toInt()).coerceAtLeast((24 * d).toInt())
@@ -186,7 +191,8 @@ class SessionBubbleService : Service() {
     }
 
     private fun paintMenu(row: android.widget.LinearLayout) {
-        // recolor the two toggle pills after a mic/cam flip
+        // repaints mic/cam/control pills from the ACTIVITY-side truth —
+        // the service just displays the state MainActivity last set
         row.getChildAt(1)?.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(if (micOn) 0xFF15803D.toInt() else 0xFF334155.toInt())
@@ -196,6 +202,14 @@ class SessionBubbleService : Service() {
             shape = GradientDrawable.OVAL
             setColor(if (camOn) 0xFF15803D.toInt() else 0xFF334155.toInt())
             setStroke(3, Color.parseColor("#475569"))
+        }
+        (row.getChildAt(3) as? TextView)?.let {
+            it.text = if (ctlOn) "🔓" else "👁"
+            it.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(if (ctlOn) 0xFF15803D.toInt() else 0xFF7F1D1D.toInt())
+                setStroke(3, Color.parseColor("#475569"))
+            }
         }
     }
 
@@ -214,5 +228,6 @@ class SessionBubbleService : Service() {
         @Volatile var actionListener: ((String) -> Unit)? = null
         @Volatile var micState = false
         @Volatile var camState = false
+        @Volatile var viewOnlyState = false
     }
 }
