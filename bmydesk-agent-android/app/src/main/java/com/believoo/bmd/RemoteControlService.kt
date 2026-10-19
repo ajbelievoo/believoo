@@ -26,6 +26,15 @@ class RemoteControlService : AccessibilityService() {
         // message is dropped while this is on, reset on session end.
         @Volatile var blocked = false
         fun enabled() = instance != null
+
+        /** Authoritative check — reads Settings.Secure so it's true the moment
+            the user flips the toggle, even before the service binds. */
+        fun enabledInSettings(ctx: android.content.Context): Boolean {
+            val flat = android.provider.Settings.Secure.getString(
+                ctx.contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+            return flat.contains(ctx.packageName)
+        }
     }
 
     override fun onServiceConnected() { instance = this }

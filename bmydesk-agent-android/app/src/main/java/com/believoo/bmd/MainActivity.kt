@@ -113,13 +113,17 @@ class MainActivity : Activity() {
                         chatAppend("System", "View-only session — remote control is locked", false)
                     }
                     // without the accessibility service the viewer can only
-                    // WATCH — surface that clearly on both ends
-                    if (!RemoteControlService.enabled()) {
+                    // WATCH — surface that clearly on both ends. Check the
+                    // settings list (bind can lag a beat behind the toggle)
+                    // and re-check once more after a short delay.
+                    fun accessibilityWarn() {
+                        if (RemoteControlService.enabled() || RemoteControlService.enabledInSettings(this@MainActivity)) return
                         setStatus("⚠ Remote control OFF — enable Accessibility for input", "#f59e0b")
                         chatAppend("System", "Viewer can't control: enable BMyDesk in Settings → Accessibility. " +
                             "Tap the bubble → 🔓 to unlock after enabling.", false)
                         service?.ctl()?.sendChat("system", "⚠ Host hasn't enabled remote-control (Accessibility off) — you can only watch. Ask them to enable BMyDesk in Settings → Accessibility.")
                     }
+                    sessTicker.postDelayed({ if (peerLive) accessibilityWarn() }, 3000)
                 }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
                 override fun onChatMsg(id: String, from: String, text: String) = chatIncoming(id, from, text)
@@ -516,7 +520,7 @@ class MainActivity : Activity() {
             sp.edit().putString("def_quality", n).apply(); toast("Default quality: ${qLabel(n)}")
         }
         head("Permissions & reliability")
-        act("Remote-control access", if (RemoteControlService.enabled()) "ON ✓ — viewers can control this device" else "OFF — viewers can only watch (tap to fix)") { showAccessibilityGuide() }
+        act("Remote-control access", if (RemoteControlService.enabledInSettings(this)) "ON ✓ — viewers can control this device" else "OFF — viewers can only watch (tap to fix)") { showAccessibilityGuide() }
         act("Battery optimisation", "Keep BMyDesk reachable in background — tap to fix") { checkBatteryExemption(true) }
         act("Notifications", "Manage alert settings") {
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)) }
@@ -894,6 +898,48 @@ class MainActivity : Activity() {
         vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { confirmExitViewer() }, lpGap(8))
         // collapse the bar into the floating button — remote goes full-screen
         vBar.addView(mbtn("▾", Color.parseColor("#334155"), 12f) { collapseVBar() }, lpGap(6))
+
+        // ── Floating control menu — auto-clicker style: tap the FAB and the
+        // controls fan out beside it in a rounded grid, not a top toolbar.
+        viewerMenu = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#f20f172a")); cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), Color.parseColor("#334155"))
+            }
+            setPadding(dp(10), dp(6), dp(10), dp(10))
+        }
+        val menuHead = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        }
+        menuHead.addView(TextView(this).apply {
+            text = "Session"; setTextColor(Color.parseColor("#94a3b8")); textSize = 11f
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        menuHead.addView(mbtn("✕", Color.parseColor("#334155"), 10f) { closeViewerMenu() })
+        viewerMenu.addView(menuHead)
+        val menuGrid = android.widget.GridLayout(this).apply { columnCount = 4 }
+        // steal every session button off the toolbar strip into the grid —
+        // the remote screen stays the whole display; controls live in the
+        // floating menu only
+        (0 until vSessRow.childCount).map { vSessRow.getChildAt(it) }.forEach { b ->
+            vSessRow.removeView(b)
+            val gp = android.widget.GridLayout.LayoutParams()
+            gp.setMargins(dp(3), dp(3), dp(3), dp(3))
+            menuGrid.addView(b, gp)
+        }
+        viewerMenu.addView(menuGrid)
+        viewerMenu.addView(mbtn("⛔ Disconnect", Color.parseColor("#dc2626"), 12f) { confirmExitViewer() },
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+        viewerMenuScroll = ScrollView(this).apply {
+            visibility = View.GONE; elevation = 14f
+            addView(viewerMenu)
+        }
+        viewerPane.addView(viewerMenuScroll, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.END).apply { topMargin = dp(56); marginEnd = dp(64) })
         // touchpad cursor — a drawn pointer floating over the remote frame
         padCursor = object : View(this) {
             override fun onDraw(cv: android.graphics.Canvas) {
@@ -1038,6 +1084,8 @@ class MainActivity : Activity() {
 
     private lateinit var vBar: LinearLayout
     private lateinit var viewerFab: ImageView
+    private lateinit var viewerMenu: LinearLayout
+    private lateinit var viewerMenuScroll: ScrollView
     private var vBarHideRunnable: Runnable? = null
     private lateinit var vSessRow: LinearLayout
     private lateinit var keysRow: LinearLayout
@@ -2840,18 +2888,53 @@ class MainActivity : Activity() {
     }
 
     // ── viewer toolbar ↔ floating button — full-screen remote, controls on tap ──
-    private fun expandVBar() {
-        vBar.visibility = View.VISIBLE
-        viewerFab.visibility = View.GONE
+    private fun expandVBar() { toggleViewerMenu() }
+
+    /** Auto-clicker style: tap the FAB → a rounded control grid fans out right
+        next to it (anchored to whichever edge the user dragged the dot to). */
+    private fun toggleViewerMenu() {
+        if (viewerMenuScroll.visibility == View.VISIBLE) { closeViewerMenu(); return }
+        val fabLp = viewerFab.layoutParams as android.widget.FrameLayout.LayoutParams
+        val fabW = if (viewerFab.width > 0) viewerFab.width else dp(46)
+        val fabLeft = viewerPane.width - fabLp.marginEnd - fabW
+        val gap = dp(8)
+        // measure the menu so we can keep it fully on-screen
+        viewerMenuScroll.measure(
+            View.MeasureSpec.makeMeasureSpec(viewerPane.width, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec((viewerPane.height * 0.7f).toInt(), View.MeasureSpec.AT_MOST))
+        val menuW = viewerMenuScroll.measuredWidth; val menuH = viewerMenuScroll.measuredHeight
+        val lp = viewerMenuScroll.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.topMargin = fabLp.topMargin.coerceIn(dp(4),
+            (viewerPane.height - menuH - dp(4)).coerceAtLeast(dp(4)))
+        if (fabLeft + fabW / 2 > viewerPane.width / 2) {
+            // fab on the right → menu slides out to its left
+            lp.gravity = Gravity.TOP or Gravity.END
+            lp.marginEnd = viewerPane.width - fabLeft + gap
+            lp.leftMargin = 0
+        } else {
+            // fab on the left → menu to its right
+            lp.gravity = Gravity.TOP or Gravity.START
+            lp.leftMargin = fabLeft + fabW + gap
+            lp.marginEnd = 0
+        }
+        lp.height = menuH // ≤ 70% of the pane thanks to the AT_MOST measure
+        viewerMenuScroll.layoutParams = lp
+        viewerMenuScroll.visibility = View.VISIBLE
         vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }
-        val r = Runnable { collapseVBar() }
+        val r = Runnable { closeViewerMenu() }
         vBarHideRunnable = r
-        sessTicker.postDelayed(r, 7000) // idle → back to full-screen
+        sessTicker.postDelayed(r, 8000) // idle → fan back into the dot
+    }
+
+    private fun closeViewerMenu() {
+        viewerMenuScroll.visibility = View.GONE
+        vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }; vBarHideRunnable = null
     }
 
     private fun collapseVBar() {
         if (remoteViewer == null || !streaming) return // keep bar while connecting/reconnecting
         vBar.visibility = View.GONE
+        viewerMenuScroll.visibility = View.GONE
         viewerFab.visibility = View.VISIBLE
     }
 
@@ -2915,6 +2998,7 @@ class MainActivity : Activity() {
         keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
         vBar.visibility = View.VISIBLE; viewerFab.visibility = View.GONE
+        if (::viewerMenuScroll.isInitialized) viewerMenuScroll.visibility = View.GONE
         vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }; vBarHideRunnable = null
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
         chatLog.removeAllViews(); chatTickRows.clear(); unseenChatIds.clear()

@@ -5,6 +5,7 @@ import android.content.Intent
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import org.webrtc.*
+import org.webrtc.audio.JavaAudioDeviceModule
 
 /**
  * Host-side WebRTC: captures the device screen (MediaProjection), answers the
@@ -41,6 +42,7 @@ class WebRtcHost(context: Context) {
 
     // call media — the viewer's offer carries sendrecv audio+video slots;
     // toggling is sender.setTrack() on the matching transceiver, no reneg.
+    private var adm: JavaAudioDeviceModule? = null
     private var micTrack: AudioTrack? = null
     private var micSource: AudioSource? = null
     private var camTrack: VideoTrack? = null
@@ -53,7 +55,12 @@ class WebRtcHost(context: Context) {
             PeerConnectionFactory.InitializationOptions.builder(context)
                 .setEnableInternalTracer(false).createInitializationOptions()
         )
+        adm = JavaAudioDeviceModule.builder(context)
+            .setUseHardwareAcousticEchoCanceler(true)
+            .setUseHardwareNoiseSuppressor(true)
+            .createAudioDeviceModule()
         factory = PeerConnectionFactory.builder()
+            .setAudioDeviceModule(adm!!)
             .setVideoEncoderFactory(DefaultVideoEncoderFactory(egl.eglBaseContext, true, true))
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
             .createPeerConnectionFactory()
@@ -251,15 +258,25 @@ class WebRtcHost(context: Context) {
 
     fun setMic(on: Boolean): Boolean {
         val t = callAudioTransceiver() ?: return false
-        if (on && micTrack == null) {
-            micSource = factory.createAudioSource(MediaConstraints())
-            micTrack = factory.createAudioTrack("mic0", micSource)
+        if (on) {
+            if (micTrack == null) {
+                micSource = factory.createAudioSource(MediaConstraints())
+                micTrack = factory.createAudioTrack("mic0", micSource)
+            }
+            micTrack?.let { t.sender.setTrack(it, true); it.setEnabled(true) }
+        } else {
+            // detach + dispose — a muted-but-attached source keeps the mic
+            // hardware busy (green dot stays on) and burns battery
+            t.sender.setTrack(null, true)
+            micTrack?.setEnabled(false)
+            runCatching { micTrack?.dispose(); micSource?.dispose() }
+            micTrack = null; micSource = null
         }
-        micTrack?.let { t.sender.setTrack(it, true) }
-        micTrack?.setEnabled(on)
         ctl.sendCallState("voice", on)
         return true
     }
+
+    private var camName: String? = null
 
     fun setCam(on: Boolean): Boolean {
         val t = callCamTransceiver() ?: return false
@@ -270,13 +287,24 @@ class WebRtcHost(context: Context) {
                 val camEnum = Camera2Enumerator(appContext)
                 val camName = camEnum.deviceNames.firstOrNull { camEnum.isFrontFacing(it) }
                     ?: camEnum.deviceNames.firstOrNull() ?: return false
+                this.camName = camName
                 camCapturer = Camera2Capturer(appContext, camName, null)
                 camCapturer!!.initialize(camHelper, appContext, camSource!!.capturerObserver)
                 camCapturer!!.startCapture(640, 480, 15)
                 camTrack = factory.createVideoTrack("cam0", camSource)
             } catch (e: Exception) { listener?.onError("camera: ${e.message}"); return false }
+        } else if (on && camCapturer != null) {
+            // restart a stopped capturer (toggled off → on in one session)
+            camCapturer!!.startCapture(640, 480, 15)
+            camTrack?.setEnabled(true)
         }
         camTrack?.let { t.sender.setTrack(if (on) it else null, true) }
+        if (!on) {
+            // actually RELEASE the camera — just detaching the track left the
+            // capturer running, so the OS camera indicator stayed on forever
+            camTrack?.setEnabled(false)
+            runCatching { camCapturer?.stopCapture() }
+        }
         ctl.sendCallState("camera", on)
         return true
     }
@@ -287,8 +315,9 @@ class WebRtcHost(context: Context) {
     fun stop() {
         ctl.close()
         runCatching { camCapturer?.stopCapture() }
-        runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose() }
-        camCapturer = null; micTrack = null; camTrack = null; micSource = null; camSource = null
+        runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose(); adm?.release() }
+        adm = null
+        camCapturer = null; micTrack = null; camTrack = null; micSource = null; camSource = null; camName = null
         runCatching { capturer?.stopCapture() }
         runCatching { peer?.close() }
         capturer = null; peer = null; remoteSet = false; iceQueue.clear()

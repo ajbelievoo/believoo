@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import org.webrtc.*
+import org.webrtc.audio.JavaAudioDeviceModule
 
 /**
  * Viewer-side WebRTC: offers to receive the remote screen, renders it onto a
@@ -27,6 +28,7 @@ class RemoteViewer(context: Context) {
     val ctl = CtlChannel(gson)
 
     val egl: EglBase = EglBase.create()
+    private var adm: JavaAudioDeviceModule? = null
     private val factory: PeerConnectionFactory
     private var peer: PeerConnection? = null
     private var dc: DataChannel? = null
@@ -42,6 +44,7 @@ class RemoteViewer(context: Context) {
     private var micTrack: AudioTrack? = null
     private var micSource: AudioSource? = null
     private var camTrack: VideoTrack? = null
+    private var camName: String? = null
     private var camCapturer: Camera2Capturer? = null
     private var camSource: VideoSource? = null
     private var camHelper: SurfaceTextureHelper? = null
@@ -52,7 +55,12 @@ class RemoteViewer(context: Context) {
             PeerConnectionFactory.InitializationOptions.builder(context)
                 .setEnableInternalTracer(false).createInitializationOptions()
         )
+        adm = JavaAudioDeviceModule.builder(context)
+            .setUseHardwareAcousticEchoCanceler(true)
+            .setUseHardwareNoiseSuppressor(true)
+            .createAudioDeviceModule()
         factory = PeerConnectionFactory.builder()
+            .setAudioDeviceModule(adm!!)
             .setVideoEncoderFactory(DefaultVideoEncoderFactory(egl.eglBaseContext, true, true))
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
             .createPeerConnectionFactory()
@@ -209,12 +217,20 @@ class RemoteViewer(context: Context) {
         touching the sender so unmute is instant and needs no renegotiation. */
     fun setMic(on: Boolean): Boolean {
         val t = callAudioT ?: return false // old peer — no call slot
-        if (on && micTrack == null) {
-            micSource = factory.createAudioSource(MediaConstraints())
-            micTrack = factory.createAudioTrack("mic0", micSource)
+        if (on) {
+            if (micTrack == null) {
+                micSource = factory.createAudioSource(MediaConstraints())
+                micTrack = factory.createAudioTrack("mic0", micSource)
+            }
+            micTrack?.let { t.sender.setTrack(it, true); it.setEnabled(true) }
+        } else {
+            // detach + dispose — a muted-but-attached source keeps the mic
+            // hardware busy (green dot stays on) and burns battery
+            t.sender.setTrack(null, true)
+            micTrack?.setEnabled(false)
+            runCatching { micTrack?.dispose(); micSource?.dispose() }
+            micTrack = null; micSource = null
         }
-        micTrack?.let { t.sender.setTrack(it, true) }
-        micTrack?.setEnabled(on)
         ctl.sendCallState("voice", on)
         return true
     }
@@ -229,13 +245,23 @@ class RemoteViewer(context: Context) {
                 val camEnum = Camera2Enumerator(appContext)
                 val camName = camEnum.deviceNames.firstOrNull { camEnum.isFrontFacing(it) }
                     ?: camEnum.deviceNames.firstOrNull() ?: return false
+                this.camName = camName
                 camCapturer = Camera2Capturer(appContext, camName, null)
                 camCapturer!!.initialize(camHelper, appContext, camSource!!.capturerObserver)
                 camCapturer!!.startCapture(640, 480, 15)
                 camTrack = factory.createVideoTrack("cam0", camSource)
             } catch (e: Exception) { listener?.onError("camera: ${e.message}"); return false }
+        } else if (on && camCapturer != null) {
+            camCapturer!!.startCapture(640, 480, 15) // restart after an off toggle
+            camTrack?.setEnabled(true)
         }
         camTrack?.let { t.sender.setTrack(if (on) it else null, true) }
+        if (!on) {
+            // release the hardware — track-detach alone left the capturer
+            // running and the camera indicator stuck on
+            camTrack?.setEnabled(false)
+            runCatching { camCapturer?.stopCapture() }
+        }
         ctl.sendCallState("camera", on)
         return true
     }
@@ -248,7 +274,8 @@ class RemoteViewer(context: Context) {
     fun stop() {
         ctl.close()
         runCatching { camCapturer?.stopCapture() }
-        runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose() }
+        runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose(); adm?.release() }
+        adm = null
         camCapturer = null; micTrack = null; camTrack = null; micSource = null; camSource = null
         runCatching { dc?.close() }
         runCatching { peer?.close() }
