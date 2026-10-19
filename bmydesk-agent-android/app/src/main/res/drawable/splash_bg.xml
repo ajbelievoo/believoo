@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cold-start window background: deep navy + centred brand logo, shown
+     while the runtime inflates the real UI (preloader). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+            <gradient android:startColor="#0e1830" android:endColor="#070d18"
+                android:angle="270" android:type="linear" />
+        </shape>
+    </item>
+    <item>
+        <bitmap android:src="@drawable/splash_logo" android:gravity="center" />
+    </item>
+</layer-list>

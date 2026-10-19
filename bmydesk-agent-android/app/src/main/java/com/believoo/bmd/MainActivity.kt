@@ -1,6 +1,8 @@
 package com.believoo.bmd
 
 import android.app.Activity
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -36,6 +38,7 @@ class MainActivity : Activity() {
 
     private lateinit var codeView: TextView
     private lateinit var statusView: TextView
+    private lateinit var statusDot: View
     private lateinit var spinner: ProgressBar
     private lateinit var reqBox: LinearLayout
     private lateinit var reqName: TextView
@@ -132,6 +135,7 @@ class MainActivity : Activity() {
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = confirmIncoming(name, data)
                 override fun onTyping(from: String) = ui { showTyping(from) }
+                override fun onWantCtl() = ui { promptGrantControl() }
                 override fun onLock() = ui {
                     val ok = RemoteControlService.instance?.lockScreen() == true
                     chatAppend("System", if (ok) "Viewer locked the screen" else "Lock failed — enable Accessibility", false)
@@ -540,17 +544,62 @@ class MainActivity : Activity() {
     // ── UI ─────────────────────────────────────────────────────────
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
+    // tactile press feedback — every button dips a little instead of the
+    // dead default ripple-less look
+    private fun pressFx(v: View) {
+        v.setOnTouchListener { vw, ev ->
+            when (ev.action) {
+                android.view.MotionEvent.ACTION_DOWN ->
+                    vw.animate().scaleX(0.94f).scaleY(0.94f).setDuration(80).start()
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL ->
+                    vw.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+            }
+            false
+        }
+    }
+
     // Brand button — rounded, flat, no Material gray. Replaces stock Button()
     // everywhere so the app looks designed, not default.
     private fun mbtn(label: String, color: Int, size: Float = 13f, onClick: () -> Unit): Button =
         Button(this).apply {
             text = label; textSize = size; isAllCaps = false
             setTextColor(Color.WHITE); stateListAnimator = null
-            background = GradientDrawable().apply { setColor(color); cornerRadius = dp(14).toFloat() }
+            background = GradientDrawable().apply {
+                setColor(color); cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.argb(26, 255, 255, 255))
+            }
             minHeight = 0; minimumHeight = 0
-            setPadding(dp(16), dp(8), dp(16), dp(8))
+            setPadding(dp(16), dp(9), dp(16), dp(9))
+            elevation = dp(2).toFloat()
             setOnClickListener { onClick() }
+            pressFx(this)
         }
+
+    // Gradient brand button — the orange→rose→violet sweep from the logo.
+    private fun gbtn(label: String, colors: IntArray, size: Float = 13f, onClick: () -> Unit): Button =
+        Button(this).apply {
+            text = label; textSize = size; isAllCaps = false
+            setTextColor(Color.WHITE); stateListAnimator = null
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, colors)
+                .apply { cornerRadius = dp(14).toFloat() }
+            minHeight = 0; minimumHeight = 0
+            setPadding(dp(16), dp(9), dp(16), dp(9))
+            elevation = dp(4).toFloat()
+            setShadowLayer(dp(8).toFloat(), 0f, dp(2).toFloat(), Color.argb(90, 225, 29, 72))
+            setOnClickListener { onClick() }
+            pressFx(this)
+        }
+
+    private val gradBrand = intArrayOf(Color.parseColor("#f59e0b"), Color.parseColor("#e11d48"), Color.parseColor("#7c3aed"))
+    private val gradGreen = intArrayOf(Color.parseColor("#22c55e"), Color.parseColor("#15803d"))
+    private val gradRed   = intArrayOf(Color.parseColor("#ef4444"), Color.parseColor("#991b1b"))
+
+    // staggered card entrance — fade + rise, like a real product
+    private fun fadeIn(v: View, delayMs: Long) {
+        v.alpha = 0f; v.translationY = dp(14).toFloat()
+        v.animate().alpha(1f).translationY(0f).setDuration(430).setStartDelay(delayMs)
+            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+    }
 
     private fun lpGap(v: Int = 10) = LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -560,14 +609,19 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
         val dark = prefs.getBoolean("dark", true)
         val bg = Color.parseColor(if (dark) "#0b1220" else "#f1f5f9")
-        val panel = Color.parseColor(if (dark) "#0f172a" else "#ffffff")
+        val panel = Color.parseColor(if (dark) "#f00d1526" else "#f0ffffff")
         val rose = Color.parseColor(if (dark) "#fb7185" else "#e11d48")
         val green = Color.parseColor("#22c55e")
         val txtMain = Color.parseColor(if (dark) "#ffffff" else "#0f172a")
         val txtSub = Color.parseColor(if (dark) "#94a3b8" else "#64748b")
         val txtDim = Color.parseColor(if (dark) "#64748b" else "#94a3b8")
+        val stroke = Color.parseColor(if (dark) "#2a3752" else "#e2e8f0")
 
-        val frame = android.widget.FrameLayout(this).apply { setBackgroundColor(bg) }
+        val frame = android.widget.FrameLayout(this).apply {
+            // subtle top-light gradient — the flat navy looked dead
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor(if (dark) "#0e1830" else "#f8fafc"), bg))
+        }
         rootFrame = frame
         val scroll = ScrollView(this)
         val col = LinearLayout(this).apply {
@@ -582,35 +636,48 @@ class MainActivity : Activity() {
         pullRef = pull
         frame.addView(pull)
 
-        // settings + theme toggle (top row)
+        // settings + theme toggle (top row) — pill buttons
         col.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END
-            addView(TextView(this@MainActivity).apply {
-                text = "⚙ Settings"; setTextColor(rose); textSize = 12f; setPadding(0, 0, dp(18), 0)
-                setOnClickListener { showSettings() }
-            })
-            addView(TextView(this@MainActivity).apply {
-                text = if (dark) "☀ Light mode" else "☾ Dark mode"
-                setTextColor(txtSub); textSize = 12f
+            val pill = { t: String, c: Int, pad: Int -> TextView(this@MainActivity).apply {
+                text = t; setTextColor(c); textSize = 12f
+                setPadding(dp(pad), dp(6), dp(pad), dp(6))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor(if (dark) "#66101c33" else "#ccffffff"))
+                    cornerRadius = dp(20).toFloat(); setStroke(dp(1), stroke)
+                }
+                pressFx(this)
+            } }
+            addView(pill("⚙ Settings", rose, 13).apply { setOnClickListener { showSettings() } })
+            addView(pill(if (dark) "☀ Light" else "☾ Dark", txtSub, 13).apply {
                 setOnClickListener { prefs.edit().putBoolean("dark", !dark).apply(); recreate() }
-            })
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(8) })
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
-        col.addView(TextView(this).apply {
-            text = "BMyDesk Agent"
-            setTextColor(txtMain); textSize = 22f; typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
+        // brand header — the website logo, centred
+        col.addView(ImageView(this).apply {
+            setImageResource(R.drawable.logo)
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(215), LinearLayout.LayoutParams.WRAP_CONTENT)
         })
         col.addView(TextView(this).apply {
-            text = "Share your screen with a session code"
-            setTextColor(txtSub); textSize = 12f; gravity = Gravity.CENTER
-            setPadding(0, 6, 0, 30)
+            text = "R E M O T E   A C C E S S   A G E N T"
+            setTextColor(txtDim); textSize = 10f; gravity = Gravity.CENTER; letterSpacing = 0.28f
+            setPadding(0, dp(8), 0, dp(24))
         })
+
+        fun cardBg() = GradientDrawable().apply {
+            setColor(panel); cornerRadius = dp(24).toFloat()
+            setStroke(dp(1), stroke)
+        }
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-            setPadding(32, 40, 32, 40)
-            background = GradientDrawable().apply { setColor(panel); cornerRadius = 36f }
+            setPadding(dp(20), dp(30), dp(20), dp(30))
+            background = cardBg()
+            elevation = dp(10).toFloat()
         }
         card.addView(TextView(this).apply {
             text = "YOUR SESSION CODE"
@@ -618,8 +685,10 @@ class MainActivity : Activity() {
         })
         codeView = TextView(this).apply {
             text = "…"
-            setTextColor(rose); textSize = 42f; typeface = Typeface.MONOSPACE; letterSpacing = 0.15f
+            setTextColor(rose); textSize = 44f; typeface = Typeface.MONOSPACE; letterSpacing = 0.18f
             setTextIsSelectable(true); setPadding(0, 16, 0, 16)
+            // glow behind the code — soft halo, same rose as the brand
+            if (dark) setShadowLayer(dp(16).toFloat(), 0f, 0f, Color.argb(110, 225, 29, 72))
             // long-press = mint a fresh code (clears the device identity)
             setOnLongClickListener {
                 getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().remove("device_id").apply()
@@ -630,21 +699,61 @@ class MainActivity : Activity() {
             }
         }
         card.addView(codeView)
-        spinner = ProgressBar(this)
+        spinner = ProgressBar(this).apply {
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(rose)
+        }
         card.addView(spinner)
-        statusView = TextView(this).apply {
-            text = "Registering…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 13f
+        // status line — pulsing dot + text, like the web agent
+        statusDot = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL; setColor(Color.parseColor("#f59e0b"))
+            }
+        }
+        // heartbeat pulse on the dot
+        android.animation.ValueAnimator.ofFloat(0.75f, 1.45f).apply {
+            duration = 750; repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            addUpdateListener { val s = it.animatedValue as Float
+                statusDot.scaleX = s; statusDot.scaleY = s
+                statusDot.alpha = 1.6f - s * 0.55f }
+            start()
+        }
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
             setPadding(0, 12, 0, 0)
         }
-        card.addView(statusView)
+        statusRow.addView(statusDot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { marginEnd = dp(8) })
+        statusView = TextView(this).apply {
+            text = "Registering…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 13f
+        }
+        statusRow.addView(statusView)
+        card.addView(statusRow)
 
-        // Accept / reject
-        reqBox = LinearLayout(this).apply {
+        // Accept / reject — amber glass prompt, springs in when shown
+        reqBox = object : LinearLayout(this) {
+            override fun setVisibility(v: Int) {
+                val was = visibility
+                super.setVisibility(v)
+                if (v == View.VISIBLE && was != View.VISIBLE) {
+                    alpha = 0f; scaleX = 0.9f; scaleY = 0.9f
+                    animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(240)
+                        .setInterpolator(android.view.animation.OvershootInterpolator(1.3f)).start()
+                }
+            }
+        }.apply {
             orientation = LinearLayout.VERTICAL; visibility = View.GONE
-            setPadding(0, 24, 0, 0)
+            setPadding(dp(14), dp(16), dp(14), dp(14))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#e01c1503")); cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), Color.parseColor("#73f59e0b"))
+            }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18) }
         }
         reqName = TextView(this).apply {
             setTextColor(Color.parseColor("#fbbf24")); textSize = 14f; gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
         }
         reqBox.addView(reqName)
         chkViewOnly = android.widget.CheckBox(this).apply {
@@ -657,18 +766,25 @@ class MainActivity : Activity() {
         }
         reqBox.addView(chkViewOnly)
         reqBox.addView(chkTrust)
-        val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        btnRow.addView(mbtn("✓ Accept", Color.parseColor("#16a34a")) { acceptRequest() })
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, 0)
+        }
+        btnRow.addView(gbtn("✓ Accept", gradGreen) { acceptRequest() })
         btnRow.addView(mbtn("✕ Reject", Color.parseColor("#475569")) { rejectRequest() }, lpGap())
         reqBox.addView(btnRow)
         card.addView(reqBox)
         col.addView(card)
+        fadeIn(card, 60)
 
         // ── Remote desk: enter a partner code to view + control them ──
         val remoteCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 28, 32, 28)
-            background = GradientDrawable().apply { setColor(panel); cornerRadius = 36f }
+            setPadding(dp(20), dp(20), dp(20), dp(22))
+            background = cardBg()
+            elevation = dp(10).toFloat()
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(14) }
         }
         remoteCard.addView(TextView(this).apply {
             text = "REMOTE DESK"
@@ -679,7 +795,11 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#94a3b8")); textSize = 12f; setPadding(0, 4, 0, 14)
         })
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val fieldBg = if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")
+        val fieldBg = if (dark) Color.parseColor("#0a1120") else Color.parseColor("#f1f5f9")
+        val fieldStroke = if (dark) Color.parseColor("#22304a") else Color.parseColor("#e2e8f0")
+        fun fieldBg2() = GradientDrawable().apply {
+            setColor(fieldBg); cornerRadius = dp(13).toFloat(); setStroke(dp(1), fieldStroke)
+        }
         remoteCodeInput = android.widget.EditText(this).apply {
             hint = "ABC123XY"
             setTextColor(rose); textSize = 17f; typeface = Typeface.MONOSPACE
@@ -690,10 +810,10 @@ class MainActivity : Activity() {
             setOnEditorActionListener { _, _, _ -> connectRemote(); true }
             setPadding(20, 12, 20, 12)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            background = GradientDrawable().apply { setColor(fieldBg); cornerRadius = 16f }
+            background = fieldBg2()
         }
         row.addView(remoteCodeInput)
-        row.addView(mbtn("Connect ➜", Color.parseColor("#e11d48")) { connectRemote() }, lpGap())
+        row.addView(gbtn("Connect ➜", gradBrand) { connectRemote() }, lpGap())
         remoteCard.addView(row)
         remoteNoteInput = android.widget.EditText(this).apply {
             hint = "Purpose (optional) — shown on their accept prompt"
@@ -703,7 +823,7 @@ class MainActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setPadding(20, 10, 20, 10)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
-            background = GradientDrawable().apply { setColor(fieldBg); cornerRadius = 16f }
+            background = fieldBg2()
         }
         remoteCard.addView(remoteNoteInput)
         remotePinInput = android.widget.EditText(this).apply {
@@ -718,7 +838,7 @@ class MainActivity : Activity() {
             setOnEditorActionListener { _, _, _ -> connectRemote(); true }
             setPadding(20, 10, 20, 10)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
-            background = GradientDrawable().apply { setColor(fieldBg); cornerRadius = 16f }
+            background = fieldBg2()
         }
         remoteCard.addView(remotePinInput)
         remoteCard.addView(TextView(this).apply {
@@ -728,9 +848,16 @@ class MainActivity : Activity() {
             setOnClickListener { showPinHelp() }
         })
         col.addView(remoteCard)
+        fadeIn(remoteCard, 150)
 
         // ── Account: sign in with BMyDesk workspace credentials ──
-        val acct = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 20, 0, 0) }
+        val acct = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = cardBg()
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(14) }
+        }
         val memberName = prefs.getString("member_name", null)
         if (memberName != null) {
             acct.addView(TextView(this).apply {
@@ -739,24 +866,34 @@ class MainActivity : Activity() {
                 setOnClickListener { prefs.edit().remove("member_token").remove("member_name").apply(); recreate() }
             })
         } else {
+            acct.addView(TextView(this).apply {
+                text = "WORKSPACE ACCOUNT"; setTextColor(txtDim); textSize = 11f; letterSpacing = 0.2f
+            })
             val emailIn = android.widget.EditText(this).apply {
                 hint = "Workspace email"; setTextColor(txtMain); textSize = 13f
                 setHintTextColor(txtDim); inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
                 setPadding(20, 10, 20, 10)
-                background = GradientDrawable().apply { setColor(if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")); cornerRadius = 14f }
+                background = fieldBg2()
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
             }
             val passIn = android.widget.EditText(this).apply {
                 hint = "Password"; setTextColor(txtMain); textSize = 13f
                 setHintTextColor(txtDim); inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
                 setPadding(20, 10, 20, 10)
-                background = GradientDrawable().apply { setColor(if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")); cornerRadius = 14f }
+                background = fieldBg2()
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
             }
-            val loginBtn = mbtn("Sign in", Color.parseColor("#e11d48")) {}
+            val loginBtn = gbtn("Sign in", gradBrand) {}
             val googleBtn = mbtn("Sign in with Google", Color.parseColor("#334155")) {
                 startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/auth/google?agent=1")))
             }
-            acct.addView(googleBtn)
-            acct.addView(emailIn); acct.addView(passIn); acct.addView(loginBtn)
+            acct.addView(emailIn); acct.addView(passIn)
+            acct.addView(loginBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) })
+            acct.addView(googleBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
             loginBtn.setOnClickListener {
                 thread {
                     try {
@@ -770,23 +907,25 @@ class MainActivity : Activity() {
             }
         }
         col.addView(acct)
+        fadeIn(acct, 240)
 
-        col.addView(TextView(this).apply {
-            text = "Viewer enters this code at\nbmydesk.believoo.com → Remote → Connect"
-            setTextColor(Color.parseColor("#64748b")); textSize = 12f; gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 0)
-        })
+        val linkRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, 0)
+        }
         pinLink = TextView(this).apply {
-            text = "🔒 Set unattended-access PIN"
-            setTextColor(Color.parseColor("#475569")); textSize = 12f; gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 0)
+            text = "🔒 Unattended PIN"
+            setTextColor(Color.parseColor("#64748b")); textSize = 12f
             setOnClickListener { promptUnattendedPin() }
         }
-        col.addView(pinLink)
-        col.addView(TextView(this).apply {
+        linkRow.addView(pinLink)
+        linkRow.addView(TextView(this).apply {
+            text = "·"; setTextColor(txtDim); textSize = 14f
+            setPadding(dp(10), 0, dp(10), 0)
+        })
+        linkRow.addView(TextView(this).apply {
             text = "⧉ Share invite link"
-            setTextColor(Color.parseColor("#475569")); textSize = 12f; gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 0)
+            setTextColor(Color.parseColor("#64748b")); textSize = 12f
             setOnClickListener {
                 val c = reg?.code ?: return@setOnClickListener
                 startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
@@ -795,8 +934,14 @@ class MainActivity : Activity() {
                 }, "Share invite link"))
             }
         })
+        col.addView(linkRow)
+        col.addView(TextView(this).apply {
+            text = "Viewer enters this code at\nbmydesk.believoo.com → Remote → Connect"
+            setTextColor(Color.parseColor("#64748b")); textSize = 11.5f; gravity = Gravity.CENTER
+            setPadding(0, dp(14), 0, 0)
+        })
 
-        endBtn = mbtn("End session", Color.parseColor("#dc2626")) { endSession() }
+        endBtn = gbtn("End session", gradRed) { endSession() }
         endBtn.visibility = View.GONE
         col.addView(endBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
@@ -830,7 +975,11 @@ class MainActivity : Activity() {
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
         vBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setPadding(20, 10, 20, 10); setBackgroundColor(Color.parseColor("#b30f172a")) // translucent float over video
+            setPadding(20, 10, 20, 10)
+            background = GradientDrawable().apply {   // translucent float over video
+                setColor(Color.parseColor("#d90d1526"))
+                setStroke(dp(1), Color.parseColor("#2a3752"))
+            }
         }
         val vLeft = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         viewerStatus = TextView(this).apply { text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 12f }
@@ -885,6 +1034,8 @@ class MainActivity : Activity() {
         vSessRow.addView(mbtn("🔒", Color.parseColor("#1e293b"), 12f) {
             activeCtl()?.sendLock(); toast("🔒 Lock sent")
         }, lpGap(6))
+        // 🔓 ask the host for control — the host sees an Allow/deny dialog
+        vSessRow.addView(mbtn("🔓", Color.parseColor("#1e293b"), 12f) { requestCtl() }, lpGap(6))
         // session buttons overflow on narrow phones — scroll them so the
         // Disconnect button is ALWAYS visible at the right edge
         val vSessScroll = android.widget.HorizontalScrollView(this).apply {
@@ -895,7 +1046,7 @@ class MainActivity : Activity() {
         vBar.addView(vSessScroll, LinearLayout.LayoutParams(
             (resources.displayMetrics.widthPixels * 0.40f).toInt(),
             LinearLayout.LayoutParams.WRAP_CONTENT))
-        vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { confirmExitViewer() }, lpGap(8))
+        vBar.addView(gbtn("Disconnect", gradRed, 12f) { confirmExitViewer() }, lpGap(8))
         // collapse the bar into the floating button — remote goes full-screen
         vBar.addView(mbtn("▾", Color.parseColor("#334155"), 12f) { collapseVBar() }, lpGap(6))
 
@@ -904,9 +1055,10 @@ class MainActivity : Activity() {
         viewerMenu = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#f20f172a")); cornerRadius = dp(18).toFloat()
-                setStroke(dp(1), Color.parseColor("#334155"))
+                setColor(Color.parseColor("#f40d1526")); cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), Color.parseColor("#2a3752"))
             }
+            elevation = dp(8).toFloat()
             setPadding(dp(10), dp(6), dp(10), dp(10))
         }
         val menuHead = LinearLayout(this).apply {
@@ -929,7 +1081,7 @@ class MainActivity : Activity() {
             menuGrid.addView(b, gp)
         }
         viewerMenu.addView(menuGrid)
-        viewerMenu.addView(mbtn("⛔ Disconnect", Color.parseColor("#dc2626"), 12f) { confirmExitViewer() },
+        viewerMenu.addView(gbtn("⛔ Disconnect", gradRed, 12f) { confirmExitViewer() },
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
         viewerMenuScroll = ScrollView(this).apply {
@@ -1014,7 +1166,11 @@ class MainActivity : Activity() {
         // special-keys row — sits under the viewer bar, toggled by ⌨
         keysRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; visibility = View.GONE
-            setBackgroundColor(Color.parseColor("#f00f172a")); setPadding(10, 4, 10, 4)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#f40d1526"))
+                setStroke(dp(1), Color.parseColor("#2a3752"))
+            }
+            setPadding(10, 4, 10, 4)
         }
         mapOf("Esc" to "Escape", "Tab" to "Tab", "Ctrl" to "ControlLeft", "Alt" to "AltLeft",
               "◀" to "ArrowLeft", "▲" to "ArrowUp", "▼" to "ArrowDown", "▶" to "ArrowRight",
@@ -1045,7 +1201,13 @@ class MainActivity : Activity() {
         // Session chat panel — overlays bottom of whichever screen is up
         chatPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; visibility = View.GONE
-            setBackgroundColor(Color.parseColor("#f20f172a")); setPadding(16, 10, 16, 10)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#f40d1526"))
+                setStroke(dp(1), Color.parseColor("#2a3752"))
+                cornerRadii = floatArrayOf(dp(18).toFloat(), dp(18).toFloat(), dp(18).toFloat(), dp(18).toFloat(), 0f,0f,0f,0f)
+            }
+            setPadding(16, 10, 16, 10)
+            elevation = dp(12).toFloat()
         }
         chatScroll = ScrollView(this)
         chatLog = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -1067,7 +1229,7 @@ class MainActivity : Activity() {
             })
         }
         chatRow.addView(chatInput)
-        chatRow.addView(mbtn("Send", Color.parseColor("#e11d48"), 12f) { sendChat() }, lpGap(6))
+        chatRow.addView(gbtn("Send", gradBrand, 12f) { sendChat() }, lpGap(6))
         chatPanel.addView(chatRow)
         val chatH = (150 * resources.displayMetrics.density).toInt()
         frame.addView(chatPanel, android.widget.FrameLayout.LayoutParams(
@@ -1078,6 +1240,51 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#475569")); textSize = 10f; gravity = Gravity.CENTER
             setPadding(0, 20, 0, 0)
         })
+
+        // ── Branded splash / preloader ─────────────────────────────
+        // Covers the first paint while registration + realtime spin up;
+        // self-removes — a stuck state can never wedge on it.
+        val splash = android.widget.FrameLayout(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#0e1830"), Color.parseColor("#070d18")))
+            elevation = 40f
+        }
+        val sLogo = ImageView(this).apply {
+            setImageResource(R.drawable.logo); adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                dp(230), android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER)
+        }
+        splash.addView(sLogo)
+        splash.addView(ProgressBar(this).apply {
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#fb7185"))
+            layoutParams = android.widget.FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER)
+                .apply { topMargin = dp(120) }
+        })
+        splash.addView(TextView(this).apply {
+            text = "B M Y D E S K"; setTextColor(Color.parseColor("#475569")); textSize = 11f
+            letterSpacing = 0.34f; gravity = Gravity.CENTER
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER)
+                .apply { topMargin = dp(170) }
+        })
+        // gentle logo breathe
+        android.animation.ValueAnimator.ofFloat(0.97f, 1.03f).apply {
+            duration = 800; repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            addUpdateListener { val s = it.animatedValue as Float; sLogo.scaleX = s; sLogo.scaleY = s }
+            start()
+        }
+        frame.addView(splash, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
+        splash.postDelayed({
+            splash.animate().alpha(0f).setDuration(480).withEndAction {
+                runCatching { frame.removeView(splash) }
+            }.start()
+        }, 1150)
 
         setContentView(frame)
     }
@@ -1200,6 +1407,40 @@ class MainActivity : Activity() {
         setViewOnlyLive(!viewOnlyLive)
         chatAppend("System", if (viewOnlyLive) "Remote input blocked — viewer is view-only"
             else "Remote input enabled — viewer has full control", false)
+    }
+
+    // viewer sent "want-ctl" — AnyDesk-style ask; Allow lifts view-only now
+    private var ctlPromptShowing = false
+    private fun promptGrantControl() {
+        if (ctlPromptShowing) return
+        ctlPromptShowing = true
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Viewer wants control")
+            .setMessage("The connected viewer is asking to control this phone — taps and keys will be injected on your screen.")
+            .setPositiveButton("Allow control") { _, _ ->
+                setViewOnlyLive(false)
+                chatAppend("System", "You allowed remote control", false)
+            }
+            .setNegativeButton("Keep view-only") { _, _ ->
+                chatAppend("System", "Control request declined — still view-only", false)
+            }
+            .setOnDismissListener { ctlPromptShowing = false }
+            .show()
+        // heads-up if the app is in the background when the ask lands
+        runCatching {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(77, Notification.Builder(this, SessionBubbleService.CHAN)
+                .setContentTitle("Viewer wants control")
+                .setContentText("Open BMyDesk → tap 🔓 to allow taps/keys")
+                .setSmallIcon(R.drawable.ic_notification)
+                .setAutoCancel(true).build())
+        }
+    }
+
+    // viewer side — ask the host to lift view-only (they see an Allow dialog)
+    private fun requestCtl() {
+        remoteViewer?.ctl?.sendWantCtl()
+        toast("🔓 Control request sent — host must tap Allow")
     }
 
     // WhatsApp-style delivery/seen receipts — id → row so the tick can update
@@ -1593,7 +1834,9 @@ class MainActivity : Activity() {
 
     // ── Special keys + typing to the remote ──
     private fun sendKey(code: String) {
-        if (vLocked) { lockedHint(); return }
+        // send anyway when the host says view-only — THEY drop it; if the
+        // unlock message never reached us this self-heals on host unlock
+        if (vLocked) lockedHint()
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", true) })
         remoteViewer?.sendInput(JsonObject().apply { addProperty("t", "key"); addProperty("code", code); addProperty("down", false) })
     }
@@ -1834,6 +2077,9 @@ class MainActivity : Activity() {
 
     private fun setStatus(t: String, color: String = "#94a3b8") {
         statusView.text = t; statusView.setTextColor(Color.parseColor(color))
+        runCatching {
+            (statusDot.background as? GradientDrawable)?.setColor(Color.parseColor(color))
+        }
     }
 
     // ── Register + signaling ───────────────────────────────────────
@@ -2502,7 +2748,7 @@ class MainActivity : Activity() {
     }
 
     private fun sendMouse(t: String, x: Float, y: Float, b: Int = 0) {
-        if (vLocked) { lockedHint(); return }
+        if (vLocked) lockedHint() // still send — the host drops it; self-heals on unlock
         val v = remoteSurface ?: return
         val p = mapTouch(v.width.toFloat(), v.height.toFloat(), x, y) ?: Pair(x / v.width, y / v.height)
         remoteViewer?.sendInput(JsonObject().apply {
@@ -2523,7 +2769,7 @@ class MainActivity : Activity() {
     private var padMoveAt = 0L
 
     private fun sendPad(t: String, b: Int = 0) {
-        if (vLocked) { lockedHint(); return }
+        if (vLocked) lockedHint() // still send — the host drops it; self-heals on unlock
         remoteViewer?.sendInput(JsonObject().apply {
             addProperty("t", t); addProperty("x", padCurX); addProperty("y", padCurY); addProperty("b", b)
         })
@@ -2943,7 +3189,13 @@ class MainActivity : Activity() {
         ui {
             when (cmd) {
                 "mic", "cam" -> toggleCall(cmd, viewer = remoteViewer != null)
-                "ctl" -> toggleViewOnlyLive() // host unlocks/locks remote control from the bubble
+                // the bubble already flipped the statics — apply the same
+                // state here (not a blind toggle, or it flips twice)
+                "ctl" -> {
+                    setViewOnlyLive(SessionBubbleService.viewOnlyState)
+                    chatAppend("System", if (viewOnlyLive) "Remote input blocked — viewer is view-only"
+                        else "Remote input enabled — viewer has full control", false)
+                }
             }
             SessionBubbleService.micState = micOn
             SessionBubbleService.camState = camOn

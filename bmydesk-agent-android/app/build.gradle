@@ -13,8 +13,8 @@ android {
         applicationId "com.believoo.bmd"
         minSdk 26
         targetSdk 34
-        versionCode 49
-        versionName "1.3.37"
+        versionCode 50
+        versionName "1.3.38"
     }
 
     signingConfigs {

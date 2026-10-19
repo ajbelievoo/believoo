@@ -28,6 +28,7 @@ class CtlChannel(private val gson: Gson = Gson()) {
         fun onQuality(mode: String) {}
         fun onViewOnly(on: Boolean) {}
         fun onTyping(from: String) {}
+        fun onWantCtl() {}
         fun onLock() {}
         fun onVol(dir: String) {}
         fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {}
@@ -69,6 +70,8 @@ class CtlChannel(private val gson: Gson = Gson()) {
                 "chat-ack" -> m.get("id").s()?.let { sink?.onChatAck(it) }
                 "chat-seen" -> m.get("id").s()?.let { sink?.onChatSeen(it) }
                 "typing" -> sink?.onTyping(m.get("from").s() ?: "peer")
+                // viewer asked the host to lift view-only — AnyDesk-style ask
+                "want-ctl" -> sink?.onWantCtl()
                 // remote device actions an Android host CAN honour
                 "lock" -> sink?.onLock()
                 "vol" -> sink?.onVol(m.get("dir").s() ?: "up")
@@ -149,6 +152,7 @@ class CtlChannel(private val gson: Gson = Gson()) {
     fun sendScreen() = send(JsonObject().apply { addProperty("t", "screen") })
     fun sendReboot() = send(JsonObject().apply { addProperty("t", "reboot") })
     fun sendLock() = send(JsonObject().apply { addProperty("t", "lock") })
+    fun sendWantCtl() = send(JsonObject().apply { addProperty("t", "want-ctl") })
     fun sendVol(dir: String) = send(JsonObject().apply { addProperty("t", "vol"); addProperty("dir", dir) })
     fun sendTyping(from: String) = send(JsonObject().apply { addProperty("t", "typing"); addProperty("from", from) })
     fun sendQuality(mode: String) = send(JsonObject().apply { addProperty("t", "quality"); addProperty("mode", mode) })

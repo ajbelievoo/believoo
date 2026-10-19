@@ -39,6 +39,7 @@ class ScreenShareService : Service() {
         fun onFile(name: String, data: ByteArray) {}
         fun onFileProgress(received: Int, total: Int) {}
         fun onTyping(from: String) {}
+        fun onWantCtl() {}
         fun onLock() {}
         fun onVol(dir: String) {}
     }
@@ -51,6 +52,7 @@ class ScreenShareService : Service() {
     override fun onBind(i: Intent?): IBinder = LocalBinder()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        active = this
         when (intent?.action) {
             ACTION_START -> startForegroundNotif()
             ACTION_CAPTURE -> {
@@ -136,6 +138,7 @@ class ScreenShareService : Service() {
                 override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
                 override fun onFileProgress(r: Int, t: Int) { events?.onFileProgress(r, t) }
                 override fun onTyping(from: String) { events?.onTyping(from) }
+                override fun onWantCtl() { events?.onWantCtl() }
                 override fun onLock() { events?.onLock() }
                 override fun onVol(dir: String) { events?.onVol(dir) }
                 // viewer's quality toggle actually retunes this capture
@@ -154,6 +157,7 @@ class ScreenShareService : Service() {
     fun addIce(c: JsonObject) { host?.addIce(c) }
 
     override fun onDestroy() {
+        if (active === this) active = null
         host?.stop()
         wakeLock?.let { runCatching { if (it.isHeld) it.release() } }; wakeLock = null
         super.onDestroy()
@@ -164,5 +168,8 @@ class ScreenShareService : Service() {
         const val ACTION_CAPTURE = "com.believoo.bmd.CAPTURE"
         const val ACTION_STOP = "com.believoo.bmd.STOP"
         const val EXTRA_RESULT_DATA = "result_data"
+        // lets SessionBubbleService reach the live ctl channel even when the
+        // activity is dead — the overlay must keep working without the UI
+        @Volatile var active: ScreenShareService? = null
     }
 }

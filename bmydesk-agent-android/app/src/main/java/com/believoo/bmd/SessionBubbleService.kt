@@ -176,9 +176,16 @@ class SessionBubbleService : Service() {
         row.addView(menuBtn("📹", if (camOn) 0xFF15803D.toInt() else 0xFF334155.toInt()) {
             actionListener?.invoke("cam"); paintMenu(row)
         })
-        // host-side control lock — 🔓 = viewer can control, 👁 = view-only
+        // host-side control lock — 🔓 = viewer can control, 👁 = view-only.
+        // Flip the statics FIRST so the tap works even when MainActivity is
+        // dead/minimized — the overlay + service outlive the UI; the listener
+        // then re-asserts for chat/log/UI paint (idempotent).
         row.addView(menuBtn(if (ctlOn) "🔓" else "👁", if (ctlOn) 0xFF15803D.toInt() else 0xFF7F1D1D.toInt()) {
-            actionListener?.invoke("ctl"); paintMenu(row)
+            viewOnlyState = !viewOnlyState
+            RemoteControlService.blocked = viewOnlyState
+            runCatching { ScreenShareService.active?.ctl()?.sendViewOnly(viewOnlyState) }
+            actionListener?.invoke("ctl")
+            paintMenu(row)
         })
         row.addView(menuBtn("✕", 0xFFDC2626.toInt()) { runCatching { confirmIntent().send() }; toggleMenu(bLp) })
 
