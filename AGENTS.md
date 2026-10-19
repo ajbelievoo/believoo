@@ -225,6 +225,15 @@ Examples:
 - **Quit CSAT**: Android back-press rating dialog; Electron `close` → `csat-check` IPC → renderer overlay → `csat-done` hides window (30s fallback). Both POST `/{code}/app-rate` (table `bmydesk_app_ratings`, 1/week cadence).
 - **rsync warning**: `/opt/build/apps/bmydesk-agent-android` contains remote-only files (`gradlew`, `gradle/`, `local.properties`) NOT in the source tree — `rsync --delete` wiped them once. Sync with `rsync -az` (no delete) or exclude those paths; wrapper restored pointing at cached gradle-8.10.2.
 
+### BMyDesk black-screen/calls/chat (added 2026-10-19, agent v1.3.28 / desktop v1.3.21)
+
+- **Black screen fix**: Electron `webPreferences` now sets `backgroundThrottling:false` (+ occlusion-safe flags) — Chromium was blanking the capture when the agent window hid/minimized (peer "connected" at ~2fps/56kbps but black). `ensureFramesFlowing()` watchdog recaptures when bytes stall after connect.
+- **Click precision**: all viewers map input over the PAINTED video frame (letterbox-aware `frameRect`), not the element rect — `object-fit:contain` padding was shifting clicks. Android adds a **touchpad mode** (`🖱 Pad` toggle in the viewer bar): on-screen cursor + relative drags, two-finger tap = right-click; default stays exact direct-touch.
+- **Chat receipts**: `{t:'chat', id}` → auto `{t:'chat-ack'}` → `{t:'chat-seen'}` when the panel is open — ✓ sent, ✓✓ delivered, blue ✓✓ seen, in the Android app, Electron app, and web viewers. Old peers just ignore the new fields. Android manifest now `adjustResize` so the composer rides above the keyboard.
+- **File receive = explicit consent**: Android `confirmIncoming` dialog + web `confirm()` — files save to Downloads only after Yes. Bytes still flow P2P on `ctl`; nothing lands on the server.
+- **Calls in-session**: viewer offers sendrecv audio+video transceivers up front (m-lines 1+2, screen stays on 0) so mic/cam toggles are `sender.replaceTrack` — no renegotiation, works mid-screen-share. Remote camera renders as PIP; `{t:'call',k,on}` ctl messages notify the peer. Same on Android viewer+host, Electron host+viewer, guest/agent-room viewers, and the browser host page.
+- **`/dl/*` stable filenames**: `BMyDesk-Agent.apk`, `BMyDesk-Agent-Setup.exe`, `BMyDesk-Agent-portable.zip` in `storage/app/bmydesk-releases/` — update those when publishing (versioned copies alongside are archival only).
+
 ## PlayGame site (added 2026-10-07)
 
 - `playgame.believoo.com` = new Laravel+React gaming site. Backend `/www/wwwroot/playgame-app`,
