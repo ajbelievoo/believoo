@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Floating session bubble while a remote session runs minimized -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Full device-access permissions — asked once on first launch so every
          in-session tool (voice/camera, location tag, file & media transfer)
@@ -76,6 +78,14 @@
              dataSync type: it only heartbeats the server, no capture/audio. -->
         <service
             android:name=".AgentService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Floating "return to session" bubble — runs only while a remote
+             viewer session is minimized; keeps the process + notification
+             alive so the WebRTC peer inside MainActivity is not reaped. -->
+        <service
+            android:name=".SessionBubbleService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 

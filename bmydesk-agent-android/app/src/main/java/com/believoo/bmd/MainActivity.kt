@@ -238,6 +238,8 @@ class MainActivity : Activity() {
         if (getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("keep_awake", false))
             window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // opened the app while a session sits in the bubble → bring it back
+        if (viewerMinimized && (remoteViewer != null || vJoin != null)) restoreViewer()
     }
     override fun onPause() { foreground = false; super.onPause() }
 
@@ -248,6 +250,9 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        if (intent?.getBooleanExtra("resume_viewer", false) == true && (remoteViewer != null || vJoin != null)) {
+            restoreViewer(); return
+        }
         if (intent != null && handleDeepLink(intent)) return
     }
 
@@ -847,7 +852,7 @@ class MainActivity : Activity() {
         vBar.addView(vSessScroll, LinearLayout.LayoutParams(
             (resources.displayMetrics.widthPixels * 0.40f).toInt(),
             LinearLayout.LayoutParams.WRAP_CONTENT))
-        vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { exitViewer() }, lpGap(8))
+        vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { confirmExitViewer() }, lpGap(8))
         // touchpad cursor — a drawn pointer floating over the remote frame
         padCursor = object : View(this) {
             override fun onDraw(cv: android.graphics.Canvas) {
@@ -1768,7 +1773,7 @@ class MainActivity : Activity() {
 
     private fun handleViewerSignal(j: AgentApi.JoinResult, p: JsonObject) {
         when (p.get("kind").s()) {
-            "accept" -> { vStage(60, "Accepted — starting stream…"); ui { startViewerPeer(j) } }
+            "accept" -> { vStage(60, "Accepted — please wait, opening stream…"); ui { startViewerPeer(j) } }
             "reject" -> { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
             "end" -> { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
             else -> remoteViewer?.onSignal(p)
@@ -1805,6 +1810,12 @@ class MainActivity : Activity() {
                         else if (st?.get("host_alive")?.asBoolean == false) {
                             ui { viewerStatus.text = "Host went offline — ask them to reopen the app" }
                             thread { Thread.sleep(2500); ui { exitViewer() } }
+                        }
+                        // ws-dead fallback — the server flipped to active but
+                        // the accept event never arrived; start streaming NOW
+                        else if (stv == "active") {
+                            vStage(60, "Accepted — please wait, opening stream…")
+                            ui { startViewerPeer(j) }
                         }
                         else if (stv == "rejected") { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
                         else if (stv == "ended") { ui { viewerStatus.text = "Host ended session" }; thread { Thread.sleep(1200); ui { exitViewer() } } }
@@ -1865,7 +1876,7 @@ class MainActivity : Activity() {
                         })
                         vStage(45, "Waiting for host approval…")
                     }
-                    override fun onJoinAccept() { vStage(60, "Accepted — starting stream…"); ui { startViewerPeer(j) } }
+                    override fun onJoinAccept() { vStage(60, "Accepted — please wait, opening stream…"); ui { startViewerPeer(j) } }
                     override fun onJoinReject() { ui { viewerStatus.text = "Host declined" }; thread { Thread.sleep(1500); ui { exitViewer() } } }
                     override fun onSignal(p: JsonObject) { if (sigNew(p)) handleViewerSignal(j, p) }
                     override fun onEnd() { ui { viewerStatus.text = "Host ended session"; thread { Thread.sleep(1200); ui { exitViewer() } } } }
@@ -1922,6 +1933,20 @@ class MainActivity : Activity() {
     private fun startViewerPeer(j: AgentApi.JoinResult) {
         if (remoteViewer != null) return // accept may arrive via ws + queue both
         vStage(72, "Negotiating secure link…")
+        // the return-bubble needs "display over other apps" — ask once, never nag
+        if (!android.provider.Settings.canDrawOverlays(this)
+            && !getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("overlay_asked", false)) {
+            getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().putBoolean("overlay_asked", true).apply()
+            android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Floating session button")
+                .setMessage("While a session runs, BMyDesk can show a small floating button on screen — tap it to jump back. Allow 'Display over other apps'? (You can still return via the notification without it.)")
+                .setPositiveButton("Allow") { _, _ ->
+                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:$packageName"))) }
+                }
+                .setNegativeButton("Skip", null)
+                .show()
+        }
         remoteViewer = RemoteViewer(this).apply {
             val self = this
             listener = object : RemoteViewer.Listener {
@@ -2361,7 +2386,42 @@ class MainActivity : Activity() {
     private fun isMetered(): Boolean =
         (getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).isActiveNetworkMetered
 
+    // ── Session minimize/restore — back NEVER kills a live session; it just
+    // drops a floating bubble and the peer keeps streaming underneath ──
+    private var viewerMinimized = false
+
+    private fun minimizeViewer() {
+        if (remoteViewer == null && vJoin == null) { exitViewer(); return }
+        viewerMinimized = true
+        viewerPane.visibility = View.GONE
+        chatPanel.visibility = View.GONE
+        exitImmersive()
+        // foreground service keeps the process (and the peer) warm + shows
+        // the overlay bubble / persistent "return" notification
+        startService(Intent(this, SessionBubbleService::class.java))
+        moveTaskToBack(true)
+    }
+
+    private fun restoreViewer() {
+        if (remoteViewer == null && vJoin == null) { viewerMinimized = false; return }
+        viewerMinimized = false
+        stopService(Intent(this, SessionBubbleService::class.java))
+        viewerPane.visibility = View.VISIBLE
+        enterImmersive()
+    }
+
+    private fun confirmExitViewer() {
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Disconnect?")
+            .setMessage("End this remote session? The other device will see you leave.\n\nTip: press Back instead to keep the session running in the background bubble.")
+            .setPositiveButton("Yes, disconnect") { _, _ -> exitViewer() }
+            .setNegativeButton("No, keep it", null)
+            .show()
+    }
+
     private fun exitViewer() {
+        viewerMinimized = false
+        stopService(Intent(this, SessionBubbleService::class.java))
         runCatching { signaling.sendViewer("end", JsonObject()) }
         vJoin = null // stops the viewer poll loop
         // clean exit — a later crash must not resurrect a finished session
@@ -2386,11 +2446,12 @@ class MainActivity : Activity() {
         vProgReset()
     }
 
-    // Back exits the remote view first; on the home card offer a quick
-    // "how was the app" rating before quitting (once a week max — never naggy).
+    // Back NEVER kills a remote session — it minimizes to the floating
+    // bubble so the user can keep using the phone while connected.
+    // Disconnect only happens via the explicit Yes/No confirm.
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (viewerPane.visibility == View.VISIBLE) { exitViewer(); return }
+        if (viewerPane.visibility == View.VISIBLE) { minimizeViewer(); return }
         maybeRateThenExit()
     }
 
