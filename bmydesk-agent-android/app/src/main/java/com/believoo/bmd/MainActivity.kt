@@ -211,7 +211,7 @@ class MainActivity : Activity() {
         pendingVDevice = null; pendingVName = null
         runCatching {
             val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
-            chkViewOnly.isChecked = sp.getBoolean("def_viewonly", true) // default: watch first, grant control deliberately
+            chkViewOnly.isChecked = sp.getBoolean("def_viewonly", false) // default: FULL control — view-only is the deliberate opt-in
             chkTrust.isChecked = sp.getBoolean("def_trust", false)
         }
     }
@@ -395,14 +395,12 @@ class MainActivity : Activity() {
             checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED
         }
         if (missing.isEmpty()) { prefs.edit().putBoolean("perms_asked_v1", true).apply(); return }
-        val dlg = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Allow BMyDesk access")
-            .setMessage("BMyDesk needs a few permissions so every tool works during a remote session:\n\n• Notifications — incoming connection alerts\n• Camera & microphone — stream/call tools\n• Location — device check-in\n• Files & media — send and receive files\n\nYou can change them anytime in Android Settings.")
-            .setPositiveButton("Continue") { _, _ -> requestPermissions(missing.toTypedArray(), 1004) }
-            .setNegativeButton("Skip", null)
-            .create()
-        dlg.setOnDismissListener { prefs.edit().putBoolean("perms_asked_v1", true).apply() }
-        dlg.show()
+        bmdDialog("Allow BMyDesk access", "🔐",
+            "BMyDesk needs a few permissions so every tool works during a remote session:\n\n• Notifications — incoming connection alerts\n• Camera & microphone — stream/call tools\n• Location — device check-in\n• Files & media — send and receive files\n\nYou can change them anytime in Android Settings.",
+            actions = listOf(
+                Triple("Skip", 0, null),
+                Triple("Continue", 1) { requestPermissions(missing.toTypedArray(), 1004) }),
+            onDismiss = { prefs.edit().putBoolean("perms_asked_v1", true).apply() })
     }
 
     // If a newer build exists on the server, offer to open the download page.
@@ -411,14 +409,13 @@ class MainActivity : Activity() {
             val latest = api.latestVersion("android") ?: return@thread
             if (latest.first != BuildConfig.VERSION_NAME) ui {
                 runCatching {
-                    android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                        .setTitle("Update available — v${latest.first}")
-                        .setMessage("A newer BMyDesk Agent is available. Download the update now?")
-                        .setPositiveButton("Download") { _, _ ->
-                            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(latest.second)))
-                        }
-                        .setNegativeButton("Later", null)
-                        .show()
+                    bmdDialog("Update available — v${latest.first}", "⬆️",
+                        "A newer BMyDesk Agent is available. Download the update now?",
+                        actions = listOf(
+                            Triple("Later", 0, null),
+                            Triple("Download", 1) {
+                                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(latest.second)))
+                            }))
                 }
             }
         }
@@ -430,24 +427,31 @@ class MainActivity : Activity() {
     private fun promptUnattendedPin() {
         val code = reg?.code ?: return
         val tok = reg?.agentToken ?: return
+        val dark = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("dark", true)
         val input = android.widget.EditText(this).apply {
             hint = "4–12 digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextColor(Color.parseColor(if (dark) "#e8edf5" else "#0f172a"))
+            setHintTextColor(Color.parseColor("#64748b"))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (dark) "#0b1322" else "#f1f5f9"))
+                cornerRadius = dp(10).toFloat()
+                setStroke(dp(1), Color.parseColor("#2a3752"))
+            }
         }
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Unattended access PIN" + (if (pinSet) " — currently ON" else ""))
-            .setMessage(
-                "A PIN lets someone connect to this device WITHOUT you tapping Accept — " +
-                "they only need your code + PIN.\n\n" +
-                "Example: set PIN 4821 on your office PC; from home you enter its code + 4821 " +
-                "and connect instantly, even at 2 AM.\n\n" +
-                "⚠ Anyone who knows the code + PIN gets in — treat it like a password. " +
-                "The device still asks for one-tap screen-share consent (Android requirement).")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ -> savePin(code, tok, input.text.toString().trim()) }
-            .setNeutralButton("Remove PIN") { _, _ -> savePin(code, tok, "") }
-            .setNegativeButton("Cancel", null)
-            .show()
+        bmdDialog("Unattended access PIN" + (if (pinSet) " — ON" else ""), "🔑",
+            "A PIN lets someone connect to this device WITHOUT you tapping Accept — " +
+            "they only need your code + PIN.\n\n" +
+            "Example: set PIN 4821 on your office PC; from home you enter its code + 4821 " +
+            "and connect instantly, even at 2 AM.\n\n" +
+            "⚠ Anyone who knows the code + PIN gets in — treat it like a password. " +
+            "The device still asks for one-tap screen-share consent (Android requirement).",
+            view = input,
+            actions = listOf(
+                Triple("Cancel", 0, null),
+                Triple("Remove PIN", 0) { savePin(code, tok, "") },
+                Triple("Save", 1) { savePin(code, tok, input.text.toString().trim()) }))
     }
 
     private fun savePin(code: String, tok: String, pin: String) {
@@ -479,35 +483,31 @@ class MainActivity : Activity() {
     private fun promptUnattendedConsent(name: String) {
         if (unattendedPrompted) return
         unattendedPrompted = true
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Unattended connection")
-            .setMessage("$name connected with your PIN / trusted access.\n\n" +
-                "Android needs one tap to allow screen sharing — tap Allow to start the session.")
-            .setPositiveButton("Allow") { _, _ ->
-                unattendedPrompted = false
-                unattendedConsent = true
-                respondedAtMs = System.currentTimeMillis()
-                pendingProjection = true
-                setStatus("Requesting screen capture permission…", "#f59e0b")
-                startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_WARM))
-                val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                startActivityForResult(mpm.createScreenCaptureIntent(), 1001)
-            }
-            .setNegativeButton("End session") { _, _ -> unattendedPrompted = false; endSession() }
-            .setOnCancelListener { unattendedPrompted = false }
-            .show()
+        bmdDialog("Unattended connection", "🔓",
+            "$name connected with your PIN / trusted access.\n\n" +
+            "Android needs one tap to allow screen sharing — tap Allow to start the session.",
+            actions = listOf(
+                Triple("End session", 2) { endSession() },
+                Triple("Allow", 3) {
+                    unattendedConsent = true
+                    respondedAtMs = System.currentTimeMillis()
+                    pendingProjection = true
+                    setStatus("Requesting screen capture permission…", "#f59e0b")
+                    startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_WARM))
+                    val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                    startActivityForResult(mpm.createScreenCaptureIntent(), 1001)
+                }),
+            onDismiss = { unattendedPrompted = false })
     }
 
     // Viewer-side PIN hint — most users never need it; explain when they do.
     private fun showPinHelp() {
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("What is the PIN?")
-            .setMessage("Leave it EMPTY for normal connections — the host just taps Accept.\n\n" +
-                "The PIN is only for UNATTENDED devices: the host sets a secret PIN on their " +
-                "device so trusted people can connect anytime, without anyone being there to accept.\n\n" +
-                "Example: your office PC has PIN 4821 → from home you type its code + 4821 and you're in instantly.")
-            .setPositiveButton("Got it", null)
-            .show()
+        bmdDialog("What is the PIN?", "ⓘ",
+            "Leave it EMPTY for normal connections — the host just taps Accept.\n\n" +
+            "The PIN is only for UNATTENDED devices: the host sets a secret PIN on their " +
+            "device so trusted people can connect anytime, without anyone being there to accept.\n\n" +
+            "Example: your office PC has PIN 4821 → from home you type its code + 4821 and you're in instantly.",
+            actions = listOf(Triple("Got it", 1, null)))
     }
 
     // ── Settings centre ────────────────────────────────────────────
@@ -611,7 +611,7 @@ class MainActivity : Activity() {
 
         head("Incoming requests (host)")
         sw("🔔", amber, "vibrate_req", true, "Vibrate on request", "Buzz when someone asks to connect")
-        sw("👁", blue, "def_viewonly", true, "Accept as view-only by default", "Viewer can watch but not touch — untick for full control")
+        sw("👁", blue, "def_viewonly", false, "Accept as view-only by default", "Viewer can watch but not touch — tick to default view-only")
         sw("🤝", violet, "def_trust", false, "Always trust by default", "Skip approval for known devices next time")
         sw("☀️", green, "keep_awake", false, "Keep screen awake", "Prevent sleep while BMyDesk is open")
         head("When I connect to another device")
@@ -751,6 +751,78 @@ class MainActivity : Activity() {
         v.alpha = 0f; v.translationY = dp(14).toFloat()
         v.animate().alpha(1f).translationY(0f).setDuration(430).setStartDelay(delayMs)
             .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+    }
+
+    // ── Branded dialog ── stock AlertDialogs look gray/2012 next to the
+    // app's design; one helper gives every prompt the same dark card,
+    // icon tile, styled buttons + pop-in animation.
+    // action style: 0 slate · 1 brand gradient · 2 red gradient · 3 green gradient
+    private fun bmdDialog(title: String, icon: String, message: String? = null,
+                          view: View? = null,
+                          actions: List<Triple<String, Int, (() -> Unit)?>> =
+                              listOf(Triple("OK", 1, null)),
+                          onDismiss: (() -> Unit)? = null): android.app.AlertDialog {
+        val dark = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("dark", true)
+        val fg = Color.parseColor(if (dark) "#e8edf5" else "#0f172a")
+        val sub = Color.parseColor(if (dark) "#9fb0c8" else "#64748b")
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(18), dp(20), dp(16))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (dark) "#111a2e" else "#ffffff"))
+                cornerRadius = dp(22).toFloat()
+                setStroke(dp(1), Color.parseColor(if (dark) "#2a3752" else "#e2e8f0"))
+            }
+            elevation = dp(16).toFloat()
+        }
+        // icon tile + title
+        val head = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        }
+        head.addView(TextView(this).apply {
+            text = icon; textSize = 18f; gravity = Gravity.CENTER
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, gradBrand)
+                .apply { cornerRadius = dp(12).toFloat() }
+        }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        head.addView(TextView(this).apply {
+            text = title; setTextColor(fg); textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD; setPadding(dp(12), 0, 0, 0)
+        })
+        card.addView(head)
+        if (message != null) card.addView(TextView(this).apply {
+            text = message; setTextColor(sub); textSize = 13f
+            setPadding(0, dp(12), 0, 0)
+            setLineSpacing(0f, 1.35f)
+        })
+        view?.let { card.addView(it, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(12) }) }
+        lateinit var dlg: android.app.AlertDialog
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END
+            setPadding(0, dp(16), 0, 0)
+        }
+        actions.forEachIndexed { i, (label, style, cb) ->
+            val b = when (style) {
+                1 -> gbtn(label, gradBrand, 12f) { dlg.dismiss(); cb?.invoke() }
+                2 -> gbtn(label, gradRed, 12f) { dlg.dismiss(); cb?.invoke() }
+                3 -> gbtn(label, gradGreen, 12f) { dlg.dismiss(); cb?.invoke() }
+                else -> mbtn(label, Color.parseColor("#1e293b"), 12f) { dlg.dismiss(); cb?.invoke() }
+            }
+            btnRow.addView(b, if (i == 0) LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                else lpGap(8))
+        }
+        card.addView(btnRow)
+        dlg = android.app.AlertDialog.Builder(this).setView(card).create()
+        dlg.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        dlg.setOnDismissListener { onDismiss?.invoke() }
+        dlg.show()
+        // pop-in like reqBox
+        card.scaleX = 0.92f; card.scaleY = 0.92f; card.alpha = 0f
+        card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(200)
+            .setInterpolator(android.view.animation.OvershootInterpolator(1.2f)).start()
+        return dlg
     }
 
     // toggle-state paint for session buttons — keeps the rounded/brand look
@@ -1346,10 +1418,11 @@ class MainActivity : Activity() {
         vSessRow.addView(mbtn("🖥", Color.parseColor("#1e293b"), 12f) { activeCtl()?.sendScreen() }, lpGap(6))
         vSessRow.addView(mbtn("📂", Color.parseColor("#1e293b"), 12f) { openFs() }, lpGap(6))
         vSessRow.addView(mbtn("⏻", Color.parseColor("#1e293b"), 12f) {
-            android.app.AlertDialog.Builder(this@MainActivity)
-                .setMessage("Reboot the REMOTE computer? The host user will be asked to confirm.")
-                .setPositiveButton("Reboot") { _, _ -> activeCtl()?.sendReboot() }
-                .setNegativeButton("Cancel", null).show()
+            bmdDialog("Reboot remote computer?", "⏻",
+                "The host user will be asked to confirm.",
+                actions = listOf(
+                    Triple("Cancel", 0, null),
+                    Triple("Reboot", 2) { activeCtl()?.sendReboot() }))
         }, lpGap(6))
         // quality toggle — cycles Auto → SD → HD → FHD; on slow nets SD is smoother
         vQualityBtn = mbtn("Auto", Color.parseColor("#1e293b"), 12f) {
@@ -1749,6 +1822,23 @@ class MainActivity : Activity() {
         chatLog = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         chatScroll.addView(chatLog)
         chatPanel.addView(chatScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        // quick-reply chips — one tap sends a canned line, saves typing on a phone
+        val quickRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(0, 0, 0, dp(6))
+        }
+        listOf("👍", "🙏 Thanks", "⏳ One sec", "✅ Done", "❓ Repeat please").forEach { q ->
+            quickRow.addView(TextView(this).apply {
+                text = q; setTextColor(Color.parseColor("#cbd5e1")); textSize = 11f
+                setPadding(dp(10), dp(5), dp(10), dp(5))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#1a2438")); cornerRadius = dp(12).toFloat()
+                    setStroke(dp(1), Color.parseColor("#2a3752"))
+                }
+                setOnClickListener { chatInput.setText(q); sendChat() }
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(6) })
+        }
+        chatPanel.addView(quickRow)
         val chatRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         chatInput = android.widget.EditText(this).apply {
             hint = "Message… or /cmd hostname"; setTextColor(Color.WHITE); textSize = 13f
@@ -1940,7 +2030,15 @@ class MainActivity : Activity() {
                 }
                 contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)?.let { uri ->
                     contentResolver.openOutputStream(uri)?.use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
-                    ui { toast("📸 Saved to Pictures/BMyDesk") }
+                    ui {
+                        toast("📸 Saved to Pictures/BMyDesk")
+                        // white blink — a capture you can feel
+                        vShotFlash?.let { f ->
+                            f.visibility = View.VISIBLE; f.alpha = 0.85f
+                            f.animate().alpha(0f).setDuration(320)
+                                .withEndAction { f.visibility = View.GONE }.start()
+                        }
+                    }
                 } ?: ui { toast("Screenshot failed") }
             }.onFailure { ui { toast("Screenshot failed: ${it.message}") } }
         }
@@ -1984,18 +2082,17 @@ class MainActivity : Activity() {
     private fun promptGrantControl() {
         if (ctlPromptShowing) return
         ctlPromptShowing = true
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Viewer wants control")
-            .setMessage("The connected viewer is asking to control this phone — taps and keys will be injected on your screen.")
-            .setPositiveButton("Allow control") { _, _ ->
-                setViewOnlyLive(false)
-                chatAppend("System", "You allowed remote control", false)
-            }
-            .setNegativeButton("Keep view-only") { _, _ ->
-                chatAppend("System", "Control request declined — still view-only", false)
-            }
-            .setOnDismissListener { ctlPromptShowing = false }
-            .show()
+        bmdDialog("Viewer wants control", "🕹",
+            "The connected viewer is asking to control this phone — taps and keys will be injected on your screen.",
+            actions = listOf(
+                Triple("Keep view-only", 0) {
+                    chatAppend("System", "Control request declined — still view-only", false)
+                },
+                Triple("Allow control", 3) {
+                    setViewOnlyLive(false)
+                    chatAppend("System", "You allowed remote control", false)
+                }),
+            onDismiss = { ctlPromptShowing = false })
         // heads-up if the app is in the background when the ask lands
         runCatching {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -2015,24 +2112,59 @@ class MainActivity : Activity() {
 
     // WhatsApp-style delivery/seen receipts — id → row so the tick can update
     private val chatTickRows = mutableMapOf<String, TextView>()
+    private var fileProgRow: TextView? = null // single updating row for transfer %
     private val unseenChatIds = mutableListOf<String>()
     private var chatSeq = 0
 
     private fun chatAppend(from: String, text: String, mine: Boolean, id: String? = null) {
         if (text.isBlank()) return
-        val label = (if (mine) "You" else from) + ": " + text
-        val row = TextView(this).apply {
-            this.text = label + if (mine && id != null) "  ✓" else ""
-            setTextColor(if (from == "System") Color.parseColor("#94a3b8") else Color.parseColor("#e2e8f0"))
-            textSize = 13f
-            if (mine && id != null) tag = label // base text — tick gets re-appended on ack/seen
+        // system lines = centered dim pill, not a fake message bubble
+        if (from == "System") {
+            val pill = TextView(this).apply {
+                this.text = text; setTextColor(Color.parseColor("#9fb0c8")); textSize = 11.5f
+                gravity = Gravity.CENTER; setPadding(dp(12), dp(4), dp(12), dp(4))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#182238")); cornerRadius = dp(10).toFloat() }
+            }
+            chatLog.addView(pill, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(5) })
+            chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+            if (chatPanel.visibility != View.VISIBLE) chatCount++
+            return
         }
-        chatLog.addView(row)
-        if (mine && id != null) chatTickRows[id] = row
+        val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        // sender+time caption over a rounded bubble — mine right/brand, theirs left/slate
+        val cell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        cell.addView(TextView(this).apply {
+            this.text = (if (mine) "You" else from) + "  ·  " + time
+            setTextColor(Color.parseColor("#4c5c78")); textSize = 9.5f
+            setPadding(dp(6), 0, dp(6), dp(2))
+            gravity = if (mine) Gravity.END else Gravity.START
+        })
+        val bubble = TextView(this).apply {
+            this.text = text + if (mine && id != null) "  ✓" else ""
+            setTextColor(Color.WHITE); textSize = 13.5f
+            setPadding(dp(12), dp(7), dp(12), dp(7))
+            maxWidth = (resources.displayMetrics.widthPixels * 0.74f).toInt()
+            background = if (mine)
+                GradientDrawable(GradientDrawable.Orientation.TL_BR, gradBrand)
+                    .apply { cornerRadius = dp(15).toFloat() }
+            else GradientDrawable().apply {
+                setColor(Color.parseColor("#1e293b")); cornerRadius = dp(15).toFloat() }
+            if (mine && id != null) tag = text // base text — tick re-appends on ack/seen
+        }
+        cell.addView(bubble)
+        cell.setPadding(if (mine) dp(40) else 0, 0, if (mine) 0 else dp(40), 0)
+        chatLog.addView(cell, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = if (mine) Gravity.END else Gravity.START; topMargin = dp(4) })
+        if (mine && id != null) chatTickRows[id] = bubble
         chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
         if (chatPanel.visibility != View.VISIBLE) {
             chatCount++
-            if (from != "System") toast("💬 $from: ${text.take(60)}")
+            toast("💬 $from: ${text.take(60)}")
         }
     }
 
@@ -2051,18 +2183,44 @@ class MainActivity : Activity() {
         unseenChatIds.clear()
     }
 
-    // "typing…" — a transient row while the peer composes; auto-expires.
-    private var typingRow: TextView? = null
-    private val typingClear = Runnable { typingRow?.let { chatLog.removeView(it) }; typingRow = null }
+    // "typing…" — three wave-pulsing dots beside the sender name; auto-expires
+    private var typingRow: View? = null
+    private var typingAnim: android.animation.ValueAnimator? = null
+    private val typingClear = Runnable {
+        typingAnim?.cancel(); typingAnim = null
+        typingRow?.let { chatLog.removeView(it) }; typingRow = null
+    }
     private fun showTyping(from: String) {
         if (typingRow == null) {
-            typingRow = TextView(this).apply {
-                setTextColor(Color.parseColor("#64748b")); textSize = 11f
-                setTypeface(null, android.graphics.Typeface.ITALIC)
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(6), dp(4), 0, 0)
             }
-            chatLog.addView(typingRow)
+            row.addView(TextView(this).apply {
+                text = "$from "; setTextColor(Color.parseColor("#64748b")); textSize = 11f
+                setTypeface(null, android.graphics.Typeface.ITALIC)
+            })
+            val dots = (0..2).map {
+                View(this).apply {
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL; setColor(Color.parseColor("#64748b")) }
+                    row.addView(this, LinearLayout.LayoutParams(dp(6), dp(6)).apply { marginEnd = dp(3) })
+                }
+            }
+            typingAnim = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 900; repeatCount = android.animation.ValueAnimator.INFINITE
+                addUpdateListener { a ->
+                    val t = a.animatedFraction
+                    dots.forEachIndexed { i, d ->
+                        val p = ((t + i * 0.22f) % 1f)
+                        d.alpha = 0.2f + 0.8f * (if (p < 0.5f) p * 2f else 2f - p * 2f)
+                    }
+                }
+                start()
+            }
+            typingRow = row
+            chatLog.addView(row)
         }
-        typingRow?.text = "$from typing…"
         chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
         typingRow?.removeCallbacks(typingClear)
         typingRow?.postDelayed(typingClear, 2500)
@@ -2115,12 +2273,11 @@ class MainActivity : Activity() {
                 setPadding(0, dp(8), 0, dp(8))
             })
         }
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Session history")
-            .setView(ScrollView(this).apply { addView(root) })
-            .setNegativeButton("Close", null)
-            .setNeutralButton("Clear") { _, _ -> sp.edit().remove("sess_hist").apply() }
-            .show()
+        bmdDialog("Session history", "🕘",
+            view = ScrollView(this).apply { addView(root) },
+            actions = listOf(
+                Triple("Clear", 2) { sp.edit().remove("sess_hist").apply() },
+                Triple("Close", 0, null)))
     }
 
     private var lastTypingSent = 0L
@@ -2178,25 +2335,26 @@ class MainActivity : Activity() {
 
     private fun openFs() {
         if (remoteViewer?.ctl?.open() != true) { toast("No session — connect first"); return }
-        val wrap = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 20, 28, 8)
-        }
+        val dark = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("dark", true)
+        val wrap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fsPathView = TextView(this).apply {
-            text = "…"; setTextColor(Color.parseColor("#7dd3fc")); textSize = 12f
+            text = "…"; setTextColor(Color.parseColor("#7dd3fc")); textSize = 11.5f
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.START
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (dark) "#0b1322" else "#f1f5f9"))
+                cornerRadius = dp(8).toFloat()
+                setStroke(dp(1), Color.parseColor("#2a3752"))
+            }
         }
         fsListBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         wrap.addView(fsPathView)
         wrap.addView(ScrollView(this).apply { addView(fsListBox) },
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
-                (resources.displayMetrics.heightPixels * 0.55f).toInt()))
-        fsDialog = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Remote files")
-            .setView(wrap)
-            .setNegativeButton("Close", null)
-            .create()
-        fsDialog?.setOnDismissListener { fsDialog = null; fsListBox = null; fsPathView = null }
-        fsDialog?.show()
+                (resources.displayMetrics.heightPixels * 0.5f).toInt()).apply { topMargin = dp(8) })
+        fsDialog = bmdDialog("Remote files", "📂", view = wrap,
+            actions = listOf(Triple("Close", 0, null)),
+            onDismiss = { fsDialog = null; fsListBox = null; fsPathView = null })
         fsPath = ""; fsReq()
     }
 
@@ -2222,18 +2380,59 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun fsRow(label: String, onTap: () -> Unit) {
-        fsListBox?.addView(TextView(this).apply {
-            text = label; setTextColor(Color.WHITE); textSize = 14f
-            setPadding(12, 18, 12, 18)
-            setOnClickListener { onTap() }
+    // file-type icon by extension — a real icon column beats a wall of 📄
+    private fun fsIcon(name: String, dir: Boolean): String {
+        if (dir) return "📁"
+        return when (name.substringAfterLast('.', "").lowercase()) {
+            "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg" -> "🖼"
+            "mp4", "mkv", "avi", "mov", "webm", "3gp" -> "🎬"
+            "mp3", "wav", "ogg", "flac", "m4a", "aac" -> "🎵"
+            "pdf" -> "📕"
+            "doc", "docx", "txt", "md", "rtf" -> "📝"
+            "xls", "xlsx", "csv" -> "📊"
+            "ppt", "pptx" -> "📽"
+            "zip", "rar", "7z", "tar", "gz" -> "🗜"
+            "apk" -> "🤖"
+            "exe", "msi", "bat", "ps1" -> "⚙️"
+            "db", "sqlite", "sql" -> "🗄"
+            else -> "📄"
+        }
+    }
+
+    private fun fsRow(icon: String, name: String, meta: String, onTap: () -> Unit) {
+        val dark = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("dark", true)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(6), dp(7), dp(6), dp(7))
+            val tv = android.util.TypedValue()
+            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+            setBackgroundResource(tv.resourceId)
+        }
+        row.addView(TextView(this).apply {
+            text = icon; textSize = 15f; gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (dark) "#1a2438" else "#e2e8f0"))
+                cornerRadius = dp(9).toFloat()
+            }
+        }, LinearLayout.LayoutParams(dp(32), dp(32)))
+        row.addView(TextView(this).apply {
+            text = name
+            setTextColor(Color.parseColor(if (dark) "#e8edf5" else "#0f172a"))
+            textSize = 13.5f; isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+            setPadding(dp(10), 0, 0, 0)
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        if (meta.isNotEmpty()) row.addView(TextView(this).apply {
+            text = meta; setTextColor(Color.parseColor("#64748b")); textSize = 11f
         })
+        row.setOnClickListener { onTap() }
+        fsListBox?.addView(row)
     }
 
     private fun renderFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {
         if (fsDialog == null) return
         fsPath = path
-        fsPathView?.text = if (path.isBlank()) "This device" else path
+        fsPathView?.text = if (path.isBlank()) "💻 This device" else "📍 $path"
         fsListBox?.removeAllViews()
         if (!err.isNullOrBlank()) {
             fsListBox?.addView(TextView(this).apply {
@@ -2241,15 +2440,17 @@ class MainActivity : Activity() {
             })
             return
         }
-        if (path.isNotBlank()) fsRow("⬅  ..") { fsPath = fsParent(fsPath); fsReq() }
-        items?.forEach { el ->
-            val it = el.asJsonObject
+        if (path.isNotBlank()) fsRow("⬅", "..", "Back") { fsPath = fsParent(fsPath); fsReq() }
+        // dirs first then files, alphabetical — explorer-style ordering
+        val sorted = items?.map { it.asJsonObject }?.sortedWith(
+            compareBy({ it.get("d")?.asBoolean != true }, { it.get("n").s()?.lowercase() ?: "" }))
+        sorted?.forEach { it ->
             val nm = it.get("n").s() ?: return@forEach
             val dir = it.get("d")?.asBoolean == true
             val sz = it.get("s")?.asLong ?: 0
-            val label = (if (dir) "📁 " else "📄 ") + nm +
-                (if (dir || sz <= 0) "" else "  · ${sz / 1024} KB")
-            fsRow(label) {
+            val meta = if (dir || sz <= 0) "" else
+                if (sz > 1024 * 1024) "${sz / 1024 / 1024} MB" else "${sz / 1024} KB"
+            fsRow(fsIcon(nm, dir), nm, meta) {
                 val full = if (fsPath.isBlank()) nm else fsPath.trimEnd('\\', '/') + fsSep() + nm
                 if (dir) { fsPath = full; fsReq() }
                 else {
@@ -2260,7 +2461,8 @@ class MainActivity : Activity() {
         }
         if (fsListBox?.childCount == 0) {
             fsListBox?.addView(TextView(this).apply {
-                text = "(empty)"; setTextColor(Color.parseColor("#64748b")); setPadding(0, 16, 0, 16)
+                text = "Empty folder"; setTextColor(Color.parseColor("#64748b"))
+                textSize = 12f; gravity = Gravity.CENTER; setPadding(0, 24, 0, 24)
             })
         }
     }
@@ -2270,12 +2472,11 @@ class MainActivity : Activity() {
     private fun confirmIncoming(name: String, data: ByteArray) {
         val safe = name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "bmydesk-file" }
         ui {
-            android.app.AlertDialog.Builder(this)
-                .setTitle("Incoming file")
-                .setMessage("$safe · ${data.size / 1024} KB\nSave it to Downloads?")
-                .setPositiveButton("Save") { _, _ -> saveIncoming(safe, data) }
-                .setNegativeButton("Decline") { _, _ -> chatAppend("System", "Declined file: $safe", false) }
-                .show()
+            bmdDialog("Incoming file", "📥",
+                "$safe · ${data.size / 1024} KB\nSave it to Downloads?",
+                actions = listOf(
+                    Triple("Decline", 0) { chatAppend("System", "Declined file: $safe", false) },
+                    Triple("Save", 3) { saveIncoming(safe, data) }))
         }
     }
 
@@ -2456,13 +2657,22 @@ class MainActivity : Activity() {
     }
 
     private fun typeDialog() {
-        val input = android.widget.EditText(this).apply { hint = "Type to remote…" }
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Send text")
-            .setView(input)
-            .setPositiveButton("Send") { _, _ -> typeText(input.text.toString()) }
-            .setNegativeButton("Cancel", null)
-            .show()
+        val dark = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("dark", true)
+        val input = android.widget.EditText(this).apply {
+            hint = "Type to remote…"
+            setTextColor(Color.parseColor(if (dark) "#e8edf5" else "#0f172a"))
+            setHintTextColor(Color.parseColor("#64748b"))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (dark) "#0b1322" else "#f1f5f9"))
+                cornerRadius = dp(10).toFloat()
+                setStroke(dp(1), Color.parseColor("#2a3752"))
+            }
+        }
+        bmdDialog("Send text", "⌨️", view = input,
+            actions = listOf(
+                Triple("Cancel", 0, null),
+                Triple("Send", 1) { typeText(input.text.toString()) }))
     }
 
     // ── Live soft keyboard: every keystroke streams to the remote ──
@@ -2518,13 +2728,13 @@ class MainActivity : Activity() {
     }
 
     // Ask to enable the accessibility service that injects viewer input —
-    // re-asks every 24h while it's still off, because a dismissed prompt
-    // used to leave every session permanently view-only with no way back.
-    private fun promptAccessibilityOnce() {
+    // it IS the product (without it every session degrades to watch-only),
+    // so accepts force-ask; background checks stay throttled to 24h.
+    private fun promptAccessibilityOnce(force: Boolean = false) {
         if (RemoteControlService.enabled()) return
         val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
         val last = prefs.getLong("access_prompted_at", 0L)
-        if (System.currentTimeMillis() - last < 24 * 3600_000L) return
+        if (!force && System.currentTimeMillis() - last < 24 * 3600_000L) return
         prefs.edit().putLong("access_prompted_at", System.currentTimeMillis()).apply()
         ui { showAccessibilityGuide() }
     }
@@ -2532,21 +2742,19 @@ class MainActivity : Activity() {
     // The toggle is buried deep in settings — show exactly where "BMyDesk
     // Agent" lives instead of dumping users into a huge list with no context.
     private fun showAccessibilityGuide() {
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Enable remote control — 4 steps")
-            .setMessage(
-                "Remote control lets a viewer tap, type and scroll on this device.\n\n" +
-                "1. Tap \"Open settings\" below\n" +
-                "2. Find \"BMyDesk Agent\" in the list (under Downloaded/Installed services)\n" +
-                "3. Switch it ON\n" +
-                "4. Tap \"Allow\" on the confirmation dialog\n\n" +
-                "Example path: Settings → Accessibility → Downloaded apps → BMyDesk Agent → ON\n\n" +
-                "Without it, sessions stay view-only.")
-            .setPositiveButton("Open settings") { _, _ ->
-                runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-            }
-            .setNegativeButton("Later", null)
-            .show()
+        bmdDialog("Enable remote control — 4 steps", "🕹",
+            "Remote control lets a viewer tap, type and scroll on this device.\n\n" +
+            "1. Tap \"Open settings\" below\n" +
+            "2. Find \"BMyDesk Agent\" in the list (under Downloaded/Installed services)\n" +
+            "3. Switch it ON\n" +
+            "4. Tap \"Allow\" on the confirmation dialog\n\n" +
+            "Example path: Settings → Accessibility → Downloaded apps → BMyDesk Agent → ON\n\n" +
+            "Without it, sessions stay view-only.",
+            actions = listOf(
+                Triple("Later", 0, null),
+                Triple("Open settings", 1) {
+                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                }))
     }
 
     // Battery optimization kills background agents — keep prompting (once a
@@ -2562,19 +2770,20 @@ class MainActivity : Activity() {
         if (!fromSettings && System.currentTimeMillis() - prefs.getLong("batt_prompt_at", 0L) < 24 * 3600_000L) return
         prefs.edit().putLong("batt_prompt_at", System.currentTimeMillis()).apply()
         ui {
-            val dlg = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle("Keep BMyDesk reachable in background")
-                .setMessage("Battery optimization can pause the agent — your code then looks offline and unattended access stops working.\n\n" +
-                    "Step 1: tap \"Exempt now\" and choose Allow on the system dialog.\n" +
-                    (if (oemAutostartIntent() != null) "Step 2: this phone also needs \"Autostart\" enabled — tap \"Autostart settings\".\n" else "") +
-                    "\nTakes ~10 seconds.")
-                .setPositiveButton("Exempt now") { _, _ ->
+            val acts = mutableListOf<Triple<String, Int, (() -> Unit)?>>(
+                Triple("Later", 0, null),
+                Triple("Exempt now", 1) {
                     runCatching { startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:$packageName"))) }
                         .onFailure { runCatching { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
-                }
-                .setNegativeButton("Later", null)
-            if (oemAutostartIntent() != null) dlg.setNeutralButton("Autostart settings") { _, _ -> openOemAutostart() }
-            dlg.show()
+                    Unit
+                })
+            if (oemAutostartIntent() != null)
+                acts.add(Triple("Autostart settings", 0) { openOemAutostart() })
+            bmdDialog("Keep BMyDesk reachable in background", "🔋",
+                "Battery optimization can pause the agent — your code then looks offline and unattended access stops working.\n\n" +
+                "Step 1: tap \"Exempt now\" and choose Allow on the system dialog.\n" +
+                (if (oemAutostartIntent() != null) "Step 2: this phone also needs \"Autostart\" enabled — tap \"Autostart settings\".\n" else "") +
+                "\nTakes ~10 seconds.", actions = acts)
         }
     }
 
@@ -2857,7 +3066,9 @@ class MainActivity : Activity() {
             pendingTrust = false
         }
         setStatus("Accepted — waiting for stream…", "#22c55e")
-        promptAccessibilityOnce()
+        // control is the DEFAULT now — without accessibility the session is
+        // watch-only, so force the enable prompt on every accept while off
+        promptAccessibilityOnce(force = true)
         endBtn.visibility = View.VISIBLE
         waitingOfferSdp?.let { sdp -> waitingOfferSdp = null; handleOffer(sdp) }
     }
@@ -3104,16 +3315,12 @@ class MainActivity : Activity() {
                     viewerStatus.text = "Join failed: $msg"
                     // loud + persistent — a 2s status flash was invisible, so a
                     // wrong PIN looked like "the connect button does nothing"
-                    android.app.AlertDialog.Builder(this@MainActivity, android.R.style.Theme_Material_Dialog_Alert)
-                        .setTitle("Could not connect")
-                        .setMessage(when {
-                            msg.contains("wrong PIN", true) -> "Wrong PIN — check the 4–12 digit PIN the host set, or leave PIN empty for a normal (accepted) connection."
-                            msg.contains("too many", true) -> msg
-                            else -> msg + "\n\nLeave the PIN field empty unless the host gave you one."
-                        })
-                        .setPositiveButton("Try again") { _, _ -> ui { exitViewer() } }
+                    bmdDialog("Could not connect", "⚠️", when {
+                        msg.contains("wrong PIN", true) -> "Wrong PIN — check the 4–12 digit PIN the host set, or leave PIN empty for a normal (accepted) connection."
+                        msg.contains("too many", true) -> msg
+                        else -> msg + "\n\nLeave the PIN field empty unless the host gave you one."
+                    }, actions = listOf(Triple("Try again", 1) { ui { exitViewer() } }))
                         .setCancelable(false)
-                        .show()
                 }
             }
         }
@@ -3154,15 +3361,14 @@ class MainActivity : Activity() {
         if (!android.provider.Settings.canDrawOverlays(this)
             && !getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("overlay_asked", false)) {
             getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().putBoolean("overlay_asked", true).apply()
-            android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle("Floating session button")
-                .setMessage("While a session runs, BMyDesk can show a small floating button on screen — tap it to jump back. Allow 'Display over other apps'? (You can still return via the notification without it.)")
-                .setPositiveButton("Allow") { _, _ ->
-                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        android.net.Uri.parse("package:$packageName"))) }
-                }
-                .setNegativeButton("Skip", null)
-                .show()
+            bmdDialog("Floating session button", "🫧",
+                "While a session runs, BMyDesk can show a small floating button on screen — tap it to jump back. Allow 'Display over other apps'? (You can still return via the notification without it.)",
+                actions = listOf(
+                    Triple("Skip", 0, null),
+                    Triple("Allow", 1) {
+                        runCatching { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:$packageName"))) }
+                    }))
         }
         remoteViewer = RemoteViewer(this).apply {
             val self = this
@@ -3266,10 +3472,25 @@ class MainActivity : Activity() {
                 override fun onFileProgress(received: Int, total: Int) = ui {
                     if (total > 0) {
                         val pct = received * 100 / total
-                        if (pct >= lastFilePct + 25 || (pct == 100 && lastFilePct < 100)) {
-                            lastFilePct = pct
-                            chatAppend("System", "Receiving file… $pct%", false)
+                        // one progress row that updates in place — not a spam of
+                        // "Receiving… 25% / 50% / 75%" chat lines
+                        if (fileProgRow == null) {
+                            fileProgRow = TextView(this@MainActivity).apply {
+                                setTextColor(Color.parseColor("#9fb0c8")); textSize = 11.5f
+                                setPadding(dp(12), dp(5), dp(12), dp(5))
+                                background = GradientDrawable().apply {
+                                    setColor(Color.parseColor("#182238")); cornerRadius = dp(10).toFloat() }
+                            }
+                            chatLog.addView(fileProgRow, LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                            ).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(5) })
                         }
+                        fileProgRow?.text = "📥 Receiving file… $pct%"
+                        if (pct >= 100) {
+                            fileProgRow?.let { chatLog.removeView(it) }; fileProgRow = null
+                            chatAppend("System", "✅ File received", false)
+                        }
+                        lastFilePct = pct
                     }
                 }
                 override fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) =
@@ -3879,21 +4100,18 @@ class MainActivity : Activity() {
         if (i?.getBooleanExtra("confirm_disconnect", false) != true) return
         i.removeExtra("confirm_disconnect")
         val viewerLive = remoteViewer != null || vJoin != null
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("End session?")
-            .setMessage("Disconnect this remote session?")
-            .setPositiveButton("Yes, end it") { _, _ -> if (viewerLive) exitViewer() else endSession() }
-            .setNegativeButton("No, keep it", null)
-            .show()
+        bmdDialog("End session?", "⛔", "Disconnect this remote session?",
+            actions = listOf(
+                Triple("No, keep it", 0, null),
+                Triple("Yes, end it", 2) { if (viewerLive) exitViewer() else endSession() }))
     }
 
     private fun confirmExitViewer() {
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("Disconnect?")
-            .setMessage("End this remote session? The other device will see you leave.\n\nTip: press Back instead to keep the session running in the background bubble.")
-            .setPositiveButton("Yes, disconnect") { _, _ -> exitViewer() }
-            .setNegativeButton("No, keep it", null)
-            .show()
+        bmdDialog("Disconnect?", "⛔",
+            "End this remote session? The other device will see you leave.\n\nTip: press Back instead to keep the session running in the background bubble.",
+            actions = listOf(
+                Triple("No, keep it", 0, null),
+                Triple("Yes, disconnect", 2) { exitViewer() }))
     }
 
     private fun exitViewer() {
@@ -3932,6 +4150,9 @@ class MainActivity : Activity() {
         // stop the ring/breathe animators so they don't idle-loop forever
         vConnOverlay?.let { it.animate().cancel(); it.alpha = 1f; it.visibility = View.GONE }
         if (vConnPlaying) { vConnPlaying = false; vConnAnims.forEach { it.cancel() } }
+        vLiveDot?.visibility = View.GONE
+        vHint?.let { it.animate().cancel(); it.visibility = View.GONE }
+        zoomFlash?.visibility = View.GONE
     }
 
     // While VIEWING, hardware Back is sent to the REMOTE device (it drives
@@ -3986,20 +4207,20 @@ class MainActivity : Activity() {
         starTvs.forEachIndexed { i, tv -> tv.setOnClickListener { stars = i + 1; paintStars() }; starRow.addView(tv) }
         val fbInput = android.widget.EditText(this).apply {
             hint = "Anything to add? (optional)"; textSize = 13f
-            setHintTextColor(Color.parseColor("#64748b")); setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#64748b"))
+            setTextColor(Color.parseColor(if (prefs.getBoolean("dark", true)) "#e8edf5" else "#0f172a"))
         }
+        fbInput.setPadding(0, dp(8), 0, 0)
         wrap.addView(starRow); wrap.addView(fbInput)
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("How was BMyDesk?")
-            .setView(wrap)
-            .setPositiveButton("Submit & exit") { _, _ ->
-                val r = stars; val fb = fbInput.text.toString().trim().ifBlank { null }
-                if (r > 0) reg?.let { rr -> thread { api.appRate(rr.code, rr.agentToken, r, fb, "android") } }
-                finish()
-            }
-            .setNeutralButton("Just exit") { _, _ -> finish() }
-            .setNegativeButton("Stay", null)
-            .show()
+        bmdDialog("How was BMyDesk?", "⭐", view = wrap,
+            actions = listOf(
+                Triple("Stay", 0, null),
+                Triple("Just exit", 0) { finish() },
+                Triple("Submit & exit", 1) {
+                    val r = stars; val fb = fbInput.text.toString().trim().ifBlank { null }
+                    if (r > 0) reg?.let { rr -> thread { api.appRate(rr.code, rr.agentToken, r, fb, "android") } }
+                    finish()
+                }))
     }
 
     override fun onDestroy() {
