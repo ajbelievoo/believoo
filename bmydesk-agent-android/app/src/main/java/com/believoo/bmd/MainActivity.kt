@@ -76,6 +76,7 @@ class MainActivity : Activity() {
             service?.events = object : ScreenShareService.Events {
                 override fun onConnected() = ui {
                     peerLive = true
+                    if (hostSince == 0L) hostSince = System.currentTimeMillis()
                     teardownRunnable?.let { teardownHandler.removeCallbacks(it) }
                     setStatus("Viewer connected — sharing screen", "#22c55e")
                     sessRow.visibility = View.VISIBLE
@@ -126,6 +127,12 @@ class MainActivity : Activity() {
                 override fun onChatSeen(id: String) = ui { chatTickRows[id]?.let { it.text = it.tag.toString() + "  ✓✓"; it.setTextColor(Color.parseColor("#38bdf8")) } }
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = confirmIncoming(name, data)
+                override fun onTyping(from: String) = ui { showTyping(from) }
+                override fun onLock() = ui {
+                    val ok = RemoteControlService.instance?.lockScreen() == true
+                    chatAppend("System", if (ok) "Viewer locked the screen" else "Lock failed — enable Accessibility", false)
+                }
+                override fun onVol(dir: String) = ui { adjustVolume(dir) }
                 override fun onCallState(kind: String, on: Boolean) = ui {
                     chatAppend("System", if (on) "Viewer started $kind" else "Viewer stopped $kind", false)
                 }
@@ -515,6 +522,7 @@ class MainActivity : Activity() {
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)) }
         }
         head("Device")
+        act("Session history", "Who connected and when — last 50 sessions") { showHistory() }
         act("Copy my session code", reg?.code ?: "not registered yet") { reg?.code?.let { clipSet(it); toast("Copied") } }
         act("Copy device ID", deviceId()) { clipSet(deviceId()); toast("Copied") }
         act("Check for updates", "Current version v${BuildConfig.VERSION_NAME}") { checkUpdate(); toast("Checking…") }
@@ -867,6 +875,12 @@ class MainActivity : Activity() {
         // pinch-zoom exists but is hard to discover — on-screen zoom controls
         vSessRow.addView(mbtn("🔍+", Color.parseColor("#1e293b"), 12f) { zoomStep(0.5f) }, lpGap(6))
         vSessRow.addView(mbtn("🔍−", Color.parseColor("#1e293b"), 12f) { zoomStep(-0.5f) }, lpGap(6))
+        // 📸 grab the last rendered remote frame into Pictures/BMyDesk
+        vSessRow.addView(mbtn("📸", Color.parseColor("#1e293b"), 12f) { shotRemote() }, lpGap(6))
+        // 🔒 ask the host's accessibility service to lock the remote screen
+        vSessRow.addView(mbtn("🔒", Color.parseColor("#1e293b"), 12f) {
+            activeCtl()?.sendLock(); toast("🔒 Lock sent")
+        }, lpGap(6))
         // session buttons overflow on narrow phones — scroll them so the
         // Disconnect button is ALWAYS visible at the right edge
         val vSessScroll = android.widget.HorizontalScrollView(this).apply {
@@ -968,6 +982,10 @@ class MainActivity : Activity() {
               "Ctrl+A" to ("KeyA" to "ctrl"), "Win+D" to ("KeyD" to "meta")).forEach { (lbl, p) ->
             keysRow.addView(mbtn(lbl, Color.parseColor("#334155"), 10f) { sendKeyMod(p.first, p.second) }, lpGap(4))
         }
+        // remote media volume — host phone answers these over ctl
+        keysRow.addView(mbtn("Vol+", Color.parseColor("#1e293b"), 10f) { activeCtl()?.sendVol("up") }, lpGap(4))
+        keysRow.addView(mbtn("Vol−", Color.parseColor("#1e293b"), 10f) { activeCtl()?.sendVol("down") }, lpGap(4))
+        keysRow.addView(mbtn("Mute", Color.parseColor("#1e293b"), 10f) { activeCtl()?.sendVol("mute") }, lpGap(4))
         // keys row overflows phone width — wrap in a horizontal scroller
         val keysScroll = android.widget.HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -994,6 +1012,13 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply { setColor(Color.parseColor("#1e293b")); cornerRadius = 14f }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setOnEditorActionListener { _, _, _ -> sendChat(); true }
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) {
+                    if (!s.isNullOrEmpty()) sendTypingPing()
+                }
+            })
         }
         chatRow.addView(chatInput)
         chatRow.addView(mbtn("Send", Color.parseColor("#e11d48"), 12f) { sendChat() }, lpGap(6))
@@ -1052,6 +1077,48 @@ class MainActivity : Activity() {
             it.translationX = panX; it.translationY = panY
         }
         updatePadCursor()
+    }
+
+    // 📸 latest decoded remote frame — the sink retains it between compositor
+    // passes; released on session exit
+    private val frameLock = Any()
+    private var lastRemoteFrame: org.webrtc.VideoFrame? = null
+
+    /** Save the newest remote frame as a JPEG into Pictures/BMyDesk. */
+    private fun shotRemote() {
+        val f = synchronized(frameLock) { lastRemoteFrame } ?: run { toast("No frame yet — wait for video"); return }
+        thread {
+            runCatching {
+                val rot = f.rotation
+                val i420 = f.buffer.toI420() ?: throw RuntimeException("no I420 frame")
+                val w = i420.width; val h = i420.height
+                val ySize = w * h; val uvSize = (w / 2) * (h / 2)
+                // I420 → NV21 (Y + interleaved VU) so YuvImage can JPEG it
+                val nv21 = ByteArray(ySize + 2 * uvSize)
+                i420.dataY.get(nv21, 0, ySize)
+                val u = ByteArray(uvSize).also { i420.dataU.get(it) }
+                val v = ByteArray(uvSize).also { i420.dataV.get(it) }
+                for (i in 0 until uvSize) { nv21[ySize + i * 2] = v[i]; nv21[ySize + i * 2 + 1] = u[i] }
+                i420.release()
+                val out = java.io.ByteArrayOutputStream()
+                android.graphics.YuvImage(nv21, android.graphics.ImageFormat.NV21, w, h, null)
+                    .compressToJpeg(android.graphics.Rect(0, 0, w, h), 92, out)
+                var bmp = android.graphics.BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
+                if (rot != 0) bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, w, h,
+                    android.graphics.Matrix().apply { postRotate(rot.toFloat()) }, true)
+                val name = "remote-" + System.currentTimeMillis() + ".jpg"
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(android.provider.MediaStore.Images.Media.RELATIVE_PATH,
+                        android.os.Environment.DIRECTORY_PICTURES + "/BMyDesk")
+                }
+                contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)?.let { uri ->
+                    contentResolver.openOutputStream(uri)?.use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
+                    ui { toast("📸 Saved to Pictures/BMyDesk") }
+                } ?: ui { toast("Screenshot failed") }
+            }.onFailure { ui { toast("Screenshot failed: ${it.message}") } }
+        }
     }
 
     // ── Session tools: chat / file / clipboard (host + viewer share these) ──
@@ -1125,6 +1192,88 @@ class MainActivity : Activity() {
         unseenChatIds.clear()
     }
 
+    // "typing…" — a transient row while the peer composes; auto-expires.
+    private var typingRow: TextView? = null
+    private val typingClear = Runnable { typingRow?.let { chatLog.removeView(it) }; typingRow = null }
+    private fun showTyping(from: String) {
+        if (typingRow == null) {
+            typingRow = TextView(this).apply {
+                setTextColor(Color.parseColor("#64748b")); textSize = 11f
+                setTypeface(null, android.graphics.Typeface.ITALIC)
+            }
+            chatLog.addView(typingRow)
+        }
+        typingRow?.text = "$from typing…"
+        chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+        typingRow?.removeCallbacks(typingClear)
+        typingRow?.postDelayed(typingClear, 2500)
+    }
+
+    // viewer pressed a volume button — adjust THIS device's media volume
+    private fun adjustVolume(dir: String) {
+        val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val flag = android.media.AudioManager.FLAG_SHOW_UI
+        when (dir) {
+            "up" -> am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_RAISE, flag)
+            "down" -> am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_LOWER, flag)
+            else -> am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_TOGGLE_MUTE, flag)
+        }
+    }
+
+    // ── Session history — last 50 sessions, prefs-stored ────────────────
+    @Volatile private var hostSince = 0L
+    @Volatile private var vJoinCode = ""
+
+    private fun recordHistory(role: String, code: String, since: Long) {
+        if (since == 0L) return
+        val durMin = ((System.currentTimeMillis() - since) / 60000).coerceAtLeast(0)
+        runCatching {
+            val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(sp.getString("sess_hist", "[]"))
+            val o = org.json.JSONObject().apply {
+                put("role", role); put("code", code)
+                put("at", System.currentTimeMillis()); put("min", durMin)
+            }
+            val next = org.json.JSONArray().put(o)
+            for (i in 0 until arr.length().coerceAtMost(49)) next.put(arr.getJSONObject(i))
+            sp.edit().putString("sess_hist", next.toString()).apply()
+        }
+    }
+
+    private fun showHistory() {
+        val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        val arr = org.json.JSONArray(sp.getString("sess_hist", "[]"))
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
+        if (arr.length() == 0) {
+            root.addView(TextView(this).apply { text = "No sessions yet"; setTextColor(Color.parseColor("#94a3b8")) })
+        }
+        val fmt = java.text.SimpleDateFormat("dd MMM · HH:mm", java.util.Locale.getDefault())
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            root.addView(TextView(this).apply {
+                text = "${o.getString("role")}  ·  ${o.getString("code")}\n${fmt.format(java.util.Date(o.getLong("at")))}  ·  ${o.getLong("min")} min"
+                setTextColor(Color.parseColor("#e2e8f0")); textSize = 13f
+                setPadding(0, dp(8), 0, dp(8))
+            })
+        }
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Session history")
+            .setView(ScrollView(this).apply { addView(root) })
+            .setNegativeButton("Close", null)
+            .setNeutralButton("Clear") { _, _ -> sp.edit().remove("sess_hist").apply() }
+            .show()
+    }
+
+    private var lastTypingSent = 0L
+    private fun sendTypingPing() {
+        val now = System.currentTimeMillis()
+        if (now - lastTypingSent < 1500) return
+        lastTypingSent = now
+        val me = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_name", null)
+            ?: (android.os.Build.MODEL ?: "Android")
+        activeCtl()?.sendTyping(me)
+    }
+
     private fun sendChat() {
         val t = chatInput.text.toString().trim(); if (t.isEmpty()) return
         if (t.startsWith("/cmd ")) {
@@ -1144,7 +1293,22 @@ class MainActivity : Activity() {
         if (activeCtl()?.open() != true) { toast("No session — connect first"); return }
         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true) // long-press picks several
         }, 1002)
+    }
+
+    private fun sendPickedFile(uri: android.net.Uri) {
+        val name = runCatching {
+            contentResolver.query(uri, null, null, null, null)?.use { c ->
+                val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (c.moveToFirst() && i >= 0) c.getString(i) else null
+            }
+        }.getOrNull() ?: "file"
+        val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+        if (bytes.size > 100 * 1024 * 1024) { ui { chatAppend("System", "Skipped $name — over 100 MB", false) }; return }
+        ui { chatAppend("System", "Sending $name (${bytes.size / 1024} KB)…", false) }
+        activeCtl()?.sendFile(name, bytes)
+        ui { chatAppend("System", "Sent: $name", false) }
     }
 
     // ── Remote file explorer — drives fs-list-req/fs-get over ctl ──
@@ -1264,6 +1428,7 @@ class MainActivity : Activity() {
 
     private fun saveIncomingBg(name: String, data: ByteArray) {
         val safe = name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "bmydesk-file" }
+        var openUri: android.net.Uri? = null
         try {
             if (android.os.Build.VERSION.SDK_INT >= 29) {
                 val v = android.content.ContentValues().apply {
@@ -1274,13 +1439,58 @@ class MainActivity : Activity() {
                 contentResolver.openOutputStream(uri!!)!!.use { it.write(data) }
                 v.clear(); v.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
                 contentResolver.update(uri, v, null, null)
+                openUri = uri
             } else {
                 val dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)!!
-                java.io.File(dir, safe).writeBytes(data)
+                val f = java.io.File(dir, safe).apply { writeBytes(data) }
+                openUri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.bmdfiles", f)
             }
-            ui { chatAppend("System", "Received: $safe (${data.size / 1024} KB) → Downloads", false) }
+            ui {
+                chatAppend("System", "Received: $safe (${data.size / 1024} KB) → Downloads", false)
+                val mime = android.webkit.MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(safe.substringAfterLast('.', "").lowercase()) ?: "*/*"
+                if (mime.startsWith("image/")) chatImageThumb(safe, data, openUri, mime)
+                openUri?.let { u -> chatOpenRow(safe, u, mime) }
+            }
         } catch (e: Exception) { ui { chatAppend("System", "File save failed: ${e.message}", false) } }
         ui { toast("📎 Received $safe") }
+    }
+
+    // ── in-chat file affordances ─────────────────────────────────────────
+    /** Thumbnail row for received images — tap opens the full file. */
+    private fun chatImageThumb(name: String, data: ByteArray, uri: android.net.Uri?, mime: String) {
+        val maxDim = (resources.displayMetrics.widthPixels * 0.55f).toInt()
+        val opts = android.graphics.BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+            android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, this)
+            var s = 1; while (outWidth / s > maxDim || outHeight / s > maxDim) s *= 2
+            inSampleSize = s; inJustDecodeBounds = false
+        }
+        val bmp = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, opts) ?: return
+        val iv = ImageView(this).apply {
+            setImageBitmap(bmp); adjustViewBounds = true; setPadding(0, 8, 0, 4)
+            setOnClickListener { uri?.let { openReceived(it, mime) } }
+        }
+        chatLog.addView(iv); chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /** "📂 Open" chip after a received file — launches the system handler. */
+    private fun chatOpenRow(name: String, uri: android.net.Uri, mime: String) {
+        val row = TextView(this).apply {
+            text = "📂 Open $name"; textSize = 12f
+            setTextColor(Color.parseColor("#38bdf8")); setPadding(4, 4, 4, 8)
+            setOnClickListener { openReceived(uri, mime) }
+        }
+        chatLog.addView(row)
+    }
+
+    private fun openReceived(uri: android.net.Uri, mime: String) {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        }.onFailure { toast("No app can open this file") }
     }
 
     // Clipboard: incoming clip → write local. Outgoing poll (foreground only —
@@ -1746,22 +1956,14 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1002) { // file picked → send over ctl channel
-            val uri = data?.data ?: return
+        if (requestCode == 1002) { // file(s) picked → send over ctl channel
+            val uris = mutableListOf<android.net.Uri>()
+            data?.clipData?.let { cd -> for (i in 0 until cd.itemCount) cd.getItemAt(i)?.uri?.let(uris::add) }
+            data?.data?.let(uris::add)
+            if (uris.isEmpty()) return
             thread {
-                try {
-                    val name = runCatching {
-                        contentResolver.query(uri, null, null, null, null)?.use { c ->
-                            val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            if (c.moveToFirst() && i >= 0) c.getString(i) else null
-                        }
-                    }.getOrNull() ?: "file"
-                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@thread
-                    if (bytes.size > 100 * 1024 * 1024) { ui { chatAppend("System", "File too large (max 100 MB)", false) }; return@thread }
-                    ui { chatAppend("System", "Sending $name (${bytes.size / 1024} KB)…", false) }
-                    activeCtl()?.sendFile(name, bytes)
-                    ui { chatAppend("System", "Sent: $name", false) }
-                } catch (e: Exception) { ui { chatAppend("System", "File send failed: ${e.message}", false) } }
+                try { uris.forEach { sendPickedFile(it) } }
+                catch (e: Exception) { ui { chatAppend("System", "File send failed: ${e.message}", false) } }
             }
             return
         }
@@ -1820,6 +2022,8 @@ class MainActivity : Activity() {
     }
 
     private fun endSession() {
+        recordHistory("Host — controlled by a viewer", reg?.code ?: "?", hostSince)
+        hostSince = 0L
         viewerMinimized = false
         runCatching { stopService(Intent(this, SessionBubbleService::class.java)) }
         setViewOnlyLive(false)
@@ -1935,6 +2139,7 @@ class MainActivity : Activity() {
         }
         // NOTE: no ws-readiness gate — join + the whole signal flow also run
         // over the HTTP queue, so a dead socket must not block connecting.
+        vJoinCode = code
         thread {
             try {
                 val j = api.join(
@@ -2081,6 +2286,17 @@ class MainActivity : Activity() {
                         org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
                         else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     track.addSink(remoteSurface)
+                    // keep the newest decoded frame around for 📸 screenshot —
+                    // retained so the frame outlives the compositor pass
+                    track.addSink(object : org.webrtc.VideoSink {
+                        override fun onFrame(f: org.webrtc.VideoFrame) {
+                            f.retain()
+                            synchronized(frameLock) {
+                                lastRemoteFrame?.release()
+                                lastRemoteFrame = f
+                            }
+                        }
+                    })
                     bindViewerTouch()
                     lastPipTrack?.let { showPip(it) } // host camera was already on
                     // restore the touchpad preference from last session
@@ -2112,6 +2328,7 @@ class MainActivity : Activity() {
                 override fun onChatSeen(id: String) = ui { chatTickRows[id]?.let { it.text = it.tag.toString() + "  ✓✓"; it.setTextColor(Color.parseColor("#38bdf8")) } }
                 override fun onClip(text: String) = clipSet(text)
                 override fun onFile(name: String, data: ByteArray) = confirmIncoming(name, data)
+                override fun onTyping(from: String) = ui { showTyping(from) }
                 override fun onCallState(kind: String, on: Boolean) = ui {
                     chatAppend("System", if (on) "Host started $kind" else "Host stopped $kind", false)
                 }
@@ -2144,6 +2361,41 @@ class MainActivity : Activity() {
     // Touch → input events (same JSON protocol as the web/Electron viewer)
     // + 2-finger pinch = local zoom, drag while zoomed = pan, double-tap resets.
     private var touchMoved = false
+
+    // fling momentum — fast vertical swipe keeps the remote scroll coasting
+    // after lift-off, like Android lists do natively
+    private val moveHist = ArrayDeque<Pair<Long, Float>>()
+    private var flingRun = 0
+    private var ev0Y = 0f // lift-off Y — the move stream's final point
+    private fun trackMove(y: Float) {
+        moveHist.addLast(android.os.SystemClock.elapsedRealtime() to y)
+        while (moveHist.size > 12) moveHist.removeFirst()
+    }
+    private fun flingWheel() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        var base: Pair<Long, Float>? = null
+        for (p in moveHist) { if (now - p.first < 90) break; base = p }
+        val lastY = moveHist.lastOrNull()?.second ?: ev0Y
+        moveHist.clear()
+        val b = base ?: return
+        // velocity at lift-off: last tracked Y vs one ~90ms earlier
+        val vel = (lastY - b.second) / ((now - b.first).coerceAtLeast(1) / 1000f)
+        if (kotlin.math.abs(vel) < 1400f) return
+        val my = ++flingRun
+        var v = -vel * 0.10f // finger-up-fast = scroll content down
+        var i = 0
+        val tick = object : Runnable {
+            override fun run() {
+                if (flingRun != my || i >= 9 || remoteViewer == null) return
+                remoteViewer?.sendInput(JsonObject().apply {
+                    addProperty("t", "wheel"); addProperty("dy", v); addProperty("dx", 0)
+                })
+                v *= 0.7f; i++
+                sessTicker.postDelayed(this, 50)
+            }
+        }
+        sessTicker.post(tick)
+    }
     private var dragging = false
     private var downX = 0f; private var downY = 0f
     private var lastMove = 0L
@@ -2469,6 +2721,7 @@ class MainActivity : Activity() {
                     touchMoved = false; dragging = false
                     downX = ev.x; downY = ev.y; lastTX = ev.x; lastTY = ev.y
                     padLastX = ev.x; padLastY = ev.y
+                    moveHist.clear(); flingRun++ // kills any momentum still ticking
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     if (padMode) {
@@ -2496,6 +2749,7 @@ class MainActivity : Activity() {
                         touchMoved = true
                     } else {
                         if (moved) touchMoved = true
+                        trackMove(ev.y)
                         if (touchMoved && !dragging) { // drag starts here — press the button
                             dragging = true
                             sendMouse("down", ev.x, ev.y)
@@ -2520,6 +2774,8 @@ class MainActivity : Activity() {
                         sendMouse("move", ev.x, ev.y)
                         sendMouse("up", ev.x, ev.y)
                         dragging = false
+                        ev0Y = ev.y
+                        flingWheel() // a fast vertical swipe keeps scrolling
                     } else if (!touchMoved) { // clean tap = left click
                         sendMouse("move", ev.x, ev.y)
                         sendMouse("down", ev.x, ev.y)
@@ -2635,6 +2891,7 @@ class MainActivity : Activity() {
     }
 
     private fun exitViewer() {
+        recordHistory("Viewed " + (vJoin?.hostLabel ?: "remote device"), vJoinCode, liveSince)
         viewerMinimized = false
         stopService(Intent(this, SessionBubbleService::class.java))
         runCatching { signaling.sendViewer("end", JsonObject()) }
@@ -2645,6 +2902,7 @@ class MainActivity : Activity() {
         signaling.disconnectViewer()
         remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }
         remoteSurface = null
+        synchronized(frameLock) { lastRemoteFrame?.release(); lastRemoteFrame = null }
         offerTimeout?.let { sessTicker.removeCallbacks(it) }
         streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0; vLocked = false
         padCursor?.visibility = View.GONE; padDrag = false; padTwoTap = false

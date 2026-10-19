@@ -121,5 +121,17 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_config" />
         </service>
+
+        <!-- received files on API <29 land in app-private storage — grant a
+             content:// uri so "Open" can hand them to another app -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.bmdfiles"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/bmd_paths" />
+        </provider>
     </application>
 </manifest>

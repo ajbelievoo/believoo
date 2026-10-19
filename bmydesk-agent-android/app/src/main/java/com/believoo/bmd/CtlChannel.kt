@@ -27,6 +27,9 @@ class CtlChannel(private val gson: Gson = Gson()) {
         fun onFileProgress(received: Int, total: Int) {}
         fun onQuality(mode: String) {}
         fun onViewOnly(on: Boolean) {}
+        fun onTyping(from: String) {}
+        fun onLock() {}
+        fun onVol(dir: String) {}
         fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {}
         fun onCallState(kind: String, on: Boolean) {} // peer toggled voice/video
     }
@@ -65,6 +68,10 @@ class CtlChannel(private val gson: Gson = Gson()) {
                 }
                 "chat-ack" -> m.get("id").s()?.let { sink?.onChatAck(it) }
                 "chat-seen" -> m.get("id").s()?.let { sink?.onChatSeen(it) }
+                "typing" -> sink?.onTyping(m.get("from").s() ?: "peer")
+                // remote device actions an Android host CAN honour
+                "lock" -> sink?.onLock()
+                "vol" -> sink?.onVol(m.get("dir").s() ?: "up")
                 // peer started/stopped a voice call or camera — UI badge
                 "call" -> sink?.onCallState(m.get("k").s() ?: "", m.get("on")?.asBoolean == true)
                 "clip" -> m.get("text").s()?.let { sink?.onClip(it) }
@@ -88,7 +95,7 @@ class CtlChannel(private val gson: Gson = Gson()) {
                     m.get("err").s())
                 "quality" -> sink?.onQuality(m.get("mode").s() ?: "auto")
                 // host-side actions — Android can't exec shell/reboot/browse files
-                "cmd", "reboot", "screen", "lock", "fs-get", "procs", "kill" -> send(JsonObject().apply {
+                "cmd", "reboot", "screen", "fs-get", "procs", "kill" -> send(JsonObject().apply {
                     addProperty("t", "cmd-out")
                     addProperty("out", "'${m.get("t").s()}' is not supported on this host")
                 })
@@ -141,6 +148,9 @@ class CtlChannel(private val gson: Gson = Gson()) {
     })
     fun sendScreen() = send(JsonObject().apply { addProperty("t", "screen") })
     fun sendReboot() = send(JsonObject().apply { addProperty("t", "reboot") })
+    fun sendLock() = send(JsonObject().apply { addProperty("t", "lock") })
+    fun sendVol(dir: String) = send(JsonObject().apply { addProperty("t", "vol"); addProperty("dir", dir) })
+    fun sendTyping(from: String) = send(JsonObject().apply { addProperty("t", "typing"); addProperty("from", from) })
     fun sendQuality(mode: String) = send(JsonObject().apply { addProperty("t", "quality"); addProperty("mode", mode) })
 
     // host → viewer: input is locked for this session (view-only accept)

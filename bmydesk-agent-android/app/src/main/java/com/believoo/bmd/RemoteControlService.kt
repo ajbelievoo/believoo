@@ -131,6 +131,15 @@ class RemoteControlService : AccessibilityService() {
     // so "input stopped while minimized" is diagnosable instead of silent.
     private var failLogged = false
 
+    /** viewer pressed "lock remote" — accessibility global action (API 28+). */
+    fun lockScreen(): Boolean {
+        val ok = if (android.os.Build.VERSION.SDK_INT >= 28)
+            performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+        else performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+        android.util.Log.d("BMyDesk", "remote lockScreen → $ok")
+        return ok
+    }
+
     private fun dispatch(sd: GestureDescription.StrokeDescription) {
         runCatching {
             val ok = dispatchGesture(GestureDescription.Builder().addStroke(sd).build(),

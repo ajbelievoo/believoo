@@ -76,6 +76,18 @@
     </div>
 </div>
 
+{{-- floating session pill — Back drops to this instead of disconnecting --}}
+<div id="sessPill" class="hidden fixed bottom-5 right-4 z-[9999]">
+    <div id="pillTag" class="hidden absolute bottom-16 right-0 bg-slate-900 border border-slate-700 text-slate-400 text-[11px] px-2.5 py-1.5 rounded-lg whitespace-nowrap">Session live — tap to return</div>
+    <div id="pillMenu" class="hidden flex-col gap-2 mb-2 items-center">
+        <button class="w-11 h-11 rounded-full bg-slate-800 border border-slate-600 text-base" id="pillOpen" title="Back to remote screen"><i class="fas fa-desktop"></i></button>
+        <button class="w-11 h-11 rounded-full bg-slate-800 border border-slate-600 text-base" id="pillMic" title="Mic on/off"><i class="fas fa-microphone"></i></button>
+        <button class="w-11 h-11 rounded-full bg-slate-800 border border-slate-600 text-base" id="pillCam" title="Camera on/off"><i class="fas fa-video"></i></button>
+        <button class="w-11 h-11 rounded-full bg-red-600 border border-red-800 text-base text-white" id="pillEnd" title="End session"><i class="fas fa-times"></i></button>
+    </div>
+    <button id="pillDot" title="Remote session — tap for controls" class="w-[54px] h-[54px] rounded-full bg-slate-900 border-2 border-rose-600 text-slate-200 text-xl shadow-lg shadow-black/50"><i class="fas fa-desktop"></i></button>
+</div>
+
 <script src="/js/pusher.min.js"></script>
 <script>
 const CODE = @json($session->session_code);
@@ -235,7 +247,7 @@ async function startPeer() {
         connected = true;
         document.getElementById('encBadge').classList.remove('hidden');
         if (streamTimeout) clearTimeout(streamTimeout);
-        startPing();
+        startPing(); armBackTrap();
     };
 
     pc.onicecandidate = (e) => {
@@ -789,8 +801,43 @@ function initChannel() {
 }
 
 function cleanup() {
+    allowLeave = true; restoreFromPill();
     try { if (pc) pc.close(); } catch (e) {}
     pc = null; connected = false;
+}
+
+// ── Floating session pill + back trap — Back/minimize never disconnects ──
+let pillMode = false, allowLeave = false;
+const mainWrap = document.querySelector('.h-\\[calc\\(100vh-120px\\)\\]');
+function armBackTrap() { try { history.pushState({ bmdSess: 1 }, document.title); } catch (e) {} }
+function minimizeToPill() {
+    if (!connected) return;
+    pillMode = true;
+    if (mainWrap) mainWrap.style.display = 'none';
+    $('sessPill').classList.remove('hidden'); $('pillMenu').classList.add('hidden');
+    $('pillTag').classList.remove('hidden'); setTimeout(() => $('pillTag').classList.add('hidden'), 4000);
+}
+function restoreFromPill() {
+    pillMode = false;
+    if (mainWrap) mainWrap.style.display = '';
+    $('sessPill').classList.add('hidden');
+}
+window.addEventListener('popstate', () => {
+    if (allowLeave || !connected) return;
+    if (!pillMode) { minimizeToPill(); armBackTrap(); }
+    else if (confirm('End the remote session and leave?')) {
+        allowLeave = true; try { whisper('end', {}); } catch (e) {}
+        cleanup(); history.back();
+    } else armBackTrap();
+});
+$('pillDot').onclick = () => $('pillMenu').classList.toggle('hidden');
+$('pillOpen').onclick = () => restoreFromPill();
+$('pillMic').onclick = () => { callToggle('audio'); paintPill(); };
+$('pillCam').onclick = () => { callToggle('video'); paintPill(); };
+$('pillEnd').onclick = () => { allowLeave = true; endSession(); };
+function paintPill() {
+    $('pillMic').classList.toggle('bc-btn-primary', micOn);
+    $('pillCam').classList.toggle('bc-btn-primary', camOn);
 }
 
 async function endSession() {
@@ -811,7 +858,11 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
     (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
 });
 
-window.addEventListener('beforeunload', () => {
+window.addEventListener('beforeunload', e => {
+    if (connected && !allowLeave) { e.preventDefault(); e.returnValue = ''; }
+});
+// end beacon on pagehide — staying on the leave-prompt mustn't kill the call
+window.addEventListener('pagehide', () => {
     whisper('end', {});
     try { fetch(END_URL, { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF } }); } catch (e) {}
     cleanup();

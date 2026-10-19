@@ -191,21 +191,33 @@ ipcMain.handle('open-external', async (_e, url) => {
 });
 
 // ── System tray: app keeps running + reachable when the window is closed ──
-let tray = null, isQuitting = false;
+let tray = null, isQuitting = false, traySession = null;
 function wireTray() {
     try { tray = new Tray(path.join(__dirname, 'assets', 'icon.png')); } catch (e) { return; }
-    const menu = Menu.buildFromTemplate([
+    rebuildTrayMenu();
+    tray.on('click', () => { win?.show(); win?.focus(); });
+}
+// menu is rebuilt so the session row can appear/disappear — the icon's
+// tooltip also flips so "who's connected" is visible without opening the app
+function rebuildTrayMenu() {
+    if (!tray) return;
+    const rows = [];
+    if (traySession?.active) rows.push({ label: '● ' + (traySession.label || 'Remote session active'), enabled: false });
+    rows.push(
         { label: 'Open BMyDesk', click: () => { win?.show(); win?.focus(); } },
         { label: 'Start with Windows', type: 'checkbox',
           checked: app.getLoginItemSettings().openAtLogin,
           click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
         { type: 'separator' },
         { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
-    ]);
-    tray.setToolTip('BMyDesk Agent');
-    tray.setContextMenu(menu);
-    tray.on('click', () => { win?.show(); win?.focus(); });
+    );
+    tray.setToolTip(traySession?.active ? 'BMyDesk — ' + (traySession.label || 'session active') : 'BMyDesk Agent');
+    tray.setContextMenu(Menu.buildFromTemplate(rows));
 }
+ipcMain.on('session-status', (_e, st) => {
+    traySession = st && st.active ? { active: true, label: st.label } : null;
+    rebuildTrayMenu();
+});
 app.whenReady().then(() => { if (gotLock) wireTray(); });
 app.on('before-quit', () => { isQuitting = true; });
 

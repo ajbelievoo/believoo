@@ -466,6 +466,7 @@ async function handleOffer(m) {
                 setStatus('Viewer connected — streaming', 'on');
                 // always-visible system notice — the host should never miss a session
                 try { window.agent?.attention(null, 'A remote viewer is connected — your screen is being shared'); } catch (e) {}
+                try { window.agent?.sessionStatus(true, 'A remote viewer is connected'); } catch (e) {}
                 ensureFramesFlowing();
             }
             if (pc.connectionState === 'disconnected') {
@@ -1067,6 +1068,7 @@ function teardown(msg) {
     clearTimeout(flowWatchdog); flowWatchdog = null;
     stopCallMedia();
     ctl = null; rxFile = null;
+    try { window.agent?.sessionStatus(false); } catch (e) {}
     $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }

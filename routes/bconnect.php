@@ -292,4 +292,5 @@ Route::prefix('admin/bconnect')->middleware(['auth', 'admin'])->group(function (
     Route::put('/companies/{company}/toggle', [\App\Http\Controllers\Admin\BconnectAdminController::class, 'toggleActive'])->name('admin.bconnect.company.toggle');
     Route::post('/companies/{company}/domain', [\App\Http\Controllers\Admin\BconnectAdminController::class, 'applyDomain'])->name('admin.bconnect.company.domain');
     Route::post('/companies/{company}/notify', [\App\Http\Controllers\Admin\BconnectAdminController::class, 'notifyAdmins'])->name('admin.bconnect.company.notify');
+    Route::get('/ratings', [\App\Http\Controllers\Admin\BconnectAdminController::class, 'ratings'])->name('admin.bconnect.ratings');
 });

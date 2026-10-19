@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('agent', {
     saveFile: (name, b64) => ipcRenderer.invoke('save-file', name, b64),
     clipboardGet: () => ipcRenderer.invoke('clipboard-get'),
     clipboardSet: (t) => ipcRenderer.send('clipboard-set', t),
+    sessionStatus: (active, label) => ipcRenderer.send('session-status', { active, label }),
     execCmd: (c) => ipcRenderer.invoke('exec-cmd', c),
     sysReboot: () => ipcRenderer.invoke('sys-reboot'),
     sysLock: () => ipcRenderer.invoke('sys-lock'),

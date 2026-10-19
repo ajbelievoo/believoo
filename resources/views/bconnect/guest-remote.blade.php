@@ -139,7 +139,7 @@ body.pillmode .stage, body.pillmode .top { display:none !important; }
             </select>
             <span id="vonlyBadge" title="The host set this session to view-only — your input is locked" style="display:none;background:#7f1d1d;color:#fecaca;font-size:11px;padding:4px 8px;border-radius:6px;">👁 view-only</span>
             <button class="endbtn" id="endBtn">End session</button>
-            <input type="file" id="fileInput" style="display:none">
+            <input type="file" id="fileInput" multiple style="display:none">
             <input type="text" id="mobKbd" autocomplete="off" autocorrect="off" autocapitalize="none" style="position:fixed;bottom:-60px;left:0;width:2px;height:2px;opacity:.01;border:0;z-index:-1">
         </div>
     </div>
@@ -499,18 +499,22 @@ async function onCtlMessage(e) {
             const m = JSON.parse(e.data);
             if (m.t === 'chat') {
                 addChat(m.from || 'Remote', m.text, false);
+                notifyRemote(m.from || 'Remote', m.text);
+                clearTyping();
                 if (m.id) {
                     ctlSend({ t: 'chat-ack', id: m.id });
                     if ($('chatPanel').style.display !== 'none') ctlSend({ t: 'chat-seen', id: m.id });
                     else unseenChat.push(m.id);
                 }
             }
+            else if (m.t === 'typing') showTyping(m.from || 'Remote');
             else if (m.t === 'chat-ack') chatAcked(m.id, false);
             else if (m.t === 'chat-seen') chatAcked(m.id, true);
             else if (m.t === 'call') addChat('System', 'Peer turned ' + m.k + (m.on ? ' on' : ' off'), false);
             else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
             else if (m.t === 'file-meta') {
                 // explicit yes/no — only then do we keep + save the bytes
+                notifyRemote('Incoming file', (m.from || 'Remote') + ' → ' + m.name);
                 if (confirm((m.from || 'Remote') + ' is sending a file:\n\n' + m.name + ' (' + Math.round(m.size / 1024) + ' KB)\n\nSave it?')) {
                     rxFile = { name: m.name, size: m.size, chunks: [], got: 0 };
                     addChat('System', 'Receiving ' + m.name + '…', false);
@@ -525,11 +529,19 @@ async function onCtlMessage(e) {
             setProg('Receiving ' + rxFile.name + ' — ' + Math.round(rxFile.got * 100 / rxFile.size) + '%');
             if (rxFile.got >= rxFile.size) {
                 const f = rxFile; rxFile = null;
-                const url = URL.createObjectURL(new Blob(f.chunks));
+                const blob = new Blob(f.chunks);
+                const url = URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = f.name; a.click();
-                setTimeout(() => URL.revokeObjectURL(url), 5000);
                 setProg(null);
                 addChat('System', '↓ Saved ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB)', false);
+                // images get an in-chat thumbnail — tap to open full-size
+                if (/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name)) {
+                    const im = document.createElement('img');
+                    im.src = url; im.title = f.name;
+                    im.style.cssText = 'max-width:180px;max-height:140px;border-radius:8px;margin:6px 0;cursor:pointer;display:block;';
+                    im.onclick = () => window.open(url, '_blank');
+                    $('chatMsgs').appendChild(im); $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight;
+                } else setTimeout(() => URL.revokeObjectURL(url), 5000);
             }
         }
     } catch (err) {}
@@ -551,6 +563,34 @@ function addChat(from, text, mine, id) {
     box.appendChild(d); box.scrollTop = box.scrollHeight;
     if (mine && id) chatTicks.set(id, d.querySelector('[data-mid]'));
 }
+// notifications + typing indicator — WhatsApp-style presence
+let notifAsked = false, typingTimer = null, typingEl = null;
+function notifyRemote(title, body) {
+    if (!('Notification' in window)) return;
+    if (!document.hidden && !pillMode) return;
+    if (Notification.permission === 'granted')
+        try { new Notification(title, { body: String(body || '').slice(0, 120), icon: '/images/icon-192x192.png' }); } catch (e) {}
+    else if (Notification.permission !== 'denied' && !notifAsked) { notifAsked = true; Notification.requestPermission(); }
+}
+function showTyping(who) {
+    const box = $('chatMsgs');
+    if (!typingEl) {
+        typingEl = document.createElement('div');
+        typingEl.style.cssText = 'color:#64748b;font-size:11px;font-style:italic;margin:2px 0;';
+    }
+    typingEl.textContent = who + ' is typing…';
+    if (!typingEl.parentNode) box.appendChild(typingEl);
+    box.scrollTop = box.scrollHeight;
+    clearTimeout(typingTimer); typingTimer = setTimeout(clearTyping, 2500);
+}
+function clearTyping() { typingEl?.remove(); }
+let typingSentAt = 0;
+function sendTyping() {
+    const now = Date.now();
+    if (now - typingSentAt < 1500) return;
+    typingSentAt = now;
+    ctlSend({ t: 'typing', from: $('nameInput').value.trim() || 'Guest' });
+}
 let chatSeq = 0;
 $('chatSend').onclick = () => {
     const t = $('chatInput').value.trim(); if (!t) return;
@@ -569,7 +609,8 @@ $('chatSend').onclick = () => {
     }
     $('chatInput').value = '';
 };
-$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('chatSend').click(); });
+$('chatInput').addEventListener('keydown', e => { sendTyping(); if (e.key === 'Enter') $('chatSend').click(); });
+$('chatInput').addEventListener('input', sendTyping);
 $('qualitySel').onchange = () => ctlSend({ t: 'quality', mode: $('qualitySel').value });
 $('fsBtn').onclick = () => {
     const v = document.querySelector('.stage-video');
@@ -760,15 +801,26 @@ $('micBtn').onclick = () => callToggle('audio');
 $('camBtn').onclick = () => callToggle('video');
 $('fileBtn').onclick = () => $('fileInput').click();
 let txAbort = false, txActive = false, progTxt = null;
+const txQueue = []; // multiple files send back-to-back, not in parallel
 function setProg(txt) { progTxt = txt; }
-$('fileInput').onchange = async e => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f || !dc2 || dc2.readyState !== 'open') return;
-    if (f.size > 200 * 1024 * 1024) { addChat('System', 'File too large (200 MB max)', false); return; }
+function queueFiles(files) {
+    if (!dc2 || dc2.readyState !== 'open') { addChat('System', 'Connect first — then send files', false); return; }
+    for (const f of files) {
+        if (f.size > 500 * 1024 * 1024) { addChat('System', f.name + ' too large (500 MB max)', false); continue; }
+        txQueue.push(f);
+    }
+    pumpQueue();
+}
+async function pumpQueue() {
+    if (txActive || !txQueue.length) return;
+    const f = txQueue.shift();
+    addChat('System', 'Sending ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB)' + (txQueue.length ? ' — ' + txQueue.length + ' more queued' : ''), false);
     await sendBuf(await f.arrayBuffer(), f.name);
-};
+    pumpQueue();
+}
+$('fileInput').onchange = e => { queueFiles([...e.target.files]); e.target.value = ''; };
 async function sendBuf(buf, name) {
-    if (txActive) { addChat('System', 'A transfer is already running', false); return; }
+    if (txActive) { txQueue.unshift(new File([buf], name)); return; }
     txActive = true; txAbort = false;
     ctlSend({ t: 'file-meta', name, size: buf.byteLength });
     for (let off = 0; off < buf.byteLength; off += FILE_CHUNK) {
@@ -780,11 +832,9 @@ async function sendBuf(buf, name) {
     addChat('System', '↑ Sent ' + name + ' (' + Math.round(buf.byteLength / 1024) + ' KB)', false);
 }
 document.addEventListener('dragover', e => e.preventDefault());
-document.addEventListener('drop', async e => {
+document.addEventListener('drop', e => {
     e.preventDefault();
-    const f = e.dataTransfer?.files?.[0];
-    if (!f || !dc2 || dc2.readyState !== 'open') return;
-    await sendBuf(await f.arrayBuffer(), f.name);
+    if (e.dataTransfer?.files?.length) queueFiles([...e.dataTransfer.files]);
 });
 // tapping the stats overlay while transferring cancels it
 $('statOverlay').onclick = () => { if (rxFile) { rxFile = null; ctlSend({ t: 'file-cancel' }); setProg(null); addChat('System', 'Transfer cancelled', false); } else if (txActive) txAbort = true; };

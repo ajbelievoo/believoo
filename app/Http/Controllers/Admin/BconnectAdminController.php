@@ -12,6 +12,25 @@ use Illuminate\Support\Facades\Artisan;
 
 class BconnectAdminController extends Controller
 {
+    /** BMyDesk app quit-ratings — stars + feedback from Android/desktop/web. */
+    public function ratings(Request $request)
+    {
+        $q = \Illuminate\Support\Facades\DB::table('bmydesk_app_ratings')->orderByDesc('id');
+        if ($request->filled('platform')) $q->where('platform', $request->platform);
+        if ($request->filled('stars')) $q->where('rating', (int) $request->stars);
+        $ratings = $q->paginate(40)->withQueryString();
+
+        $stats = [
+            'total' => \Illuminate\Support\Facades\DB::table('bmydesk_app_ratings')->count(),
+            'avg' => round((float) \Illuminate\Support\Facades\DB::table('bmydesk_app_ratings')->avg('rating'), 1),
+            'stars' => \Illuminate\Support\Facades\DB::table('bmydesk_app_ratings')
+                ->selectRaw('rating, count(*) c')->groupBy('rating')->pluck('c', 'rating'),
+            'platforms' => \Illuminate\Support\Facades\DB::table('bmydesk_app_ratings')
+                ->selectRaw('platform, count(*) c')->groupBy('platform')->pluck('c', 'platform'),
+        ];
+        return view('admin.bconnect.ratings', compact('ratings', 'stats'));
+    }
+
     public function index()
     {
         $companies = Company::withCount(['projects', 'members', 'tickets', 'invoices'])->latest()->paginate(25);

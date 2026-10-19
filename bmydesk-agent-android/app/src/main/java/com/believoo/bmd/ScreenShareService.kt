@@ -38,6 +38,9 @@ class ScreenShareService : Service() {
         fun onClip(text: String) {}
         fun onFile(name: String, data: ByteArray) {}
         fun onFileProgress(received: Int, total: Int) {}
+        fun onTyping(from: String) {}
+        fun onLock() {}
+        fun onVol(dir: String) {}
     }
 
     var events: Events? = null
@@ -132,6 +135,9 @@ class ScreenShareService : Service() {
                 override fun onClip(text: String) { events?.onClip(text) }
                 override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
                 override fun onFileProgress(r: Int, t: Int) { events?.onFileProgress(r, t) }
+                override fun onTyping(from: String) { events?.onTyping(from) }
+                override fun onLock() { events?.onLock() }
+                override fun onVol(dir: String) { events?.onVol(dir) }
                 // viewer's quality toggle actually retunes this capture
                 override fun onQuality(mode: String) { h.setQuality(mode) }
             }
