@@ -66,10 +66,17 @@ class WebRtcHost(context: Context) {
             .createPeerConnectionFactory()
     }
 
+    @Volatile private var stopping = false
+
     fun startCapture(resultData: Intent, width: Int, height: Int, fps: Int = 15) {
+        stopping = false
         try {
             capturer = ScreenCapturerAndroid(resultData, object : android.media.projection.MediaProjection.Callback() {
-                override fun onStop() { listener?.onError("Screen capture stopped") }
+                // onStop also fires on our own stop() — only surface it as an
+                // error when the SYSTEM revoked the projection mid-session
+                override fun onStop() {
+                    if (!stopping) listener?.onError("Screen capture stopped")
+                }
             })
             surfaceHelper = SurfaceTextureHelper.create("CaptureThread", egl.eglBaseContext)
             videoSource = factory.createVideoSource(true)
@@ -106,9 +113,13 @@ class WebRtcHost(context: Context) {
         }, 12000)
     }
 
+    /** true once the capture pipeline produced a screen track to send. */
+    fun hasTrack(): Boolean = localTrack != null
+
     fun handleOffer(offerSdp: String, ice: List<PeerConnection.IceServer>) {
         // answering with no screen track = the viewer connects to silence
-        // (black forever). Surface it instead of pretending we're streaming.
+        // (black forever). The service queues offers until capture is up —
+        // reaching here with no track is a bug, surface it loudly.
         if (localTrack == null) { listener?.onError("Screen capture isn't running — accept again and tap 'Start now'"); return }
         val constraints = MediaConstraints()
         // A reconnecting viewer sends a FRESH offer — the old peer (probably a
@@ -355,6 +366,7 @@ class WebRtcHost(context: Context) {
     fun camVideoTrack(): VideoTrack? = camTrack
 
     fun stop() {
+        stopping = true
         ctl.close()
         runCatching { camCapturer?.stopCapture() }
         runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose(); adm?.release() }

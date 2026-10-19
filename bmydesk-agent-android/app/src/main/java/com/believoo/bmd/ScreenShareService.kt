@@ -166,7 +166,11 @@ class ScreenShareService : Service() {
 
     fun answerOffer(offerSdp: String) {
         val h = host
-        if (h == null) pendingOffer = offerSdp else h.handleOffer(offerSdp, iceServers)
+        // WARM builds the factory before consent — an offer landing in that
+        // window must QUEUE, not error: answering without a screen track
+        // gives the viewer a permanently black session.
+        if (h == null || !h.hasTrack()) pendingOffer = offerSdp
+        else h.handleOffer(offerSdp, iceServers)
     }
     fun addIce(c: JsonObject) { host?.addIce(c) }
 
