@@ -91,8 +91,15 @@ class RemoteViewer(context: Context) {
             override fun onAddTrack(r: RtpReceiver?, s: Array<out MediaStream>?) {}
             override fun onTrack(t: RtpTransceiver?) {
                 val tr = t?.receiver?.track() ?: return
+                // === on the Java proxy objects is NOT reliable — libwebrtc can
+                // hand a different RtpTransceiver instance for the same native
+                // slot (screen once rendered into the tiny PIP). Match by mid
+                // or by the recvonly direction we created the slot with.
+                val isScreen = t === screenT
+                    || (t.mid != null && screenT?.mid != null && t.mid == screenT?.mid)
+                    || (t.direction == RtpTransceiver.RtpTransceiverDirection.RECV_ONLY && tr.kind() == "video")
                 when {
-                    t === screenT -> (tr as? VideoTrack)?.let { listener?.onTrack(it) }
+                    isScreen -> (tr as? VideoTrack)?.let { listener?.onTrack(it) }
                     tr.kind() == "audio" -> tr.setEnabled(true) // call audio plays via the audio device module
                     tr.kind() == "video" -> (tr as? VideoTrack)?.let { listener?.onPipTrack(it) }
                 }
