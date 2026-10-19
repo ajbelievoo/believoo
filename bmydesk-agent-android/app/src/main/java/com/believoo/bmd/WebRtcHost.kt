@@ -20,6 +20,8 @@ class WebRtcHost(context: Context) {
         fun onPeerDisconnected()
         /** viewer's camera — picture-in-picture feed on the host side */
         fun onPipTrack(track: VideoTrack) {}
+        /** projection revoked or capture crashed — pipeline needs re-consent */
+        fun onCaptureDead() {}
         fun onError(message: String)
     }
 
@@ -35,6 +37,7 @@ class WebRtcHost(context: Context) {
     private var videoSource: VideoSource? = null
     private var surfaceHelper: SurfaceTextureHelper? = null
     private var localTrack: VideoTrack? = null
+    private var screenSender: RtpSender? = null
     private var iceQueue = mutableListOf<IceCandidate>()
     private var remoteSet = false
     private var capW = 0
@@ -73,9 +76,14 @@ class WebRtcHost(context: Context) {
         try {
             capturer = ScreenCapturerAndroid(resultData, object : android.media.projection.MediaProjection.Callback() {
                 // onStop also fires on our own stop() — only surface it as an
-                // error when the SYSTEM revoked the projection mid-session
+                // error when the SYSTEM revoked the projection mid-session.
+                // ColorOS/Funtouch kill it when the app is swiped away — mark
+                // the pipeline dead so the service can trigger a re-consent.
                 override fun onStop() {
-                    if (!stopping) listener?.onError("Screen capture stopped")
+                    if (stopping) return
+                    localTrack = null; videoSource = null; capturer = null
+                    listener?.onError("Screen capture stopped")
+                    listener?.onCaptureDead()
                 }
             })
             surfaceHelper = SurfaceTextureHelper.create("CaptureThread", egl.eglBaseContext)
@@ -86,11 +94,16 @@ class WebRtcHost(context: Context) {
             // viewer watches black
             capturer!!.startCapture(width, height, fps)
         } catch (e: Exception) {
+            localTrack = null; videoSource = null; capturer = null
             listener?.onError("Screen capture failed: ${e.message}")
+            listener?.onCaptureDead()
             return
         }
         capW = width; capH = height
         localTrack = factory.createVideoTrack("screen", videoSource)
+        // recapture mid-session: the live peer still points at the dead track —
+        // swap in the new one on the existing sender (no renegotiation needed)
+        if (remoteSet) runCatching { screenSender?.setTrack(localTrack, true) }
     }
 
     // Post-connect sanity: is the encoder actually emitting? A dead
@@ -127,7 +140,7 @@ class WebRtcHost(context: Context) {
         // the same capture, freezing the stream.
         peer?.let { old ->
             runCatching { old.close() }
-            iceQueue.clear(); remoteSet = false
+            iceQueue.clear(); remoteSet = false; screenSender = null
         }
         peer = factory.createPeerConnection(ice, object : PeerConnection.Observer {
             override fun onIceCandidate(c: IceCandidate) {
@@ -207,7 +220,7 @@ class WebRtcHost(context: Context) {
             }
         }) ?: run { listener?.onError("peer create failed"); return }
 
-        localTrack?.let { peer!!.addTrack(it, listOf("screen")) }
+        localTrack?.let { screenSender = peer!!.addTrack(it, listOf("screen")) }
         // screen content: high bitrate + never trade resolution for fps
         runCatching {
             peer!!.senders.firstOrNull { it.track()?.kind() == "video" }?.let { snd ->
@@ -367,6 +380,7 @@ class WebRtcHost(context: Context) {
 
     fun stop() {
         stopping = true
+        screenSender = null
         ctl.close()
         runCatching { camCapturer?.stopCapture() }
         runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose(); adm?.release() }

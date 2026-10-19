@@ -42,6 +42,8 @@ class ScreenShareService : Service() {
         fun onWantCtl() {}
         fun onLock() {}
         fun onVol(dir: String) {}
+        /** capture died (revoked/crashed) — host should re-grant projection */
+        fun onCaptureDead() {}
     }
 
     var events: Events? = null
@@ -61,6 +63,11 @@ class ScreenShareService : Service() {
             ACTION_CAPTURE -> {
                 val data = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
                     ?: run { events?.onError("No projection data"); return START_NOT_STICKY }
+                // Android 14+: getMediaProjection throws unless the service is
+                // ALREADY foreground with the mediaProjection type — replaying
+                // a recapture intent onto a restarted service would crash the
+                // capture thread without this.
+                startForegroundNotif()
                 startCapture(data)
             }
             ACTION_STOP -> {
@@ -125,7 +132,11 @@ class ScreenShareService : Service() {
         Thread {
             val h = ensureHost()
             h.startCapture(resultData, cw, ch, 20)
-            pendingOffer?.let { pendingOffer = null; h.handleOffer(it, iceServers) }
+            // only consume the queued offer once a real screen track exists —
+            // if capture failed, keep it queued so the next offer (after the
+            // user's re-consent) still gets answered
+            val pend = pendingOffer
+            if (pend != null && h.hasTrack()) { pendingOffer = null; h.handleOffer(pend, iceServers) }
         }.start()
     }
 
@@ -141,6 +152,7 @@ class ScreenShareService : Service() {
                 override fun onPeerConnected() { events?.onConnected(); h.watchEncoding() }
                 override fun onPeerDisconnected() { events?.onDisconnected() }
                 override fun onPipTrack(track: org.webrtc.VideoTrack) { events?.onPipTrack(track) }
+                override fun onCaptureDead() { events?.onCaptureDead() }
                 override fun onError(message: String) { events?.onError(message) }
             }
         h.ctl.sink = object : CtlChannel.Sink {
@@ -169,8 +181,14 @@ class ScreenShareService : Service() {
         // WARM builds the factory before consent — an offer landing in that
         // window must QUEUE, not error: answering without a screen track
         // gives the viewer a permanently black session.
-        if (h == null || !h.hasTrack()) pendingOffer = offerSdp
-        else h.handleOffer(offerSdp, iceServers)
+        if (h == null || !h.hasTrack()) {
+            pendingOffer = offerSdp
+            // a live host with NO track means the projection died mid-session
+            // — poke the host UI to re-run consent so the viewer stops seeing
+            // black. The activity throttles; keep firing so a foregrounded
+            // MainActivity always gets the poke.
+            if (h != null) events?.onCaptureDead()
+        } else h.handleOffer(offerSdp, iceServers)
     }
     fun addIce(c: JsonObject) { host?.addIce(c) }
 

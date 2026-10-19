@@ -3,6 +3,7 @@ package com.believoo.bmd
 import android.app.Activity
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -110,6 +111,7 @@ class MainActivity : Activity() {
                     teardownHandler.postDelayed(r, 30_000)
                 }
                 override fun onError(msg: String) = ui { setStatus(msg, "#ef4444") }
+                override fun onCaptureDead() = ui { onCaptureDeadNow() }
                 override fun onCtlReady() = ui {
                     sessRow.visibility = View.VISIBLE; startClipSync()
                     // host accepted with "view only" — lock input injection and
@@ -211,6 +213,11 @@ class MainActivity : Activity() {
         pendingVDevice = null; pendingVName = null
         runCatching {
             val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+            // one-time migration: older builds defaulted view-only ON and may
+            // have left a stale saved pref — wipe it once so control is truly
+            // the default (users who want watch-only can re-enable it after)
+            if (!sp.getBoolean("mig_vo145", false))
+                sp.edit().putBoolean("def_viewonly", false).putBoolean("mig_vo145", true).apply()
             chkViewOnly.isChecked = sp.getBoolean("def_viewonly", false) // default: FULL control — view-only is the deliberate opt-in
             chkTrust.isChecked = sp.getBoolean("def_trust", false)
         }
@@ -298,6 +305,12 @@ class MainActivity : Activity() {
         // opened the app while a session sits in the bubble → bring it back
         if (viewerMinimized && (remoteViewer != null || vJoin != null || service != null)) restoreViewer()
         maybeConfirmDisconnect(intent)
+        // cold-start from the "restore sharing" heads-up: binding may still
+        // be in flight, so give the service a moment before firing consent
+        if (intent?.getBooleanExtra("recapture", false) == true) {
+            intent.removeExtra("recapture")
+            sessTicker.postDelayed({ onCaptureDeadNow() }, 800)
+        }
     }
     override fun onPause() { foreground = false; super.onPause() }
 
@@ -311,6 +324,10 @@ class MainActivity : Activity() {
         setIntent(intent)
         if (intent?.getBooleanExtra("confirm_disconnect", false) == true) {
             maybeConfirmDisconnect(intent); return
+        }
+        // heads-up notification tap → host is foreground now, re-run consent
+        if (intent?.getBooleanExtra("recapture", false) == true) {
+            intent.removeExtra("recapture"); onCaptureDeadNow(); return
         }
         if (intent?.getBooleanExtra("resume_viewer", false) == true &&
             (remoteViewer != null || vJoin != null || service != null)) {
@@ -2110,6 +2127,38 @@ class MainActivity : Activity() {
         toast("🔓 Control request sent — host must tap Allow")
     }
 
+    // ── Capture-death recovery ── ColorOS/Funtouch (and any swipe-kill or
+    // status-chip stop) revoke the MediaProjection mid-session: ctl keeps
+    // working but the viewer sees permanent black. Auto re-launch the consent
+    // dialog (one tap restores) + a heads-up notification for a backgrounded
+    // host. Once per dead-window; reset when a capture result lands.
+    private var recaptureAsked = false
+    private var recapturing = false
+    private fun onCaptureDeadNow() {
+        if (service == null) return
+        setStatus("⚠ Screen sharing stopped — tap 'Start now' to restore", "#f59e0b")
+        runCatching {
+            service?.ctl()?.sendChat("system", "⚠ Host's screen capture stopped — they're re-sharing…")
+        }
+        runCatching {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val pi = PendingIntent.getActivity(this, 0,
+                Intent(this, MainActivity::class.java).putExtra("recapture", true)
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            nm.notify(78, Notification.Builder(this, SessionBubbleService.CHAN)
+                .setContentTitle("Screen sharing stopped")
+                .setContentText("Tap to restore the remote view")
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentIntent(pi).setAutoCancel(true).build())
+        }
+        if (recaptureAsked) return
+        recaptureAsked = true
+        recapturing = true
+        val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        startActivityForResult(mpm.createScreenCaptureIntent(), 1001)
+    }
+
     // WhatsApp-style delivery/seen receipts — id → row so the tick can update
     private val chatTickRows = mutableMapOf<String, TextView>()
     private var fileProgRow: TextView? = null // single updating row for transfer %
@@ -3044,12 +3093,22 @@ class MainActivity : Activity() {
         if (requestCode != 1001) return
         if (resultCode != RESULT_OK || data == null) {
             pendingProjection = false
+            recaptureAsked = false
+            // recapture decline ≠ session decline — the viewer keeps the
+            // channel but sees black until the host re-allows
+            if (recapturing) {
+                recapturing = false
+                setStatus("Screen share declined — viewer is black until you allow", "#f59e0b")
+                return
+            }
             // an auto-accepted (PIN/trusted) session can't be 'rejected' —
             // the server already made it active; deny = end it outright.
             if (unattendedConsent) { unattendedConsent = false; endSession() }
             else { respondTo("reject"); setStatus("Capture permission denied", "#ef4444") }
             return
         }
+        recaptureAsked = false
+        val wasRecapture = recapturing; recapturing = false
         // start FGS first (Android 14 requirement) then hand over the projection intent
         startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_START))
         bindService(Intent(this, ScreenShareService::class.java), conn, Context.BIND_AUTO_CREATE)
@@ -3058,6 +3117,7 @@ class MainActivity : Activity() {
             .putExtra(ScreenShareService.EXTRA_RESULT_DATA, data)
         startService(svc)
         pendingProjection = false
+        if (wasRecapture) { setStatus("Sharing restored", "#22c55e"); return }
         respondTo("accept")
         unattendedConsent = false
         if (pendingTrust) {
