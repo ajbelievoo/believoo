@@ -637,15 +637,18 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#94a3b8")); textSize = 12f; setPadding(0, 4, 0, 14)
         })
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val fieldBg = if (dark) Color.parseColor("#131c2e") else Color.parseColor("#f1f5f9")
         remoteCodeInput = android.widget.EditText(this).apply {
             hint = "ABC123XY"
             setTextColor(rose); textSize = 17f; typeface = Typeface.MONOSPACE
             setHintTextColor(Color.parseColor("#475569"))
             filters = arrayOf(android.text.InputFilter.AllCaps(), android.text.InputFilter.LengthFilter(8))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
+            setOnEditorActionListener { _, _, _ -> connectRemote(); true }
             setPadding(20, 12, 20, 12)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
+            background = GradientDrawable().apply { setColor(fieldBg); cornerRadius = 16f }
         }
         row.addView(remoteCodeInput)
         row.addView(mbtn("Connect ➜", Color.parseColor("#e11d48")) { connectRemote() }, lpGap())
@@ -658,7 +661,7 @@ class MainActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setPadding(20, 10, 20, 10)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
-            background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
+            background = GradientDrawable().apply { setColor(fieldBg); cornerRadius = 16f }
         }
         remoteCard.addView(remoteNoteInput)
         remotePinInput = android.widget.EditText(this).apply {
@@ -667,9 +670,13 @@ class MainActivity : Activity() {
             setHintTextColor(Color.parseColor("#475569"))
             filters = arrayOf(android.text.InputFilter.LengthFilter(12))
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            // the keyboard's ✓/→ submits — users hunt for a hidden Connect
+            // button otherwise and think the PIN step is stuck
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
+            setOnEditorActionListener { _, _, _ -> connectRemote(); true }
             setPadding(20, 10, 20, 10)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
-            background = GradientDrawable().apply { setColor(Color.parseColor("#131c2e")); cornerRadius = 16f }
+            background = GradientDrawable().apply { setColor(fieldBg); cornerRadius = 16f }
         }
         remoteCard.addView(remotePinInput)
         remoteCard.addView(TextView(this).apply {
@@ -1864,8 +1871,22 @@ class MainActivity : Activity() {
                     override fun onEnd() { ui { viewerStatus.text = "Host ended session"; thread { Thread.sleep(1200); ui { exitViewer() } } } }
                 })
             } catch (e: Exception) {
-                ui { viewerStatus.text = "Join failed: ${e.message}"; }
-                thread { Thread.sleep(2500); ui { exitViewer() } }
+                val msg = e.message ?: "join failed"
+                ui {
+                    viewerStatus.text = "Join failed: $msg"
+                    // loud + persistent — a 2s status flash was invisible, so a
+                    // wrong PIN looked like "the connect button does nothing"
+                    android.app.AlertDialog.Builder(this@MainActivity, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("Could not connect")
+                        .setMessage(when {
+                            msg.contains("wrong PIN", true) -> "Wrong PIN — check the 4–12 digit PIN the host set, or leave PIN empty for a normal (accepted) connection."
+                            msg.contains("too many", true) -> msg
+                            else -> msg + "\n\nLeave the PIN field empty unless the host gave you one."
+                        })
+                        .setPositiveButton("Try again") { _, _ -> ui { exitViewer() } }
+                        .setCancelable(false)
+                        .show()
+                }
             }
         }
     }
@@ -1883,7 +1904,13 @@ class MainActivity : Activity() {
         // that a dead host doesn't keep the viewer spinning for minutes
         if (vConnTries > 4) { ui { viewerStatus.text = "Connection lost — host app closed or network dropped" }; thread { Thread.sleep(2500); ui { exitViewer() } }; return }
         vRebuilding = true
-        ui { viewerStatus.text = "Reconnecting… (attempt $vConnTries)" }
+        ui {
+            viewerStatus.text = if (vJoin?.autoAccepted == true && vConnTries >= 3)
+                // PIN joins "work" server-side but the remote Android still
+                // needs its one-tap consent — say so instead of spinning forever
+                "Waiting for host… (Android needs one tap on the remote device too — open BMyDesk there)"
+            else "Reconnecting… (attempt $vConnTries)"
+        }
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             runCatching { remoteViewer?.stop() }
             remoteViewer = null
