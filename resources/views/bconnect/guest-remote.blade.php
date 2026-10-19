@@ -53,6 +53,13 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
 @keyframes sp { to { transform:rotate(360deg); } }
 .endbtn { background:#7f1d1d; color:#fecaca; border:0; font-weight:600; font-size:12px; padding:8px 16px; border-radius:10px; cursor:pointer; }
 #clickHint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.72); color:#cbd5e1; font-size:12px; padding:8px 16px; border-radius:999px; z-index:6; }
+/* floating session pill — Back drops to this instead of disconnecting */
+body.pillmode .stage, body.pillmode .top { display:none !important; }
+#sessPill { position:fixed; bottom:20px; right:16px; z-index:9999; display:none; }
+#pillDot { width:54px; height:54px; border-radius:50%; background:#0f172a; border:2px solid #e11d48; color:#e2e8f0; font-size:20px; box-shadow:0 6px 18px rgba(0,0,0,.5); cursor:pointer; }
+#pillMenu { display:none; flex-direction:column; gap:8px; margin-bottom:10px; align-items:center; }
+.pillBtn { width:44px; height:44px; border-radius:50%; background:#1e293b; border:1px solid #334155; color:#e2e8f0; font-size:16px; cursor:pointer; }
+#pillTag { position:fixed; bottom:82px; right:16px; z-index:9998; display:none; background:#0f172a; border:1px solid #334155; color:#94a3b8; font-size:11px; padding:6px 10px; border-radius:8px; }
 </style>
 </head>
 <body>
@@ -171,6 +178,18 @@ body { background:var(--bg); color:var(--txt); font-family:ui-sans-serif,system-
             </div>
         </div>
     </div>
+</div>
+
+<!-- floating session pill — Back drops here instead of disconnecting -->
+<div id="pillTag">Remote session still running — tap ⌂ to return</div>
+<div id="sessPill">
+    <div id="pillMenu">
+        <button class="pillBtn" id="pillOpen" title="Back to the remote screen">⌂</button>
+        <button class="pillBtn" id="pillMic" title="Mic on/off">🎤</button>
+        <button class="pillBtn" id="pillCam" title="Camera on/off">📹</button>
+        <button class="pillBtn" id="pillEnd" title="End session" style="background:#dc2626;border-color:#991b1b;">✕</button>
+    </div>
+    <button id="pillDot" title="Remote session — tap for controls">⌂</button>
 </div>
 
 <script src="/js/pusher.min.js"></script>
@@ -379,7 +398,7 @@ async function startPeer() {
         $('clickHint').style.display = 'block';
         setBadge('connected', true); connected = true; $('encBadge').style.display = 'inline-block';
         if (streamTimeout) clearTimeout(streamTimeout);
-        startPing();
+        startPing(); armBackTrap();
     };
     pc.onicecandidate = e => { if (e.candidate) sendSignal({ kind: 'ice', candidate: e.candidate }); };
     pc.onconnectionstatechange = () => {
@@ -722,6 +741,8 @@ async function callToggle(kind) {
         }
         $('micBtn').style.background = micOn ? '#15803d' : '#1e293b';
         $('camBtn').style.background = camOn ? '#15803d' : '#1e293b';
+        if ($('pillMic')) { $('pillMic').style.background = micOn ? '#15803d' : '#1e293b';
+            $('pillCam').style.background = camOn ? '#15803d' : '#1e293b'; }
         ctlSend({ t: 'call', k: kind === 'audio' ? 'voice' : 'camera', on });
         addChat('System', (kind === 'audio' ? 'Microphone ' : 'Camera ') + (on ? 'on' : 'off'), false);
     } catch (e) { addChat('System', (kind === 'audio' ? 'Mic' : 'Camera') + ' failed: ' + (e.message || e), false); }
@@ -897,7 +918,42 @@ video.addEventListener('click', () => { video.focus(); $('clickHint').style.disp
 function startPing() {
     setInterval(() => { if (dc && dc.readyState === 'open') dc.send(JSON.stringify({ t: 'ping', ts: performance.now() })); }, 3000);
 }
-function cleanup() { try { if (pc) pc.close(); } catch (e) {} pc = null; connected = false; }
+function cleanup() { allowLeave = true; restoreFromPill(); try { if (pc) pc.close(); } catch (e) {} pc = null; connected = false; }
+
+// ── Floating session pill + back trap — Back/minimize never disconnects ──
+let pillMode = false, allowLeave = false;
+function armBackTrap() { try { history.pushState({ bmdSess: 1 }, document.title); } catch (e) {} }
+function minimizeToPill() {
+    if (!connected) return;
+    pillMode = true;
+    document.body.classList.add('pillmode');
+    $('sessPill').style.display = 'block'; $('pillMenu').style.display = 'none';
+    $('pillTag').style.display = 'block'; setTimeout(() => { $('pillTag').style.display = 'none'; }, 4000);
+}
+function restoreFromPill() {
+    pillMode = false;
+    document.body.classList.remove('pillmode');
+    $('sessPill').style.display = 'none'; $('pillTag').style.display = 'none';
+}
+window.addEventListener('popstate', () => {
+    if (allowLeave) return; // user confirmed — real navigation, session ends via pagehide beacon
+    if (!connected) { return; }
+    if (!pillMode) { minimizeToPill(); armBackTrap(); }
+    else if (confirm('End the remote session and leave?')) {
+        allowLeave = true; try { sendSignal({ kind: 'end' }); } catch (e) {}
+        cleanup(); history.back();
+    } else armBackTrap();
+});
+$('pillDot').onclick = () => { const m = $('pillMenu'); m.style.display = m.style.display === 'none' ? 'flex' : 'none'; };
+$('pillOpen').onclick = () => { restoreFromPill(); };
+$('pillMic').onclick = () => { callToggle('audio'); };
+$('pillCam').onclick = () => { callToggle('video'); };
+$('pillEnd').onclick = () => {
+    if (confirm('End this remote session?')) {
+        allowLeave = true; try { sendSignal({ kind: 'end' }); } catch (e) {}
+        cleanup(); showCsat();
+    }
+};
 $('joinBtn').addEventListener('click', join);
 $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
 $('endBtn').addEventListener('click', async () => {
@@ -930,7 +986,12 @@ $('csatSend').onclick = async () => {
     endCsat();
 };
 $('csatSkip').onclick = (e) => { e.preventDefault(); endCsat(); };
-window.addEventListener('beforeunload', () => {
+window.addEventListener('beforeunload', e => {
+    if (connected && !allowLeave) { e.preventDefault(); e.returnValue = ''; }
+});
+// 'end' beacon goes on pagehide — only when the page REALLY unloads (the
+// beforeunload prompt doesn't kill the session if the user stays).
+window.addEventListener('pagehide', () => {
     try { fetch(API + '/' + CODE + '/signal', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'end', agent_token: VTOKEN, n: nonce() }) }); } catch (e) {}
 });

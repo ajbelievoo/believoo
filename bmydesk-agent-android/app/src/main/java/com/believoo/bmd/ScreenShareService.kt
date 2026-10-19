@@ -55,7 +55,12 @@ class ScreenShareService : Service() {
                     ?: run { events?.onError("No projection data"); return START_NOT_STICKY }
                 startCapture(data)
             }
-            ACTION_STOP -> { RemoteControlService.blocked = false; host?.stop(); host = null; pendingOffer = null; stopSelf() }
+            ACTION_STOP -> {
+                RemoteControlService.blocked = false
+                host?.stop(); host = null; pendingOffer = null
+                wakeLock?.let { runCatching { if (it.isHeld) it.release() } }; wakeLock = null
+                stopSelf()
+            }
         }
         return START_STICKY
     }
@@ -85,10 +90,19 @@ class ScreenShareService : Service() {
     }
 
     @Volatile private var pendingOffer: String? = null
+    @Volatile private var wakeLock: android.os.PowerManager.WakeLock? = null
 
     // PeerConnectionFactory + EGL + codec enumeration are heavy (seconds on
     // emulators / low-end phones) — never on the main thread, or Android ANRs.
     private fun startCapture(resultData: Intent) {
+        // partial wake lock: the app is meant to sit minimized while the
+        // viewer drives the phone — without this, doze can stall encoder +
+        // data-channel threads and remote input silently stops landing.
+        if (wakeLock == null) {
+            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "bmd:session")
+                .apply { setReferenceCounted(false); runCatching { acquire(4 * 60 * 60 * 1000L) } }
+        }
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val m = DisplayMetrics(); @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m)
         // keep aspect ratio, cap long side at 2560 so encode stays smooth
@@ -132,6 +146,7 @@ class ScreenShareService : Service() {
 
     override fun onDestroy() {
         host?.stop()
+        wakeLock?.let { runCatching { if (it.isHeld) it.release() } }; wakeLock = null
         super.onDestroy()
     }
 

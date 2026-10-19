@@ -25,6 +25,7 @@ class WebRtcHost(context: Context) {
     var listener: Listener? = null
     private val gson = Gson()
     val ctl = CtlChannel(gson)
+    private val inputDropWarned = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val egl = EglBase.create()
     private val factory: PeerConnectionFactory
@@ -121,7 +122,15 @@ class WebRtcHost(context: Context) {
                             // remote-control injection — AccessibilityService
                             // turns viewer touch/keys into real gestures
                             val dm = appContext.resources.displayMetrics
-                            RemoteControlService.instance?.handleInput(m, dm.widthPixels, dm.heightPixels)
+                            val svc = RemoteControlService.instance
+                            if (svc == null) {
+                                // input arrived but no accessibility service —
+                                // means the user hasn't enabled it (or the OEM
+                                // killed it). Log once so it's diagnosable.
+                                if (inputDropWarned.compareAndSet(false, true))
+                                    android.util.Log.w("BMyDesk",
+                                        "remote input arriving but RemoteControlService is null — accessibility not enabled?")
+                            } else svc.handleInput(m, dm.widthPixels, dm.heightPixels)
                         }
                     }
                 })

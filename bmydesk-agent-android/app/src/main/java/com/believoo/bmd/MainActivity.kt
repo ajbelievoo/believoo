@@ -78,6 +78,15 @@ class MainActivity : Activity() {
                     teardownRunnable?.let { teardownHandler.removeCallbacks(it) }
                     setStatus("Viewer connected — sharing screen", "#22c55e")
                     sessRow.visibility = View.VISIBLE
+                    // auto-minimize to the floating bubble — the controlled
+                    // phone shows its real screen, not our UI; session stays
+                    // live via the foreground service + accessibility service
+                    if (getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("auto_min_host", true)) {
+                        sessTicker.postDelayed({
+                            if (peerLive && service != null && !isFinishing && !isDestroyed)
+                                minimizeViewer()
+                        }, 1200)
+                    }
                 }
                 override fun onDisconnected() = ui {
                     peerLive = false
@@ -212,6 +221,7 @@ class MainActivity : Activity() {
         }
         super.onCreate(savedInstanceState)
         buildUi()
+        SessionBubbleService.actionListener = { cmd -> onBubbleAction(cmd) }
         // Persistent agent — keeps the process (and so the ws/poll loop) alive
         // even after the user swipes the activity away, and re-surfaces join
         // requests as heads-up notifications.
@@ -239,7 +249,8 @@ class MainActivity : Activity() {
             window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // opened the app while a session sits in the bubble → bring it back
-        if (viewerMinimized && (remoteViewer != null || vJoin != null)) restoreViewer()
+        if (viewerMinimized && (remoteViewer != null || vJoin != null || service != null)) restoreViewer()
+        maybeConfirmDisconnect(intent)
     }
     override fun onPause() { foreground = false; super.onPause() }
 
@@ -250,7 +261,12 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        if (intent?.getBooleanExtra("resume_viewer", false) == true && (remoteViewer != null || vJoin != null)) {
+        setIntent(intent)
+        if (intent?.getBooleanExtra("confirm_disconnect", false) == true) {
+            maybeConfirmDisconnect(intent); return
+        }
+        if (intent?.getBooleanExtra("resume_viewer", false) == true &&
+            (remoteViewer != null || vJoin != null || service != null)) {
             restoreViewer(); return
         }
         if (intent != null && handleDeepLink(intent)) return
@@ -1732,6 +1748,8 @@ class MainActivity : Activity() {
     }
 
     private fun endSession() {
+        viewerMinimized = false
+        runCatching { stopService(Intent(this, SessionBubbleService::class.java)) }
         setViewOnlyLive(false)
         RemoteControlService.blocked = false
         unattendedPrompted = false
@@ -2467,7 +2485,7 @@ class MainActivity : Activity() {
     private var viewerMinimized = false
 
     private fun minimizeViewer() {
-        if (remoteViewer == null && vJoin == null) { exitViewer(); return }
+        if (remoteViewer == null && vJoin == null && service == null) return
         viewerMinimized = true
         viewerPane.visibility = View.GONE
         chatPanel.visibility = View.GONE
@@ -2479,11 +2497,36 @@ class MainActivity : Activity() {
     }
 
     private fun restoreViewer() {
-        if (remoteViewer == null && vJoin == null) { viewerMinimized = false; return }
+        if (remoteViewer == null && vJoin == null && service == null) { viewerMinimized = false; return }
         viewerMinimized = false
         stopService(Intent(this, SessionBubbleService::class.java))
-        viewerPane.visibility = View.VISIBLE
-        enterImmersive()
+        if (remoteViewer != null || vJoin != null) { viewerPane.visibility = View.VISIBLE; enterImmersive() }
+    }
+
+    // bubble toolbar taps land here — no UI needed for mic/cam/end
+    private fun onBubbleAction(cmd: String) {
+        ui {
+            when (cmd) {
+                "mic", "cam" -> {
+                    toggleCall(cmd, viewer = remoteViewer != null)
+                    SessionBubbleService.micState = micOn
+                    SessionBubbleService.camState = camOn
+                }
+            }
+        }
+    }
+
+    /** 'confirm_disconnect' intent → the bubble's ✕: explicit Yes ends it. */
+    private fun maybeConfirmDisconnect(i: Intent?) {
+        if (i?.getBooleanExtra("confirm_disconnect", false) != true) return
+        i.removeExtra("confirm_disconnect")
+        val viewerLive = remoteViewer != null || vJoin != null
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("End session?")
+            .setMessage("Disconnect this remote session?")
+            .setPositiveButton("Yes, end it") { _, _ -> if (viewerLive) exitViewer() else endSession() }
+            .setNegativeButton("No, keep it", null)
+            .show()
     }
 
     private fun confirmExitViewer() {

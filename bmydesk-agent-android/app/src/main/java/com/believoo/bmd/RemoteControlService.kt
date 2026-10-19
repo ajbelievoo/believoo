@@ -126,8 +126,24 @@ class RemoteControlService : AccessibilityService() {
         dispatch(GestureDescription.StrokeDescription(p, 0, 650))
     }
 
+    // dispatchGesture returns false when the gesture can't start (too many
+    // pending) and the callback reports cancel — log once per failure burst
+    // so "input stopped while minimized" is diagnosable instead of silent.
+    private var failLogged = false
+
     private fun dispatch(sd: GestureDescription.StrokeDescription) {
-        runCatching { dispatchGesture(GestureDescription.Builder().addStroke(sd).build(), null, null) }
+        runCatching {
+            val ok = dispatchGesture(GestureDescription.Builder().addStroke(sd).build(),
+                object : GestureResultCallback() {
+                    override fun onCancelled(g: GestureDescription?) {
+                        if (!failLogged) { failLogged = true
+                            android.util.Log.w("BMyDesk", "remote gesture CANCELLED (bg/OEM restriction?)") }
+                    }
+                    override fun onCompleted(g: GestureDescription?) { failLogged = false }
+                }, null)
+            if (!ok && !failLogged) { failLogged = true
+                android.util.Log.w("BMyDesk", "dispatchGesture returned false") }
+        }
     }
 
     // ── keys: global actions for nav keys, SET_TEXT for printable chars ──
