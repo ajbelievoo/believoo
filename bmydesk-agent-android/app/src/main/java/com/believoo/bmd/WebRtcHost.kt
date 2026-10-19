@@ -17,6 +17,8 @@ class WebRtcHost(context: Context) {
         fun sendSignal(payload: JsonObject)
         fun onPeerConnected()
         fun onPeerDisconnected()
+        /** viewer's camera — picture-in-picture feed on the host side */
+        fun onPipTrack(track: VideoTrack) {}
         fun onError(message: String)
     }
 
@@ -35,6 +37,15 @@ class WebRtcHost(context: Context) {
     private var remoteSet = false
     private var capW = 0
     private var capH = 0
+
+    // call media — the viewer's offer carries sendrecv audio+video slots;
+    // toggling is sender.setTrack() on the matching transceiver, no reneg.
+    private var micTrack: AudioTrack? = null
+    private var micSource: AudioSource? = null
+    private var camTrack: VideoTrack? = null
+    private var camCapturer: Camera2Capturer? = null
+    private var camSource: VideoSource? = null
+    private var camHelper: SurfaceTextureHelper? = null
 
     init {
         PeerConnectionFactory.initialize(
@@ -117,7 +128,12 @@ class WebRtcHost(context: Context) {
             }
             override fun onRenegotiationNeeded() {}
             override fun onAddTrack(r: RtpReceiver?, s: Array<out MediaStream>?) {}
-            override fun onTrack(t: RtpTransceiver?) {}
+            override fun onTrack(t: RtpTransceiver?) {
+                val tr = t?.receiver?.track() ?: return
+                // viewer mic → auto-played by the audio device module;
+                // viewer camera → PIP surface on the host side
+                if (tr.kind() == "video" && tr !== localTrack) (tr as? VideoTrack)?.let { listener?.onPipTrack(it) }
+            }
         }) ?: run { listener?.onError("peer create failed"); return }
 
         localTrack?.let { peer!!.addTrack(it, listOf("screen")) }
@@ -199,8 +215,55 @@ class WebRtcHost(context: Context) {
         if (remoteSet && peer != null) peer!!.addIceCandidate(cand) else iceQueue.add(cand)
     }
 
+    // ── Voice/video call — Zoom-style, inside the remote session ──
+    // Finds the offer's call slots: the audio transceiver, and the video
+    // transceiver that is NOT carrying the screen track.
+    private fun callAudioTransceiver(): RtpTransceiver? =
+        peer?.transceivers?.firstOrNull { it.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO }
+    private fun callCamTransceiver(): RtpTransceiver? {
+        val screenSender = peer?.senders?.firstOrNull { it.track() === localTrack }
+        return peer?.transceivers?.firstOrNull {
+            it.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO && it.sender !== screenSender
+        }
+    }
+
+    fun setMic(on: Boolean): Boolean {
+        val t = callAudioTransceiver() ?: return false
+        if (on && micTrack == null) {
+            micSource = factory.createAudioSource(MediaConstraints())
+            micTrack = factory.createAudioTrack("mic0", micSource)
+        }
+        micTrack?.let { t.sender.setTrack(it, true) }
+        micTrack?.setEnabled(on)
+        ctl.sendCallState("voice", on)
+        return true
+    }
+
+    fun setCam(on: Boolean): Boolean {
+        val t = callCamTransceiver() ?: return false
+        if (on && camTrack == null) {
+            try {
+                camHelper = camHelper ?: SurfaceTextureHelper.create("CamThread", egl.eglBaseContext)
+                camSource = factory.createVideoSource(false)
+                val camEnum = Camera2Enumerator(appContext)
+                val camName = camEnum.deviceNames.firstOrNull { camEnum.isFrontFacing(it) }
+                    ?: camEnum.deviceNames.firstOrNull() ?: return false
+                camCapturer = Camera2Capturer(appContext, camName, null)
+                camCapturer!!.initialize(camHelper, appContext, camSource!!.capturerObserver)
+                camCapturer!!.startCapture(640, 480, 15)
+                camTrack = factory.createVideoTrack("cam0", camSource)
+            } catch (e: Exception) { listener?.onError("camera: ${e.message}"); return false }
+        }
+        camTrack?.let { t.sender.setTrack(if (on) it else null, true) }
+        ctl.sendCallState("camera", on)
+        return true
+    }
+
     fun stop() {
         ctl.close()
+        runCatching { camCapturer?.stopCapture() }
+        runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose() }
+        camCapturer = null; micTrack = null; camTrack = null; micSource = null; camSource = null
         runCatching { capturer?.stopCapture() }
         runCatching { peer?.close() }
         capturer = null; peer = null; remoteSet = false; iceQueue.clear()

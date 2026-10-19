@@ -41,6 +41,8 @@
 
             <div id="previewBox" class="flex-1 bg-black rounded-xl border border-[var(--bc-border)] relative overflow-hidden min-h-[300px] flex items-center justify-center">
                 <video id="localPreview" autoplay muted playsinline class="max-w-full max-h-full w-full h-full object-contain hidden"></video>
+                <video id="pipVideo" autoplay playsinline muted class="absolute bottom-3 right-3 w-40 rounded-xl border-2 border-cyan-400 hidden bg-black"></video>
+                <audio id="callAudio" autoplay class="hidden"></audio>
                 <div id="previewPlaceholder" class="text-center text-slate-500 p-6">
                     <i class="fas fa-desktop text-4xl mb-3 text-slate-700"></i>
                     <p class="text-sm">Your screen preview appears here after you start sharing.</p>
@@ -49,6 +51,8 @@
 
             <div class="flex gap-2 mt-4 flex-wrap">
                 <button id="shareBtn" class="bc-btn bc-btn-primary"><i class="fas fa-share-square mr-1"></i>Choose Screen to Share</button>
+                <button id="micBtn" class="bc-btn bc-btn-secondary hidden" title="Voice call — mic on/off"><i class="fas fa-microphone mr-1"></i>Mic</button>
+                <button id="camBtn" class="bc-btn bc-btn-secondary hidden" title="Video call — camera on/off"><i class="fas fa-video mr-1"></i>Cam</button>
                 <button id="endBtn" class="bc-btn bc-btn-danger"><i class="fas fa-phone-slash mr-1"></i>End Session</button>
             </div>
             <p class="text-[11px] text-slate-600 mt-3"><i class="fas fa-shield-alt mr-1"></i>Browser host is view-only. For mouse/keyboard control, use the BMyDesk Agent app.</p>
@@ -154,8 +158,13 @@ async function handleOffer(m) {
         pc.onicecandidate = (e) => { if (e.candidate) sendSignal({ kind: 'ice', candidate: e.candidate }); };
         pc.onconnectionstatechange = () => {
             dbg('peer ' + pc.connectionState);
-            if (pc.connectionState === 'connected') setStatus('Viewer connected', 'bc-badge-green');
-            if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) setStatus('Viewer disconnected', 'bc-badge-amber');
+            if (pc.connectionState === 'connected') { setStatus('Viewer connected', 'bc-badge-green'); document.getElementById('micBtn').classList.remove('hidden'); document.getElementById('camBtn').classList.remove('hidden'); }
+            if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) { setStatus('Viewer disconnected', 'bc-badge-amber'); stopCallMedia(); }
+        };
+        // viewer's call media — mic → audio element, camera → PIP window
+        pc.ontrack = (e) => {
+            if (e.track.kind === 'audio') { const a = document.getElementById('callAudio'); a.srcObject = new MediaStream([e.track]); a.play().catch(() => {}); }
+            else { const p = document.getElementById('pipVideo'); p.srcObject = new MediaStream([e.track]); p.classList.remove('hidden'); p.play().catch(() => {}); }
         };
         pc.ondatachannel = (e) => {
             const dcIn = e.channel;
@@ -186,6 +195,47 @@ async function handleOffer(m) {
         setStatus('Streaming…', 'bc-badge-green');
     } catch (e) { console.error('offer handling failed', e); dbg('ERR ' + e.message); setStatus('Stream error: ' + e.message, 'bc-badge-red'); }
 }
+
+// ══ Voice/video call — the viewer's sendrecv m-lines give us send slots;
+// toggling is just sender.replaceTrack, no renegotiation ══
+let micStream = null, camStream = null, micOn = false, camOn = false;
+function callTrans(kind) {
+    if (!pc) return null;
+    const screenTrk = stream?.getVideoTracks()[0];
+    return pc.getTransceivers().find(t => kind === 'audio'
+        ? t.receiver?.track?.kind === 'audio'
+        : (t.receiver?.track?.kind === 'video' && t.sender?.track !== screenTrk)) || null;
+}
+async function callToggle(kind) {
+    if (!pc || pc.connectionState !== 'connected') { setStatus('Wait for the viewer to connect', 'bc-badge-amber'); return; }
+    const on = !(kind === 'audio' ? micOn : camOn);
+    const tr = callTrans(kind);
+    if (!tr) { setStatus('The viewer app is too old for calls — ask them to update', 'bc-badge-amber'); return; }
+    try {
+        if (kind === 'audio') {
+            if (on && !micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            if (micStream) { const t = micStream.getAudioTracks()[0]; await tr.sender.replaceTrack(t); t.enabled = on; if (!on) { micStream.getTracks().forEach(x => x.stop()); micStream = null; } }
+            micOn = on;
+        } else {
+            if (on && !camStream) camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 } } });
+            if (camStream) { await tr.sender.replaceTrack(on ? camStream.getVideoTracks()[0] : null); if (!on) { camStream.getTracks().forEach(x => x.stop()); camStream = null; } }
+            camOn = on;
+        }
+        document.getElementById('micBtn').classList.toggle('bc-btn-primary', micOn);
+        document.getElementById('camBtn').classList.toggle('bc-btn-primary', camOn);
+    } catch (e) { setStatus((kind === 'audio' ? 'Mic' : 'Camera') + ' failed: ' + e.message, 'bc-badge-red'); }
+}
+function stopCallMedia() {
+    micOn = false; camOn = false;
+    micStream?.getTracks().forEach(t => t.stop()); micStream = null;
+    camStream?.getTracks().forEach(t => t.stop()); camStream = null;
+    const p = document.getElementById('pipVideo'); if (p) { p.srcObject = null; p.classList.add('hidden'); }
+    const a = document.getElementById('callAudio'); if (a) a.srcObject = null;
+    document.getElementById('micBtn').classList.remove('bc-btn-primary');
+    document.getElementById('camBtn').classList.remove('bc-btn-primary');
+}
+document.getElementById('micBtn').onclick = () => callToggle('audio');
+document.getElementById('camBtn').onclick = () => callToggle('video');
 
 // Viewer asked to switch display — browsers need a fresh getDisplayMedia,
 // so the host sees the screen picker again (can't happen silently).

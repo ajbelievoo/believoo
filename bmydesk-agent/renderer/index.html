@@ -244,6 +244,8 @@
         <button id="lockBtn" title="Lock remote computer" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🔒</button>
         <button id="laserBtn" title="Laser pointer — move mouse to point (click again to control)" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🔴</button>
         <button id="fsOpenBtn" title="Browse remote files" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">📂</button>
+        <button id="micBtn" title="Voice call — send my mic" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">🎙</button>
+        <button id="camBtn" title="Video call — send my camera" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;">📹</button>
         <button id="hostMonBtn" title="Switch my shared display" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:none;">🖥</button>
         <button id="viewOnlyBtn" title="View only — block remote input" style="background:#1e293b;border:0;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:none;">👁</button>
         <button id="fsToggleBtn" title="Allow viewer to browse my files" style="background:#22c55e;border:0;color:#0f172a;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:none;">📁</button>
@@ -311,6 +313,11 @@
 
     <div class="foot">BMyDesk Agent <span id="verFoot">v1.3.20</span> · <span id="verNote">your code is permanent — tap ↻ for a new one</span></div>
 </div>
+
+<!-- Call media — remote voice plays here; remote camera PIP floats bottom-right.
+     Root level so hosts get the viewer's camera feed too. -->
+<video id="pipVideo" autoplay playsinline muted style="display:none;position:fixed;bottom:16px;right:16px;width:130px;height:170px;object-fit:cover;border-radius:10px;border:1px solid rgba(148,163,184,.4);background:#000;z-index:70;"></video>
+<audio id="callAudio" autoplay></audio>
 
 <!-- Unattended-access PIN dialog — Electron has no window.prompt(), so this
      is a real modal (the old prompt() silently failed = "PIN doesn't work"). -->

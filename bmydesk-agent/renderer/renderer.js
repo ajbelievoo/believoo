@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.20';
+const APP_VERSION = '1.3.21';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -466,19 +466,24 @@ async function handleOffer(m) {
                 setStatus('Viewer connected — streaming', 'on');
                 // always-visible system notice — the host should never miss a session
                 try { window.agent?.attention(null, 'A remote viewer is connected — your screen is being shared'); } catch (e) {}
+                ensureFramesFlowing();
             }
             if (pc.connectionState === 'disconnected') {
                 setStatus('Viewer connection unstable…', 'wait');
                 // ICE 'disconnected' can sit for a while before 'failed' —
-                // don't let a killed viewer app hold the host screen hostage
+                // a flapping link heals (viewer re-offers) — don't tear down
+                // a live session over a short drop, but a truly dead viewer
+                // must not hold the host screen hostage either.
                 clearTimeout(hostDiscT);
                 hostDiscT = setTimeout(() => {
                     if (pc && pc.connectionState !== 'connected') teardown('Viewer disconnected');
-                }, 15000);
+                }, 30000);
             }
             if (pc.connectionState === 'connected') clearTimeout(hostDiscT);
             if (['failed', 'closed'].includes(pc.connectionState)) { teardown('Viewer lost — ready for new connection'); }
         };
+        // viewer's call media — mic audio plays, camera opens the PIP window
+        pc.ontrack = (e) => { if (e.track !== stream?.getVideoTracks()[0]) attachRemoteTrack(e); };
         pc.ondatachannel = (e) => {
             if (e.channel.label === 'ctl') { wireCtl(e.channel); return; }
             dcIn = e.channel;
@@ -565,7 +570,17 @@ async function onCtlMessage(e) {
     try {
         if (typeof e.data === 'string') {
             const m = JSON.parse(e.data);
-            if (m.t === 'chat') { addChat(m.from || ctlPeer, m.text, false); }
+            if (m.t === 'chat') {
+                addChat(m.from || ctlPeer, m.text, false);
+                if (m.id) {
+                    ctlSend({ t: 'chat-ack', id: m.id }); // delivered — peer's ✓✓
+                    if (!$('chatPanel').classList.contains('hidden')) ctlSend({ t: 'chat-seen', id: m.id });
+                    else unseenChatIds.push(m.id);
+                }
+            }
+            else if (m.t === 'chat-ack') { chatAcked(m.id, false); }
+            else if (m.t === 'chat-seen') { chatAcked(m.id, true); }
+            else if (m.t === 'call') { addChat('System', (ctlPeer === 'peer' ? 'Peer' : ctlPeer) + (m.on ? ' turned ' + m.k + ' ON' : ' turned ' + m.k + ' off'), false); }
             else if (m.t === 'clip') { if (!hostGuard(perm.clip, 'clipboard')) return; try { window.agent?.clipboardSet(m.text); } catch (x) {} }
             else if (m.t === 'quality') { applyQuality(m.mode); }
             else if (m.t === 'file-meta') { if (!hostGuard(perm.files, 'file')) { ctlSend({ t: 'file-cancel' }); return; } rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; hdbg('rx file: ' + m.name); }
@@ -655,6 +670,44 @@ function tuneVideoSender() {
     e.scaleResolutionDownBy = w > 2560 ? w / 2560 : 1;
     p.degradationPreference = 'maintain-resolution';
     sender.setParameters(p).catch(() => {});
+}
+
+// Capture watchdog — if WebRTC says "connected" but the capturer is emitting
+// dead frames (window was hidden/occluded, WGC hiccup), re-run the capture and
+// swap the track in-place (replaceTrack needs no renegotiation). This is the
+// fix for "viewer sees black screen while stats say connected".
+let flowWatchdog = null;
+async function videoBytesSent() {
+    const sender = pc?.getSenders().find(s => s.track?.kind === 'video');
+    if (!sender) return -1;
+    const st = await sender.getStats().catch(() => null);
+    let b = -1;
+    st?.forEach(r => { if (r.type === 'outbound-rtp' && r.kind === 'video') b = r.bytesSent || 0; });
+    return b;
+}
+function ensureFramesFlowing(tries = 0) {
+    clearTimeout(flowWatchdog);
+    flowWatchdog = setTimeout(async () => {
+        if (!pc || pc.connectionState !== 'connected') return;
+        const a = await videoBytesSent();
+        setTimeout(async () => {
+            if (!pc || pc.connectionState !== 'connected') return;
+            const b = await videoBytesSent();
+            if (b > a + 50000) return; // ~real video flowing — healthy
+            if (tries >= 3) { hdbg('capture still dead after retries'); return; }
+            hdbg('no video bytes flowing — recapturing screen');
+            try {
+                const old = stream;
+                await captureScreen(curSourceId);
+                const t = stream.getVideoTracks()[0];
+                const sender = pc?.getSenders().find(s => s.track?.kind === 'video');
+                await sender?.replaceTrack(t);
+                old?.getTracks().forEach(tr => tr.stop());
+                tuneVideoSender();
+            } catch (e) { hdbg('recapture failed: ' + (e.message || e)); }
+            ensureFramesFlowing(tries + 1);
+        }, 4000);
+    }, tries === 0 ? 3000 : 2000);
 }
 
 // Viewer picks quality → we retune the outbound video sender live.
@@ -761,19 +814,33 @@ async function switchMonitor() {
     } catch (e) { ctlSend({ t: 'cmd-out', out: 'Screen switch failed: ' + (e.message || e) }); }
 }
 
-// ── Chat UI ──
-function addChat(from, text, mine) {
+// ── Chat UI — WhatsApp-style receipts: ✓ sent → ✓✓ delivered → blue ✓✓ seen ──
+const chatTicks = new Map(); // id → tick <span>
+const unseenChatIds = [];
+function addChat(from, text, mine, id) {
     const box = $('chatMsgs');
     if (!box) return;
     const d = document.createElement('div');
     d.style.cssText = 'margin:2px 0;padding:3px 0;';
-    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span></span>`;
+    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span></span>` +
+        (mine && id ? ` <span data-mid="${id}" style="color:#64748b;">✓</span>` : '');
     d.children[1].textContent = text;
     box.appendChild(d); box.scrollTop = box.scrollHeight;
+    if (mine && id) chatTicks.set(id, d.querySelector('[data-mid]'));
     $('chatPanel').classList.remove('hidden');
+}
+function chatAcked(id, seen) {
+    const t = chatTicks.get(id);
+    if (!t) return;
+    t.textContent = '✓✓';
+    if (seen) t.style.color = '#38bdf8'; // blue double-tick = read
+}
+function flushChatSeen() {
+    while (unseenChatIds.length) ctlSend({ t: 'chat-seen', id: unseenChatIds.shift() });
 }
 $('chatSend').onclick = sendChat;
 $('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+let chatSeq = 0;
 function sendChat() {
     const t = $('chatInput').value.trim();
     if (!t) return;
@@ -786,12 +853,80 @@ function sendChat() {
         const a = t.slice(6).trim();
         if (a) { ctlSend({ t: 'kill', arg: a }); addChat('Me ▸', 'kill ' + a, true); }
     } else {
-        ctlSend({ t: 'chat', from: (localStorage.getItem('bmydesk_member_name') || 'Me'), text: t });
-        addChat('Me', t, true);
+        const id = 'd' + (++chatSeq) + Math.random().toString(36).slice(2, 8);
+        ctlSend({ t: 'chat', id, from: (localStorage.getItem('bmydesk_member_name') || 'Me'), text: t });
+        addChat('Me', t, true, id);
     }
     $('chatInput').value = '';
 }
-$('chatToggle').onclick = () => $('chatPanel').classList.toggle('hidden');
+$('chatToggle').onclick = () => { $('chatPanel').classList.toggle('hidden'); if (!$('chatPanel').classList.contains('hidden')) flushChatSeen(); };
+
+// ══ Voice/video call — Zoom-style, over the same peer connection ══
+// The viewer's offer carries sendrecv audio+video m-lines up front, so a
+// toggle is just sender.replaceTrack — no renegotiation, instant on/off.
+let micStream = null, camStream = null, micOn = false, camOn = false;
+function callPc() { return isViewing() ? vPc : pc; }
+function callTrans(kind) {
+    const p = callPc(); if (!p) return null;
+    if (isViewing()) return kind === 'audio' ? vAudioT : vCamT; // exact refs we created
+    // host side — slots mirror the offer's m-lines; pick by receiver kind,
+    // excluding the transceiver that carries our screen track.
+    const screenTrk = stream?.getVideoTracks()[0];
+    return p.getTransceivers().find(t => kind === 'audio'
+        ? t.receiver?.track?.kind === 'audio'
+        : (t.receiver?.track?.kind === 'video' && t.sender?.track !== screenTrk)) || null;
+}
+async function callToggle(kind) {
+    const p = callPc();
+    if (!p) { setStatus('No session — connect first', 'wait'); return; }
+    const on = !(kind === 'audio' ? micOn : camOn);
+    const tr = callTrans(kind);
+    if (!tr) { addChat('System', 'The other app is too old for calls — ask them to update', false); return; }
+    try {
+        if (kind === 'audio') {
+            if (on && !micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            if (micStream) {
+                const t = micStream.getAudioTracks()[0];
+                await tr.sender.replaceTrack(t);
+                t.enabled = on;
+                if (!on) { micStream.getTracks().forEach(x => x.stop()); micStream = null; }
+            }
+            micOn = on;
+        } else {
+            if (on && !camStream) camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 } } });
+            if (camStream) {
+                await tr.sender.replaceTrack(on ? camStream.getVideoTracks()[0] : null);
+                if (!on) { camStream.getTracks().forEach(x => x.stop()); camStream = null; }
+            }
+            camOn = on;
+        }
+        $('micBtn').style.background = micOn ? '#15803d' : '#1e293b';
+        $('camBtn').style.background = camOn ? '#15803d' : '#1e293b';
+        ctlSend({ t: 'call', k: kind === 'audio' ? 'voice' : 'camera', on });
+        addChat('System', (kind === 'audio' ? 'Microphone ' : 'Camera ') + (on ? 'on' : 'off'), false);
+    } catch (e) { addChat('System', (kind === 'audio' ? 'Mic' : 'Camera') + ' failed: ' + (e.message || e), false); }
+}
+function stopCallMedia() {
+    micOn = false; camOn = false;
+    micStream?.getTracks().forEach(t => t.stop()); micStream = null;
+    camStream?.getTracks().forEach(t => t.stop()); camStream = null;
+    const pb = $('pipVideo'); if (pb) { pb.srcObject = null; pb.style.display = 'none'; }
+    const ab = $('callAudio'); if (ab) ab.srcObject = null;
+    if ($('micBtn')) $('micBtn').style.background = '#1e293b';
+    if ($('camBtn')) $('camBtn').style.background = '#1e293b';
+}
+$('micBtn').onclick = () => callToggle('audio');
+$('camBtn').onclick = () => callToggle('video');
+// Remote tracks — viewer mic → audio element, viewer/host camera → PIP window.
+// Screen video is excluded: only tracks that aren't our outbound screen feed.
+function attachRemoteTrack(e) {
+    const t = e.track;
+    if (t.kind === 'audio') {
+        const a = $('callAudio'); a.srcObject = new MediaStream([t]); a.play().catch(() => {});
+    } else if (t.kind === 'video') {
+        const pv = $('pipVideo'); pv.srcObject = new MediaStream([t]); pv.style.display = 'block'; pv.play().catch(() => {});
+    }
+}
 $('fsBtn').onclick = () => {
     const p = $('viewerPane');
     if (!document.fullscreenElement) p?.requestFullscreen?.().catch(() => {});
@@ -925,6 +1060,8 @@ function teardown(msg) {
         setTimeout(() => { try { window.agent?.sysLock(); } catch (e) {} }, 1000);
     }
     curSourceId = null;
+    clearTimeout(flowWatchdog); flowWatchdog = null;
+    stopCallMedia();
     ctl = null; rxFile = null;
     $('sessBar')?.classList.add('hidden'); $('chatPanel')?.classList.add('hidden');
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
@@ -1139,13 +1276,21 @@ async function startViewerPeer() {
     vDc = vPc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     wireCtl(vPc.createDataChannel('ctl')); // reliable — chat/clipboard/file
 
+    // m-line order: [0] screen-recv, [1] call audio, [2] camera — the call
+    // slots let either side start mic/camera later WITHOUT renegotiation.
+    vScreenT = vPc.addTransceiver('video', { direction: 'recvonly' });
+    vAudioT = vPc.addTransceiver('audio', { direction: 'sendrecv' });
+    vCamT = vPc.addTransceiver('video', { direction: 'sendrecv' });
+
     vPc.ontrack = (e) => {
-        $('remoteVideo').srcObject = e.streams[0];
-        $('statOverlay').style.display = 'block';
-        startStats();
-        startSessionTimer();
-        $('viewerOverlay').classList.add('hidden');
-        vStage(100, 'Connected — move & click to control');
+        if (e.transceiver === vScreenT || (e.track.kind === 'video' && !$('remoteVideo').srcObject)) {
+            $('remoteVideo').srcObject = new MediaStream([e.track]);
+            $('statOverlay').style.display = 'block';
+            startStats();
+            startSessionTimer();
+            $('viewerOverlay').classList.add('hidden');
+            vStage(100, 'Connected — move & click to control');
+        } else attachRemoteTrack(e);
     };
     vPc.onicecandidate = (e) => { if (e.candidate) viewerSignal({ kind: 'ice', candidate: e.candidate }); };
     vPc.onconnectionstatechange = () => {
@@ -1159,7 +1304,9 @@ async function startViewerPeer() {
         if (vPc.connectionState === 'closed') vStatus('Disconnected');
     };
 
-    const offer = await vPc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
+    // no offerToReceive flags — the explicit transceivers above carry the
+    // m-lines (flags would mint extra video slots and scramble the mapping)
+    const offer = await vPc.createOffer();
     await vPc.setLocalDescription(offer);
     vStage(72, 'Negotiating secure link…');
     // retransmit until an answer lands — a single lost POST must not kill the session
@@ -1178,6 +1325,7 @@ async function startViewerPeer() {
 // rebuild it wholesale — session stays 'active' server-side so no new host
 // approval and no re-join needed.
 let vReconnectTries = 0, vDiscTimer = null, sessStart = 0, sessT = null, vAutoDropped = false;
+let vScreenT = null, vAudioT = null, vCamT = null; // viewer-side call transceivers
 function viewerReconnect() {
     if (!vPc) return;
     vReconnectTries++;
@@ -1239,6 +1387,21 @@ $('laserBtn').onclick = () => {
 };
 
 // Input capture on the remote video → host's DataChannel handler
+// The <video> element is object-fit:contain — the painted frame is letterboxed
+// inside the element rect. Mapping over the element rect lands clicks off by
+// the letterbox bars whenever aspect ratios differ — map over the PAINTED frame.
+function frameRect(v) {
+    const r = v.getBoundingClientRect(); // includes the CSS zoom transform
+    const vw = v.videoWidth || 0, vh = v.videoHeight || 0;
+    if (!vw || !vh || !r.width || !r.height) return { left: r.left, top: r.top, width: r.width, height: r.height };
+    const s = Math.min(r.width / vw, r.height / vh);
+    const w = vw * s, h = vh * s;
+    return { left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h };
+}
+function vidNorm(v, cx, cy) {
+    const r = frameRect(v);
+    return { x: Math.min(1, Math.max(0, (cx - r.left) / r.width)), y: Math.min(1, Math.max(0, (cy - r.top) / r.height)) };
+}
 function bindViewerInput() {
     const v = $('remoteVideo');
     const send = (o) => { if (vDc && vDc.readyState === 'open') { try { vDc.send(JSON.stringify(o)); vLastInput = Date.now(); } catch (e) {} } };
@@ -1246,9 +1409,8 @@ function bindViewerInput() {
     v.addEventListener('mousemove', (e) => {
         if (panning) { zoom.x += e.clientX - panX; zoom.y += e.clientY - panY; panX = e.clientX; panY = e.clientY; applyZoom(); return; }
         const n = performance.now(); if (n - last < 33) return; last = n;
-        const r = v.getBoundingClientRect();
-        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-        send(laserOn ? { t: 'laser', x, y } : { t: 'move', x, y });
+        const p = vidNorm(v, e.clientX, e.clientY);
+        send(laserOn ? { t: 'laser', x: p.x, y: p.y } : { t: 'move', x: p.x, y: p.y });
     });
     v.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -1279,6 +1441,8 @@ function exitViewer(delay = 0) {
         stopViewerPoll();
         if (vPc) { try { vPc.close(); } catch (e) {} vPc = null; }
         vDc = null; vCh = null; vJoinedCode = null; vChanName = null; vChanToken = null;
+        vScreenT = null; vAudioT = null; vCamT = null;
+        stopCallMedia();
         sessStart = 0; if (sessT) { clearInterval(sessT); sessT = null; }
         vReconnectTries = 0; vAutoDropped = false;
         if (vDiscTimer) { clearTimeout(vDiscTimer); vDiscTimer = null; }

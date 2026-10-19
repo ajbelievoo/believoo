@@ -63,7 +63,7 @@ class MainActivity : Activity() {
     // Session tools (chat + file) — shared by host + viewer modes
     private lateinit var sessRow: LinearLayout
     private lateinit var chatPanel: LinearLayout
-    private lateinit var chatLog: TextView
+    private lateinit var chatLog: LinearLayout // one row per message (tick state needs a view each)
     private lateinit var chatScroll: ScrollView
     private lateinit var chatInput: android.widget.EditText
     private var chatCount = 0
@@ -103,8 +103,15 @@ class MainActivity : Activity() {
                     }
                 }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
+                override fun onChatMsg(id: String, from: String, text: String) = chatIncoming(id, from, text)
+                override fun onChatAck(id: String) = ui { chatTickRows[id]?.let { it.text = it.tag.toString() + "  ✓✓" } }
+                override fun onChatSeen(id: String) = ui { chatTickRows[id]?.let { it.text = it.tag.toString() + "  ✓✓"; it.setTextColor(Color.parseColor("#38bdf8")) } }
                 override fun onClip(text: String) = clipSet(text)
-                override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
+                override fun onFile(name: String, data: ByteArray) = confirmIncoming(name, data)
+                override fun onCallState(kind: String, on: Boolean) = ui {
+                    chatAppend("System", if (on) "Viewer started $kind" else "Viewer stopped $kind", false)
+                }
+                override fun onPipTrack(track: org.webrtc.VideoTrack) = showPip(track)
             }
             service?.signaling = signaling
             service?.setIce(iceServersFrom(reg?.iceServers))
@@ -519,6 +526,7 @@ class MainActivity : Activity() {
         val txtDim = Color.parseColor(if (dark) "#64748b" else "#94a3b8")
 
         val frame = android.widget.FrameLayout(this).apply { setBackgroundColor(bg) }
+        rootFrame = frame
         val scroll = ScrollView(this)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -756,6 +764,11 @@ class MainActivity : Activity() {
         // the keyboard? or took control back? one tap, no rejoin needed.
         viewOnlyLiveBtn = mbtn("👁 View only", Color.parseColor("#1e293b"), 12f) { toggleViewOnlyLive() }
         sessRow.addView(viewOnlyLiveBtn, lpGap())
+        // in-call mic/camera — the viewer hears us / sees us Zoom-style
+        hostMicBtn = mbtn("🎙", Color.parseColor("#1e293b"), 12f) { toggleCall(kind = "mic", viewer = false) }
+        sessRow.addView(hostMicBtn, lpGap())
+        hostCamBtn = mbtn("📹", Color.parseColor("#1e293b"), 12f) { toggleCall(kind = "cam", viewer = false) }
+        sessRow.addView(hostCamBtn, lpGap())
         col.addView(sessRow)
 
         // ── Fullscreen viewer pane (remote screen + touch control) ──
@@ -805,6 +818,15 @@ class MainActivity : Activity() {
             applyViewMode()
         }
         vSessRow.addView(vFitBtn, lpGap(6))
+        // touchpad ↔ direct-touch — a cursor you drag around (precise on
+        // desktop UIs) vs tap-exactly-where-you-touch
+        vPadBtn = mbtn("🖱 Pad", Color.parseColor("#1e293b"), 12f) { setPadMode(!padMode) }
+        vSessRow.addView(vPadBtn, lpGap(6))
+        // voice/video call — Zoom-style, over the same peer connection
+        vMicBtn = mbtn("🎙", Color.parseColor("#1e293b"), 12f) { toggleCall(kind = "mic", viewer = true) }
+        vSessRow.addView(vMicBtn, lpGap(6))
+        vCamBtn = mbtn("📹", Color.parseColor("#1e293b"), 12f) { toggleCall(kind = "cam", viewer = true) }
+        vSessRow.addView(vCamBtn, lpGap(6))
         // pinch-zoom exists but is hard to discover — on-screen zoom controls
         vSessRow.addView(mbtn("🔍+", Color.parseColor("#1e293b"), 12f) { zoomStep(0.5f) }, lpGap(6))
         vSessRow.addView(mbtn("🔍−", Color.parseColor("#1e293b"), 12f) { zoomStep(-0.5f) }, lpGap(6))
@@ -819,6 +841,27 @@ class MainActivity : Activity() {
             (resources.displayMetrics.widthPixels * 0.40f).toInt(),
             LinearLayout.LayoutParams.WRAP_CONTENT))
         vBar.addView(mbtn("Disconnect", Color.parseColor("#dc2626"), 12f) { exitViewer() }, lpGap(8))
+        // touchpad cursor — a drawn pointer floating over the remote frame
+        padCursor = object : View(this) {
+            override fun onDraw(cv: android.graphics.Canvas) {
+                val s = width / 24f
+                val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE; style = android.graphics.Paint.Style.FILL }
+                val edge = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor("#0f172a"); style = android.graphics.Paint.Style.STROKE; strokeWidth = 2f }
+                // classic arrow pointer (hotspot at the tip, top-left)
+                val p = android.graphics.Path().apply {
+                    moveTo(0f, 0f); lineTo(0f, 17f * s); lineTo(4.5f * s, 13.5f * s)
+                    lineTo(7f * s, 20f * s); lineTo(9.5f * s, 19f * s); lineTo(7f * s, 12.5f * s)
+                    lineTo(12f * s, 12.5f * s); close()
+                }
+                cv.drawPath(p, fill); cv.drawPath(p, edge)
+            }
+        }.apply {
+            visibility = View.GONE
+            layoutParams = android.widget.FrameLayout.LayoutParams(dp(26), dp(26))
+        }
+        viewerPane.addView(padCursor)
         viewerPane.addView(vBar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP))
@@ -855,7 +898,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.parseColor("#f20f172a")); setPadding(16, 10, 16, 10)
         }
         chatScroll = ScrollView(this)
-        chatLog = TextView(this).apply { setTextColor(Color.parseColor("#e2e8f0")); textSize = 13f }
+        chatLog = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         chatScroll.addView(chatLog)
         chatPanel.addView(chatScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         val chatRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -886,6 +929,15 @@ class MainActivity : Activity() {
     private lateinit var keysRow: LinearLayout
     private lateinit var vQualityBtn: Button
     private lateinit var vFitBtn: Button
+    private lateinit var vPadBtn: Button
+    private lateinit var vMicBtn: Button
+    private lateinit var vCamBtn: Button
+    private lateinit var hostMicBtn: Button
+    private lateinit var hostCamBtn: Button
+    private var micOn = false; private var camOn = false
+    private var pipView: org.webrtc.SurfaceViewRenderer? = null
+    private var lastPipTrack: org.webrtc.VideoTrack? = null
+    private var rootFrame: android.widget.FrameLayout? = null
     private var vQuality = "auto"
     private var fillMode = false
     private fun qLabel(q: String) = when (q) { "sd" -> "SD"; "hd" -> "HD"; "fhd" -> "FHD"; else -> "Auto" }
@@ -899,6 +951,7 @@ class MainActivity : Activity() {
                 org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
                 else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
         }
+        updatePadCursor()
     }
 
     /** Button-driven zoom steps — same transform the pinch gesture applies. */
@@ -909,6 +962,7 @@ class MainActivity : Activity() {
             it.scaleX = vScale; it.scaleY = vScale
             it.translationX = panX; it.translationY = panY
         }
+        updatePadCursor()
     }
 
     // ── Session tools: chat / file / clipboard (host + viewer share these) ──
@@ -918,6 +972,7 @@ class MainActivity : Activity() {
     private fun toggleChat() {
         chatPanel.visibility = if (chatPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         chatCount = 0
+        if (chatPanel.visibility == View.VISIBLE) flushChatSeen()
     }
 
     // ── Host-side control switch: view-only ↔ full control, mid-session ──
@@ -942,14 +997,42 @@ class MainActivity : Activity() {
             else "Remote input enabled — viewer has full control", false)
     }
 
-    private fun chatAppend(from: String, text: String, mine: Boolean) {
+    // WhatsApp-style delivery/seen receipts — id → row so the tick can update
+    private val chatTickRows = mutableMapOf<String, TextView>()
+    private val unseenChatIds = mutableListOf<String>()
+    private var chatSeq = 0
+
+    private fun chatAppend(from: String, text: String, mine: Boolean, id: String? = null) {
         if (text.isBlank()) return
-        chatLog.append((if (mine) "You" else from) + ": " + text + "\n")
+        val label = (if (mine) "You" else from) + ": " + text
+        val row = TextView(this).apply {
+            this.text = label + if (mine && id != null) "  ✓" else ""
+            setTextColor(if (from == "System") Color.parseColor("#94a3b8") else Color.parseColor("#e2e8f0"))
+            textSize = 13f
+            if (mine && id != null) tag = label // base text — tick gets re-appended on ack/seen
+        }
+        chatLog.addView(row)
+        if (mine && id != null) chatTickRows[id] = row
         chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
         if (chatPanel.visibility != View.VISIBLE) {
             chatCount++
             if (from != "System") toast("💬 $from: ${text.take(60)}")
         }
+    }
+
+    /** A chat msg arrived — show it; if the panel is open mark it seen now,
+        else queue the receipt for when the user opens the chat. */
+    private fun chatIncoming(id: String, from: String, text: String) {
+        ui {
+            chatAppend(from, text, false)
+            if (chatPanel.visibility == View.VISIBLE) activeCtl()?.sendChatSeen(id)
+            else unseenChatIds.add(id)
+        }
+    }
+
+    private fun flushChatSeen() {
+        unseenChatIds.forEach { activeCtl()?.sendChatSeen(it) }
+        unseenChatIds.clear()
     }
 
     private fun sendChat() {
@@ -960,8 +1043,9 @@ class MainActivity : Activity() {
         } else {
             val me = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_name", null)
                 ?: (android.os.Build.MODEL ?: "Android")
-            activeCtl()?.sendChat(me, t)
-            chatAppend("You", t, true)
+            val id = "a" + (++chatSeq) + java.util.UUID.randomUUID().toString().take(6)
+            activeCtl()?.sendChat(me, t, id)
+            chatAppend("You", t, true, id)
         }
         chatInput.setText("")
     }
@@ -1065,6 +1149,20 @@ class MainActivity : Activity() {
             fsListBox?.addView(TextView(this).apply {
                 text = "(empty)"; setTextColor(Color.parseColor("#64748b")); setPadding(0, 16, 0, 16)
             })
+        }
+    }
+
+    // Ask first — a file arriving over a remote session should be confirmed
+    // ("yes or no") before it lands in Downloads, not silently accepted.
+    private fun confirmIncoming(name: String, data: ByteArray) {
+        val safe = name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "bmydesk-file" }
+        ui {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Incoming file")
+                .setMessage("$safe · ${data.size / 1024} KB\nSave it to Downloads?")
+                .setPositiveButton("Save") { _, _ -> saveIncoming(safe, data) }
+                .setNegativeButton("Decline") { _, _ -> chatAppend("System", "Declined file: $safe", false) }
+                .show()
         }
     }
 
@@ -1627,6 +1725,7 @@ class MainActivity : Activity() {
         unattendedPrompted = false
         unattendedConsent = false
         resetAcceptOptions()
+        stopCallMedia()
         reg?.let { thread { api.end(it.code, it.agentToken) } }
         signaling.send("end", JsonObject())
         runCatching { startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_STOP)) }
@@ -1638,6 +1737,7 @@ class MainActivity : Activity() {
         reqBox.visibility = View.GONE
         endBtn.visibility = View.GONE
         sessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
+        chatLog.removeAllViews(); chatTickRows.clear(); unseenChatIds.clear()
         setStatus("Ready — share your code", "#22c55e")
     }
 
@@ -1812,6 +1912,7 @@ class MainActivity : Activity() {
                     }, 6000)
                 }
                 override fun onPeerDisconnected() { streaming = false; viewerReconnect(self) }
+                override fun onPipTrack(track: org.webrtc.VideoTrack) { lastPipTrack = track; showPip(track) }
                 override fun onTrack(track: org.webrtc.VideoTrack) = ui {
                     // Fresh renderer each session — a released
                     // SurfaceViewRenderer can't be init()ed again, which is
@@ -1828,6 +1929,7 @@ class MainActivity : Activity() {
                         override fun onFirstFrameRendered() {}
                         override fun onFrameResolutionChanged(w: Int, h: Int, rot: Int) {
                             vidW = w; vidH = h; vidRot = rot
+                            updatePadCursor()
                             // wide remote desktop on a portrait phone → rotate so the whole display fills the screen
                             if (getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("auto_landscape", true)) ui { requestedOrientation = if (w > h) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                                  else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
@@ -1838,6 +1940,12 @@ class MainActivity : Activity() {
                         else org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
                     track.addSink(remoteSurface)
                     bindViewerTouch()
+                    lastPipTrack?.let { showPip(it) } // host camera was already on
+                    // restore the touchpad preference from last session
+                    if (::vPadBtn.isInitialized) {
+                        val pm = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("pad_mode", false)
+                        if (pm != padMode) setPadMode(pm) else updatePadCursor()
+                    }
                     vStage(100, "Live — touch to control")
                     startSessTimer()
                 }
@@ -1851,8 +1959,14 @@ class MainActivity : Activity() {
 
                 }
                 override fun onChat(from: String, text: String) = ui { chatAppend(from, text, false) }
+                override fun onChatMsg(id: String, from: String, text: String) = chatIncoming(id, from, text)
+                override fun onChatAck(id: String) = ui { chatTickRows[id]?.let { it.text = it.tag.toString() + "  ✓✓" } }
+                override fun onChatSeen(id: String) = ui { chatTickRows[id]?.let { it.text = it.tag.toString() + "  ✓✓"; it.setTextColor(Color.parseColor("#38bdf8")) } }
                 override fun onClip(text: String) = clipSet(text)
-                override fun onFile(name: String, data: ByteArray) = saveIncoming(name, data)
+                override fun onFile(name: String, data: ByteArray) = confirmIncoming(name, data)
+                override fun onCallState(kind: String, on: Boolean) = ui {
+                    chatAppend("System", if (on) "Host started $kind" else "Host stopped $kind", false)
+                }
                 override fun onFileProgress(received: Int, total: Int) = ui {
                     if (total > 0) {
                         val pct = received * 100 / total
@@ -1948,6 +2062,123 @@ class MainActivity : Activity() {
         })
     }
 
+    // ── Touchpad mode — phone screen acts like a laptop trackpad ──
+    // Swiping moves a cursor over the remote screen (relative, precise — good
+    // for tiny desktop targets); tap = click at cursor, two-finger tap = right
+    // click, long-press+drag = remote drag. "👆 Touch" mode keeps the old
+    // tap-exactly-where-you-touch behaviour.
+    private var padMode = false
+    private var padCursor: View? = null
+    private var padCurX = 0.5f; private var padCurY = 0.5f // normalized in the REMOTE frame
+    private var padDrag = false; private var padTwoTap = false
+    private var padLastX = 0f; private var padLastY = 0f
+    private var padMoveAt = 0L
+
+    private fun sendPad(t: String, b: Int = 0) {
+        if (vLocked) return
+        remoteViewer?.sendInput(JsonObject().apply {
+            addProperty("t", t); addProperty("x", padCurX); addProperty("y", padCurY); addProperty("b", b)
+        })
+    }
+
+    /** Draw the on-screen cursor at padCurX/Y — transformed like the video. */
+    private fun updatePadCursor() {
+        val c = padCursor ?: return
+        val v = remoteSurface ?: run { c.visibility = View.GONE; return }
+        if (!padMode || vidW <= 0) { c.visibility = View.GONE; return }
+        val r = renderRect(v.width.toFloat(), v.height.toFloat()) ?: run { c.visibility = View.GONE; return }
+        // point inside the surface's local frame rect → apply the surface's
+        // own scale/pan transform (pivot = center) to land in pane coords.
+        val lx = r[2] + padCurX * r[0]; val ly = r[3] + padCurY * r[1]
+        val px = (lx - v.width / 2f) * vScale + v.width / 2f + panX
+        val py = (ly - v.height / 2f) * vScale + v.height / 2f + panY
+        c.translationX = px - c.width / 2f; c.translationY = py - c.height * 0.08f
+        c.visibility = View.VISIBLE
+    }
+
+    // ── Voice/video call (Zoom-style) — mic/cam toggles on both roles ──
+    // Transceivers are pre-negotiated sendrecv, so toggles are instant.
+    private fun toggleCall(kind: String, viewer: Boolean) {
+        val isMic = kind == "mic"
+        val need = if (isMic) arrayOf(android.Manifest.permission.RECORD_AUDIO)
+            else arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO)
+        val missing = need.filter {
+            androidx.core.content.ContextCompat.checkSelfPermission(this, it) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty() && !(if (isMic) micOn else camOn)) {
+            androidx.core.app.ActivityCompat.requestPermissions(this, missing.toTypedArray(), 77)
+            toast("Allow ${missing.joinToString { it.substringAfterLast('.') }} then tap again")
+            return
+        }
+        val next = !(if (isMic) micOn else camOn)
+        val ok = if (viewer) {
+            if (isMic) remoteViewer?.setMic(next) == true else remoteViewer?.setCam(next) == true
+        } else {
+            if (isMic) service?.peer()?.setMic(next) == true else service?.peer()?.setCam(next) == true
+        }
+        if (!ok) { toast("Peer doesn't support calls — update the other app"); return }
+        if (isMic) micOn = next else camOn = next
+        paintCallBtn()
+        chatAppend("System", (if (isMic) "Microphone " else "Camera ") + (if (next) "on — the other side can " +
+            (if (isMic) "hear you" else "see you") else "off"), false)
+    }
+
+    private fun paintCallBtn() {
+        vMicBtn.setBackgroundColor(Color.parseColor(if (micOn) "#15803d" else "#1e293b"))
+        vCamBtn.setBackgroundColor(Color.parseColor(if (camOn) "#15803d" else "#1e293b"))
+        if (::hostMicBtn.isInitialized) {
+            hostMicBtn.setBackgroundColor(Color.parseColor(if (micOn) "#15803d" else "#1e293b"))
+            hostCamBtn.setBackgroundColor(Color.parseColor(if (camOn) "#15803d" else "#1e293b"))
+        }
+    }
+
+    /** Remote camera arrived → small picture-in-picture in the corner. Goes on
+        the ROOT frame so it also floats over the host home screen. */
+    private fun showPip(track: org.webrtc.VideoTrack) {
+        ui {
+            val parent = rootFrame ?: return@ui
+            val eglCtx = remoteViewer?.egl?.eglBaseContext ?: serviceEglContext() ?: return@ui
+            if (pipView == null) {
+                pipView = org.webrtc.SurfaceViewRenderer(this)
+                pipView!!.init(eglCtx, null)
+                pipView!!.setZOrderMediaOverlay(true)
+                val sz = dp(110)
+                parent.addView(pipView, android.widget.FrameLayout.LayoutParams(
+                    sz, (sz * 4 / 3), Gravity.BOTTOM or Gravity.END).apply {
+                    marginEnd = dp(16); bottomMargin = dp(80) })
+            }
+            pipView!!.visibility = View.VISIBLE
+            track.addSink(pipView)
+        }
+    }
+
+    // the host peer's egl is private — the PIP needs SOME egl context; if the
+    // viewer isn't up (we're hosting), spin a tiny one for the pip sink.
+    private var hostEgl: org.webrtc.EglBase? = null
+    private fun serviceEglContext(): org.webrtc.EglBase.Context? {
+        if (hostEgl == null) hostEgl = org.webrtc.EglBase.create()
+        return hostEgl?.eglBaseContext
+    }
+
+    private fun stopCallMedia() {
+        micOn = false; camOn = false; lastPipTrack = null
+        if (::vMicBtn.isInitialized) paintCallBtn()
+        pipView?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); runCatching { it.release() } }
+        pipView = null
+    }
+
+    private fun setPadMode(on: Boolean) {
+        padMode = on
+        getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().putBoolean("pad_mode", on).apply()
+        vPadBtn.text = if (on) "👆 Touch" else "🖱 Pad"
+        vPadBtn.setBackgroundColor(Color.parseColor(if (on) "#b45309" else "#1e293b"))
+        padCursor?.visibility = if (on) View.VISIBLE else View.GONE
+        if (on) updatePadCursor()
+        if (chatPanel.visibility == View.VISIBLE) chatAppend("System",
+            if (on) "Touchpad mode — swipe moves the cursor, tap clicks it"
+            else "Touch mode — tap exactly where you want to click", false)
+    }
+
     private fun bindViewerTouch() {
         val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop * 2f
         val scaleDet = android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -1955,6 +2186,7 @@ class MainActivity : Activity() {
                 vScale = (vScale * d.scaleFactor).coerceIn(1f, 5f)
                 remoteSurface?.let { it.scaleX = vScale; it.scaleY = vScale }
                 clampPan()
+                updatePadCursor()
                 return true
             }
         })
@@ -1962,10 +2194,14 @@ class MainActivity : Activity() {
             override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
                 vScale = 1f; panX = 0f; panY = 0f
                 remoteSurface?.let { it.scaleX = 1f; it.scaleY = 1f; it.translationX = 0f; it.translationY = 0f }
+                updatePadCursor()
                 return true
             }
             override fun onLongPress(e: android.view.MotionEvent) {
                 if (touchMoved) return // not a stationary press
+                if (padMode) { // press-and-hold → remote drag starts at the cursor
+                    padDrag = true; sendPad("down"); return
+                }
                 // long-press = right click (context menus on the remote desktop)
                 sendMouse("move", e.x, e.y)
                 sendMouse("down", e.x, e.y, 2)
@@ -1977,7 +2213,8 @@ class MainActivity : Activity() {
             if (ev.pointerCount >= 2) {
                 // pinch starts mid-gesture — release any held remote button
                 if (dragging) { sendMouse("up", ev.x, ev.y); dragging = false }
-                touchMoved = true
+                if (padDrag) { sendPad("up"); padDrag = false }
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_MOVE) { padTwoTap = false; touchMoved = true }
                 // two-finger drag on a fit view = remote scroll (wheel events)
                 if (ev.actionMasked == android.view.MotionEvent.ACTION_MOVE && !fillMode && vScale <= 1.01f) {
                     val ay = (ev.getY(0) + ev.getY(1)) / 2f
@@ -1993,6 +2230,10 @@ class MainActivity : Activity() {
                     last2Y = ay
                 } else if (ev.actionMasked == android.view.MotionEvent.ACTION_POINTER_DOWN) {
                     last2Y = (ev.getY(0) + ev.getY(1)) / 2f
+                    padTwoTap = true // potential two-finger tap → right click in pad mode
+                } else if (ev.actionMasked == android.view.MotionEvent.ACTION_POINTER_UP && padTwoTap) {
+                    padTwoTap = false
+                    if (padMode) { sendPad("move"); sendPad("down", 2); sendPad("up", 2) }
                 }
                 return@setOnTouchListener true
             }
@@ -2001,13 +2242,31 @@ class MainActivity : Activity() {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     touchMoved = false; dragging = false
                     downX = ev.x; downY = ev.y; lastTX = ev.x; lastTY = ev.y
+                    padLastX = ev.x; padLastY = ev.y
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
+                    if (padMode) {
+                        // relative cursor move — finger distance scaled up a bit
+                        // so one swipe crosses a desktop screen comfortably
+                        remoteSurface?.let { v ->
+                            val r = renderRect(v.width.toFloat(), v.height.toFloat())
+                            if (r != null && (r[0] > 0 && r[1] > 0)) {
+                                padCurX = (padCurX + (ev.x - padLastX) * 1.4f / r[0]).coerceIn(0f, 1f)
+                                padCurY = (padCurY + (ev.y - padLastY) * 1.4f / r[1]).coerceIn(0f, 1f)
+                            }
+                        }
+                        padLastX = ev.x; padLastY = ev.y
+                        if (kotlin.math.hypot(ev.x - downX, ev.y - downY) > slop * 0.5f) touchMoved = true
+                        updatePadCursor()
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - padMoveAt >= 33) { padMoveAt = now; sendPad("move") }
+                    } else {
                     val moved = kotlin.math.hypot(ev.x - downX, ev.y - downY) > slop
                     if (vScale > 1.01f || fillMode) { // zoomed/fill → pan locally instead of remote-drag
                         panX += ev.x - lastTX; panY += ev.y - lastTY; lastTX = ev.x; lastTY = ev.y
                         clampPan()
                         remoteSurface?.let { it.translationX = panX; it.translationY = panY }
+                        updatePadCursor()
                         touchMoved = true
                     } else {
                         if (moved) touchMoved = true
@@ -2023,9 +2282,15 @@ class MainActivity : Activity() {
                             }
                         }
                     }
+                    }
                 }
                 android.view.MotionEvent.ACTION_UP -> {
-                    if (dragging) {
+                    if (padMode) {
+                        if (padDrag) { sendPad("move"); sendPad("up"); padDrag = false }
+                        else if (!touchMoved) { // tap = click wherever the cursor sits
+                            sendPad("move"); sendPad("down"); sendPad("up")
+                        }
+                    } else if (dragging) {
                         sendMouse("move", ev.x, ev.y)
                         sendMouse("up", ev.x, ev.y)
                         dragging = false
@@ -2080,6 +2345,8 @@ class MainActivity : Activity() {
         remoteSurface = null
         offerTimeout?.let { sessTicker.removeCallbacks(it) }
         streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0; vLocked = false
+        padCursor?.visibility = View.GONE; padDrag = false; padTwoTap = false
+        stopCallMedia()
         closeLiveKb()
         fillMode = false; vFitBtn.text = "⛶ Fill"
         requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -2088,6 +2355,7 @@ class MainActivity : Activity() {
         keysRow.visibility = View.GONE
         viewerPane.visibility = View.GONE
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
+        chatLog.removeAllViews(); chatTickRows.clear(); unseenChatIds.clear()
         vProgReset()
     }
 

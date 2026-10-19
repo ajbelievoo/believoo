@@ -17,6 +17,8 @@ class RemoteViewer(context: Context) {
         fun onPeerDisconnected()
         fun onPeerUnstable() {} // transient DISCONNECTED — heals on its own
         fun onTrack(track: VideoTrack)
+        /** remote (host) camera track — the picture-in-picture call feed */
+        fun onPipTrack(track: VideoTrack) {}
         fun onError(message: String)
     }
 
@@ -30,6 +32,20 @@ class RemoteViewer(context: Context) {
     private var dc: DataChannel? = null
     private var iceQueue = mutableListOf<IceCandidate>()
     private var remoteSet = false
+
+    // Call plumbing — transceivers are negotiated UP FRONT (sendrecv, no
+    // track), so starting/stopping mic/camera later is replaceTrack(), never
+    // a renegotiation. screenT carries the remote screen; callCamT the PIP.
+    private var screenT: RtpTransceiver? = null
+    private var callAudioT: RtpTransceiver? = null
+    private var callCamT: RtpTransceiver? = null
+    private var micTrack: AudioTrack? = null
+    private var micSource: AudioSource? = null
+    private var camTrack: VideoTrack? = null
+    private var camCapturer: Camera2Capturer? = null
+    private var camSource: VideoSource? = null
+    private var camHelper: SurfaceTextureHelper? = null
+    private val appContext: Context = context.applicationContext
 
     init {
         PeerConnectionFactory.initialize(
@@ -74,12 +90,22 @@ class RemoteViewer(context: Context) {
             override fun onRenegotiationNeeded() {}
             override fun onAddTrack(r: RtpReceiver?, s: Array<out MediaStream>?) {}
             override fun onTrack(t: RtpTransceiver?) {
-                (t?.receiver?.track() as? VideoTrack)?.let { listener?.onTrack(it) }
+                val tr = t?.receiver?.track() ?: return
+                when {
+                    t === screenT -> (tr as? VideoTrack)?.let { listener?.onTrack(it) }
+                    tr.kind() == "audio" -> tr.setEnabled(true) // call audio plays via the audio device module
+                    tr.kind() == "video" -> (tr as? VideoTrack)?.let { listener?.onPipTrack(it) }
+                }
             }
         }) ?: run { listener?.onError("peer create failed"); return }
 
-        peer!!.addTransceiver(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+        // slot order in the offer: [0]=screen recv, [1]=call audio, [2]=camera
+        screenT = peer!!.addTransceiver(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
             RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY))
+        callAudioT = peer!!.addTransceiver(MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
+            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_RECV))
+        callCamT = peer!!.addTransceiver(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_RECV))
 
         val init = DataChannel.Init()
         init.ordered = false; init.maxRetransmits = 0
@@ -87,8 +113,8 @@ class RemoteViewer(context: Context) {
         ctl.attach(peer!!.createDataChannel("ctl", DataChannel.Init())) // reliable — chat/clip/file
 
         val constraints = MediaConstraints()
-        constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
-        constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+        // no OfferToReceive* flags — the explicit transceivers above carry
+        // exactly the m-lines we want (extra flags would mint duplicate slots)
 
         peer!!.createOffer(object : WebRtcHost.SdpAdapter() {
             override fun onCreateSuccess(offer: SessionDescription?) {
@@ -158,11 +184,53 @@ class RemoteViewer(context: Context) {
         }
     }
 
+    // ── Voice/video call (Zoom-style, inside the remote session) ──
+    /** Mic toggle — lazily creates the audio track; setEnabled mutes without
+        touching the sender so unmute is instant and needs no renegotiation. */
+    fun setMic(on: Boolean): Boolean {
+        val t = callAudioT ?: return false // old peer — no call slot
+        if (on && micTrack == null) {
+            micSource = factory.createAudioSource(MediaConstraints())
+            micTrack = factory.createAudioTrack("mic0", micSource)
+        }
+        micTrack?.let { t.sender.setTrack(it, true) }
+        micTrack?.setEnabled(on)
+        ctl.sendCallState("voice", on)
+        return true
+    }
+
+    /** Camera toggle — sends our camera as a picture-in-picture call feed. */
+    fun setCam(on: Boolean): Boolean {
+        val t = callCamT ?: return false
+        if (on && camTrack == null) {
+            try {
+                camHelper = camHelper ?: SurfaceTextureHelper.create("CamThread", egl.eglBaseContext)
+                camSource = factory.createVideoSource(false)
+                val camEnum = Camera2Enumerator(appContext)
+                val camName = camEnum.deviceNames.firstOrNull { camEnum.isFrontFacing(it) }
+                    ?: camEnum.deviceNames.firstOrNull() ?: return false
+                camCapturer = Camera2Capturer(appContext, camName, null)
+                camCapturer!!.initialize(camHelper, appContext, camSource!!.capturerObserver)
+                camCapturer!!.startCapture(640, 480, 15)
+                camTrack = factory.createVideoTrack("cam0", camSource)
+            } catch (e: Exception) { listener?.onError("camera: ${e.message}"); return false }
+        }
+        camTrack?.let { t.sender.setTrack(if (on) it else null, true) }
+        ctl.sendCallState("camera", on)
+        return true
+    }
+
+    fun callActive(): Boolean = micTrack?.enabled() == true || camTrack?.enabled() == true
+
     fun stop() {
         ctl.close()
+        runCatching { camCapturer?.stopCapture() }
+        runCatching { micSource?.dispose(); camSource?.dispose(); camHelper?.dispose() }
+        camCapturer = null; micTrack = null; camTrack = null; micSource = null; camSource = null
         runCatching { dc?.close() }
         runCatching { peer?.close() }
         dc = null; peer = null; remoteSet = false; iceQueue.clear()
+        screenT = null; callAudioT = null; callCamT = null
     }
 
     // Strip SDP lines some libwebrtc/Chrome builds fail to parse.

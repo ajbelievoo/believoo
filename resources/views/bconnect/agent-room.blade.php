@@ -20,6 +20,8 @@
             @if(!$canControl)<span class="bc-badge bc-badge-cyan" title="Upgrade to Pro/Enterprise for mouse & keyboard control"><i class="fas fa-eye mr-1"></i>View only · upgrade for control</span>@endif
             <button id="fileBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Send file"><i class="fas fa-paperclip mr-1"></i>File</button>
             <button id="chatBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Chat"><i class="fas fa-comment mr-1"></i>Chat</button>
+            <button id="micBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Voice call — mic on/off"><i class="fas fa-microphone mr-1"></i></button>
+            <button id="camBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Video call — camera on/off"><i class="fas fa-video mr-1"></i></button>
             <button id="shotBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Screenshot"><i class="fas fa-camera mr-1"></i></button>
             <button id="recBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Record session"><i class="fas fa-circle mr-1"></i></button>
             <button id="monBtn" class="bc-btn bc-btn-secondary text-sm hidden" title="Switch remote display"><i class="fas fa-desktop mr-1"></i></button>
@@ -39,6 +41,8 @@
     <div id="remoteContainer" class="flex-1 bg-black rounded-2xl border border-[var(--bc-border)] relative overflow-hidden flex items-center justify-center select-none">
         <video id="remoteVideo" autoplay playsinline class="max-w-full max-h-full w-full h-full object-contain" style="cursor:crosshair;"></video>
         <div id="statOverlay" class="absolute top-2 left-2 text-[10px] text-slate-200 bg-slate-900/60 px-2 py-0.5 rounded hidden pointer-events-none"></div>
+        <video id="pipVideo" autoplay playsinline muted class="absolute bottom-3 right-3 w-44 rounded-xl border-2 border-[var(--bc-cyan,#22d3ee)] hidden bg-black z-10"></video>
+        <audio id="callAudio" autoplay class="hidden"></audio>
         <div id="waitOverlay" class="absolute inset-0 flex items-center justify-center bg-[var(--bc-bg)]/90 text-center z-10">
             <div>
                 <div class="w-14 h-14 mx-auto mb-4 rounded-full border-4 border-[var(--bc-border)] animate-spin" style="border-top-color:var(--bc-cyan);"></div>
@@ -206,14 +210,22 @@ function startViewerPoll() {
     }, 2000);
 }
 
+let screenT = null, audioT = null, camT = null; // call transceiver refs
 async function startPeer() {
     if (pc) return; // accept may arrive via ws + queue both
     pc = new RTCPeerConnection(pcConfig);
 
+    // m-line order: [0] screen-recv, [1] call audio, [2] camera — call slots
+    // mean mic/camera can start later with replaceTrack, no renegotiation.
+    screenT = pc.addTransceiver('video', { direction: 'recvonly' });
+    audioT = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    camT = pc.addTransceiver('video', { direction: 'sendrecv' });
+
     pc.ontrack = (e) => {
+        if (e.transceiver !== screenT && (e.track.kind === 'audio' || video.srcObject)) { attachCallTrack(e); return; }
         dbg('video track arrived');
         wStage(100, 'Connected');
-        video.srcObject = e.streams[0];
+        video.srcObject = e.streams[0] || new MediaStream([e.track]);
         $('statOverlay')?.classList.remove('hidden');
         startStats();
         startSessionTimer();
@@ -243,8 +255,8 @@ async function startPeer() {
 
     dc = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
     dc2 = pc.createDataChannel('ctl'); // reliable — chat/clipboard/file
-    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn'].forEach(i => $(i).classList.remove('hidden')); };
-    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn','chatPanel','fsPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); };
+    dc2.onopen = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn','micBtn','camBtn'].forEach(i => $(i).classList.remove('hidden')); };
+    dc2.onclose = () => { ['fileBtn','chatBtn','shotBtn','recBtn','qualitySel','monBtn','rebootBtn','lockBtn','laserBtn','fsOpenBtn','micBtn','camBtn','chatPanel','fsPanel'].forEach(i => $(i).classList.add('hidden')); stopStats(); stopRec(); stopCallMedia(); };
     dc2.onmessage = onCtlMessage;
     dc.onopen = () => { if (CAN_CONTROL) document.getElementById('inputBadge').classList.remove('hidden'); };
     dc.onclose = () => document.getElementById('inputBadge').classList.add('hidden');
@@ -255,7 +267,9 @@ async function startPeer() {
         } catch (err) {}
     };
 
-    const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
+    // explicit transceivers carry the m-lines — offerToReceive flags would
+    // mint duplicate video slots and scramble the screen/camera mapping
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     // retransmit until an answer lands — a single lost POST must not kill the session
     let offerTries = 0;
@@ -339,9 +353,25 @@ async function onCtlMessage(e) {
     try {
         if (typeof e.data === 'string') {
             const m = JSON.parse(e.data);
-            if (m.t === 'chat') addChat(m.from || 'Remote', m.text, false);
+            if (m.t === 'chat') {
+                addChat(m.from || 'Remote', m.text, false);
+                if (m.id) {
+                    ctlSend({ t: 'chat-ack', id: m.id });
+                    if ($('chatPanel') && !$('chatPanel').classList.contains('hidden')) ctlSend({ t: 'chat-seen', id: m.id });
+                    else unseenChat.push(m.id);
+                }
+            }
+            else if (m.t === 'chat-ack') chatAcked(m.id, false);
+            else if (m.t === 'chat-seen') chatAcked(m.id, true);
+            else if (m.t === 'call') addChat('System', 'Peer turned ' + m.k + (m.on ? ' on' : ' off'), false);
             else if (m.t === 'clip') { try { await navigator.clipboard.writeText(m.text); } catch (x) {} }
-            else if (m.t === 'file-meta') { rxFile = { name: m.name, size: m.size, chunks: [], got: 0 }; addChat('System', 'Receiving ' + m.name + '…', false); }
+            else if (m.t === 'file-meta') {
+                // explicit yes/no before we accept the bytes
+                if (confirm((m.from || 'Remote') + ' is sending a file:\n\n' + m.name + ' (' + Math.round(m.size / 1024) + ' KB)\n\nSave it to your Downloads folder?')) {
+                    rxFile = { name: m.name, size: m.size, chunks: [], got: 0 };
+                    addChat('System', 'Receiving ' + m.name + '…', false);
+                } else { rxFile = null; addChat('System', 'File declined: ' + m.name, false); }
+            }
             else if (m.t === 'cmd-out') addChat('Host ▸', m.out || '(no output)', false);
             else if (m.t === 'view-only') addChat('System', m.on ? 'Host locked remote input (view-only mode)' : 'Host re-enabled remote input', false);
             else if (m.t === 'fs-list') renderFsList(m);
@@ -357,15 +387,25 @@ async function onCtlMessage(e) {
         }
     } catch (err) {}
 }
-function addChat(from, text, mine) {
+// WhatsApp-style receipts — ✓ sent, ✓✓ delivered, blue ✓✓ seen
+const chatTicks = new Map(), unseenChat = [];
+function chatAcked(id, seen) {
+    const t = chatTicks.get(id); if (!t) return;
+    t.textContent = '✓✓'; if (seen) t.style.color = '#38bdf8';
+}
+function flushChatSeen() { while (unseenChat.length) ctlSend({ t: 'chat-seen', id: unseenChat.shift() }); }
+function addChat(from, text, mine, id) {
     const box = $('chatMsgs'); if (!box) return;
     const d = document.createElement('div');
     d.style.cssText = 'margin:4px 0;';
-    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span style="color:#cbd5e1;"></span>`;
+    d.innerHTML = `<span style="color:${mine ? '#22d3ee' : '#f43f5e'};font-weight:600;">${from}:</span> <span style="color:#cbd5e1;"></span>` +
+        (mine && id ? ` <span data-mid="${id}" style="color:#64748b;">✓</span>` : '');
     d.children[1].textContent = text;
     box.appendChild(d); box.scrollTop = box.scrollHeight;
+    if (mine && id) chatTicks.set(id, d.querySelector('[data-mid]'));
 }
 const $ = id => document.getElementById(id);
+let chatSeq = 0;
 $('chatSend').onclick = () => {
     const t = $('chatInput').value.trim(); if (!t) return;
     if (t.startsWith('/cmd ')) {
@@ -377,8 +417,9 @@ $('chatSend').onclick = () => {
         const a = t.slice(6).trim();
         if (a) { ctlSend({ t: 'kill', arg: a }); addChat('Me ▸', 'kill ' + a, true); }
     } else {
-        ctlSend({ t: 'chat', from: VIEWER, text: t });
-        addChat('Me', t, true);
+        const id = 'w' + (++chatSeq) + Math.random().toString(36).slice(2, 8);
+        ctlSend({ t: 'chat', id, from: VIEWER, text: t });
+        addChat('Me', t, true, id);
     }
     $('chatInput').value = '';
 };
@@ -515,7 +556,45 @@ function stopRec() {
     const b = $('recBtn'); if (b) { b.innerHTML = '<i class="fas fa-circle mr-1"></i>'; b.style.color = ''; }
 }
 
-$('chatBtn').onclick = () => { $('chatPanel').classList.toggle('hidden'); $('chatPanel').classList.toggle('flex'); };
+$('chatBtn').onclick = () => { $('chatPanel').classList.toggle('hidden'); $('chatPanel').classList.toggle('flex'); if (!$('chatPanel').classList.contains('hidden')) flushChatSeen(); };
+
+// ══ Voice/video call — mic/camera ride the sendrecv transceivers ══
+let micStream = null, camStream = null, micOn = false, camOn = false;
+function attachCallTrack(e) {
+    if (e.track.kind === 'audio') { const a = $('callAudio'); a.srcObject = new MediaStream([e.track]); a.play().catch(() => {}); }
+    else { const p = $('pipVideo'); p.srcObject = new MediaStream([e.track]); p.classList.remove('hidden'); p.play().catch(() => {}); }
+}
+async function callToggle(kind) {
+    if (!pc || pc.connectionState !== 'connected') { addChat('System', 'Connect first — then start the call', false); return; }
+    const on = !(kind === 'audio' ? micOn : camOn);
+    const tr = kind === 'audio' ? audioT : camT;
+    if (!tr) { addChat('System', 'Call slots unavailable — reconnect', false); return; }
+    try {
+        if (kind === 'audio') {
+            if (on && !micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            if (micStream) { const t = micStream.getAudioTracks()[0]; await tr.sender.replaceTrack(t); t.enabled = on; if (!on) { micStream.getTracks().forEach(x => x.stop()); micStream = null; } }
+            micOn = on;
+        } else {
+            if (on && !camStream) camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 } } });
+            if (camStream) { await tr.sender.replaceTrack(on ? camStream.getVideoTracks()[0] : null); if (!on) { camStream.getTracks().forEach(x => x.stop()); camStream = null; } }
+            camOn = on;
+        }
+        $('micBtn').classList.toggle('bc-btn-primary', micOn);
+        $('camBtn').classList.toggle('bc-btn-primary', camOn);
+        ctlSend({ t: 'call', k: kind === 'audio' ? 'voice' : 'camera', on });
+        addChat('System', (kind === 'audio' ? 'Microphone ' : 'Camera ') + (on ? 'on' : 'off'), false);
+    } catch (e) { addChat('System', (kind === 'audio' ? 'Mic' : 'Camera') + ' failed: ' + (e.message || e), false); }
+}
+function stopCallMedia() {
+    micOn = false; camOn = false;
+    micStream?.getTracks().forEach(t => t.stop()); micStream = null;
+    camStream?.getTracks().forEach(t => t.stop()); camStream = null;
+    const p = $('pipVideo'); if (p) { p.srcObject = null; p.classList.add('hidden'); }
+    const a = $('callAudio'); if (a) a.srcObject = null;
+    $('micBtn')?.classList.remove('bc-btn-primary'); $('camBtn')?.classList.remove('bc-btn-primary');
+}
+$('micBtn').onclick = () => callToggle('audio');
+$('camBtn').onclick = () => callToggle('video');
 $('fileBtn').onclick = () => $('fileInput').click();
 let txAbort = false, txActive = false, progTxt = null;
 $('fileInput').onchange = async e => {
@@ -564,6 +643,20 @@ function vdev() {
     return d;
 }
 let lastMove = 0;
+// object-fit:contain letterboxes the frame inside the element — map input
+// over the PAINTED frame or clicks land offset whenever aspects differ.
+function frameRect() {
+    const r = video.getBoundingClientRect(); // includes CSS zoom transform
+    const vw = video.videoWidth || 0, vh = video.videoHeight || 0;
+    if (!vw || !vh || !r.width || !r.height) return { left: r.left, top: r.top, width: r.width, height: r.height };
+    const s = Math.min(r.width / vw, r.height / vh);
+    const w = vw * s, h = vh * s;
+    return { left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h };
+}
+function vidPos(cx, cy) {
+    const r = frameRect();
+    return { x: Math.min(1, Math.max(0, (cx - r.left) / r.width)), y: Math.min(1, Math.max(0, (cy - r.top) / r.height)) };
+}
 // Zoom/pan — Ctrl+wheel zooms at cursor, middle-drag pans when zoomed,
 // double-click resets to fit. Works in view-only sessions too (coords come
 // from the transformed rect, so remote input stays accurate while zoomed).
@@ -591,9 +684,8 @@ if (CAN_CONTROL) {
         const now = performance.now();
         if (now - lastMove < 33) return; // ~30fps
         lastMove = now;
-        const r = video.getBoundingClientRect();
-        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-        sendInput(laserOn ? { t: 'laser', x, y } : { t: 'move', x, y });
+        const p = vidPos(e.clientX, e.clientY);
+        sendInput(laserOn ? { t: 'laser', x: p.x, y: p.y } : { t: 'move', x: p.x, y: p.y });
     });
     video.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -610,7 +702,7 @@ if (CAN_CONTROL) {
 
     // Touch → mouse mapping (mobile viewers)
     let touchMoved = false;
-    const pos = (t) => { const r = video.getBoundingClientRect(); return { x: (t.clientX - r.left) / r.width, y: (t.clientY - r.top) / r.height }; };
+    const pos = (t) => vidPos(t.clientX, t.clientY);
     video.addEventListener('touchstart', (e) => { touchMoved = false; }, { passive: true });
     video.addEventListener('touchmove', (e) => {
         touchMoved = true;

@@ -90,6 +90,11 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
+            // CRITICAL: without this, Chromium throttles the whole pipeline the
+            // moment the window is hidden to tray / minimized / occluded — the
+            // screen-capture track stays 'live' but emits stale black frames
+            // at ~1-2fps. Unattended hosts always have the window hidden.
+            backgroundThrottling: false,
         },
     });
     win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -123,6 +128,11 @@ app.whenReady().then(() => {
         if (url) deliverDeepLink(url);
     });
 });
+
+// Windows-only: stop Chromium marking a fully-covered window "occluded" and
+// freezing its media capture — a viewer watching an unattended, hidden-agent
+// PC otherwise gets a black stream at ~2fps.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 

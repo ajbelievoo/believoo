@@ -18,12 +18,17 @@ class CtlChannel(private val gson: Gson = Gson()) {
     interface Sink {
         fun onCtlOpen() {}
         fun onChat(from: String, text: String) {}
+        /** chat carrying a delivery id — default keeps old signature working */
+        fun onChatMsg(id: String, from: String, text: String) { onChat(from, text) }
+        fun onChatAck(id: String) {}   // peer received it (✓✓)
+        fun onChatSeen(id: String) {}  // peer read it (blue ✓✓)
         fun onClip(text: String) {}
         fun onFile(name: String, data: ByteArray) {}
         fun onFileProgress(received: Int, total: Int) {}
         fun onQuality(mode: String) {}
         fun onViewOnly(on: Boolean) {}
         fun onFsList(path: String, items: com.google.gson.JsonArray?, err: String?) {}
+        fun onCallState(kind: String, on: Boolean) {} // peer toggled voice/video
     }
 
     var sink: Sink? = null
@@ -48,7 +53,20 @@ class CtlChannel(private val gson: Gson = Gson()) {
         if (!buf.binary) {
             val m = runCatching { gson.fromJson(String(bytes), JsonObject::class.java) }.getOrNull() ?: return
             when (m.get("t").s()) {
-                "chat" -> sink?.onChat(m.get("from").s() ?: "peer", m.get("text").s() ?: "")
+                "chat" -> {
+                    val mid = m.get("id").s()
+                    // delivery receipt — the ✓✓ the sender watches for
+                    if (!mid.isNullOrBlank()) send(JsonObject().apply {
+                        addProperty("t", "chat-ack"); addProperty("id", mid) })
+                    sink?.let {
+                        if (mid.isNullOrBlank()) it.onChat(m.get("from").s() ?: "peer", m.get("text").s() ?: "")
+                        else it.onChatMsg(mid, m.get("from").s() ?: "peer", m.get("text").s() ?: "")
+                    }
+                }
+                "chat-ack" -> m.get("id").s()?.let { sink?.onChatAck(it) }
+                "chat-seen" -> m.get("id").s()?.let { sink?.onChatSeen(it) }
+                // peer started/stopped a voice call or camera — UI badge
+                "call" -> sink?.onCallState(m.get("k").s() ?: "", m.get("on")?.asBoolean == true)
                 "clip" -> m.get("text").s()?.let { sink?.onClip(it) }
                 "file-meta" -> {
                     rxName = m.get("name").s() ?: "file.bin"
@@ -99,8 +117,18 @@ class CtlChannel(private val gson: Gson = Gson()) {
             runCatching { d.send(DataChannel.Buffer(ByteBuffer.wrap(gson.toJson(m).toByteArray()), false)) }
     }
 
-    fun sendChat(from: String, text: String) = send(JsonObject().apply {
+    fun sendChat(from: String, text: String, id: String? = null) = send(JsonObject().apply {
         addProperty("t", "chat"); addProperty("from", from); addProperty("text", text)
+        if (!id.isNullOrBlank()) addProperty("id", id)
+    })
+
+    // WhatsApp-style read receipts — sent when the message was actually visible
+    fun sendChatSeen(id: String) = send(JsonObject().apply {
+        addProperty("t", "chat-seen"); addProperty("id", id)
+    })
+    // peer-facing call state — "voice on/off", "camera on/off" notices
+    fun sendCallState(kind: String, on: Boolean) = send(JsonObject().apply {
+        addProperty("t", "call"); addProperty("k", kind); addProperty("on", on)
     })
 
     fun sendClip(text: String) = send(JsonObject().apply {

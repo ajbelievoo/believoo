@@ -30,8 +30,14 @@ class ScreenShareService : Service() {
         fun onError(msg: String)
         fun onCtlReady() {}
         fun onChat(from: String, text: String) {}
+        fun onChatMsg(id: String, from: String, text: String) { onChat(from, text) }
+        fun onChatAck(id: String) {}
+        fun onChatSeen(id: String) {}
+        fun onCallState(kind: String, on: Boolean) {}
+        fun onPipTrack(track: org.webrtc.VideoTrack) {}
         fun onClip(text: String) {}
         fun onFile(name: String, data: ByteArray) {}
+        fun onFileProgress(received: Int, total: Int) {}
     }
 
     var events: Events? = null
@@ -96,13 +102,19 @@ class ScreenShareService : Service() {
                 override fun sendSignal(payload: JsonObject) { signaling?.send("signal", payload) }
                 override fun onPeerConnected() { events?.onConnected() }
                 override fun onPeerDisconnected() { events?.onDisconnected() }
+                override fun onPipTrack(track: org.webrtc.VideoTrack) { events?.onPipTrack(track) }
                 override fun onError(message: String) { events?.onError(message) }
             }
             h.ctl.sink = object : CtlChannel.Sink {
                 override fun onCtlOpen() { events?.onCtlReady() }
                 override fun onChat(from: String, text: String) { events?.onChat(from, text) }
+                override fun onChatMsg(id: String, from: String, text: String) { events?.onChatMsg(id, from, text) }
+                override fun onChatAck(id: String) { events?.onChatAck(id) }
+                override fun onChatSeen(id: String) { events?.onChatSeen(id) }
+                override fun onCallState(kind: String, on: Boolean) { events?.onCallState(kind, on) }
                 override fun onClip(text: String) { events?.onClip(text) }
                 override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
+                override fun onFileProgress(r: Int, t: Int) { events?.onFileProgress(r, t) }
                 // viewer's quality toggle actually retunes this capture
                 override fun onQuality(mode: String) { h.setQuality(mode) }
             }
