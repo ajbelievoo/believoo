@@ -214,6 +214,11 @@ class WebRtcHost(context: Context) {
         }, constraints)
     }
 
+    /** The peer's shared GL context — decoded/captured frames are texture
+        buffers bound to THIS context group. Any renderer surface (PIP,
+        mini-view) init()ed with a different EglBase draws them as black. */
+    fun eglContext(): EglBase.Context = egl.eglBaseContext
+
     /** Viewer quality toggle — retune the capture instead of leaving it hot. */
     fun setQuality(mode: String) {
         if (capW == 0 || capH == 0) return
@@ -258,6 +263,9 @@ class WebRtcHost(context: Context) {
 
     fun setMic(on: Boolean): Boolean {
         val t = callAudioTransceiver() ?: return false
+        // defensive: if negotiation left the audio slot unable to send, our
+        // mic track would attach but never hit the wire — force sendrecv.
+        runCatching { t.direction = RtpTransceiver.RtpTransceiverDirection.SEND_RECV }
         if (on) {
             if (micTrack == null) {
                 micSource = factory.createAudioSource(MediaConstraints())
@@ -272,6 +280,7 @@ class WebRtcHost(context: Context) {
             runCatching { micTrack?.dispose(); micSource?.dispose() }
             micTrack = null; micSource = null
         }
+        android.util.Log.d("BMyDesk", "host setMic on=$on dir=${t.direction} current=${t.currentDirection}")
         ctl.sendCallState("voice", on)
         return true
     }

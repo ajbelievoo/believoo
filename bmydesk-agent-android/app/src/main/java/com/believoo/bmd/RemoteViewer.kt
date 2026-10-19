@@ -217,6 +217,7 @@ class RemoteViewer(context: Context) {
         touching the sender so unmute is instant and needs no renegotiation. */
     fun setMic(on: Boolean): Boolean {
         val t = callAudioT ?: return false // old peer — no call slot
+        runCatching { t.direction = RtpTransceiver.RtpTransceiverDirection.SEND_RECV }
         if (on) {
             if (micTrack == null) {
                 micSource = factory.createAudioSource(MediaConstraints())
@@ -231,6 +232,7 @@ class RemoteViewer(context: Context) {
             runCatching { micTrack?.dispose(); micSource?.dispose() }
             micTrack = null; micSource = null
         }
+        android.util.Log.d("BMyDesk", "viewer setMic on=$on dir=${t.direction} current=${t.currentDirection}")
         ctl.sendCallState("voice", on)
         return true
     }

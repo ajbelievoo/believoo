@@ -39,13 +39,18 @@ class SessionBubbleService : Service() {
     private var wm: WindowManager? = null
     private var bubble: View? = null
     private var menu: View? = null
+    private var mini: View? = null
+    private var miniRenderer: org.webrtc.SurfaceViewRenderer? = null
+    private var miniBoundTrack: org.webrtc.VideoTrack? = null
     private val micOn get() = micState
     private val camOn get() = camState
     private val ctlOn get() = !viewOnlyState
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        instance = this
         startForegroundNotif()
         if (bubble == null) addBubble()
+        refreshMini()
         return START_STICKY
     }
 
@@ -89,7 +94,12 @@ class SessionBubbleService : Service() {
             w, h,
             if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            // FLAG_SECURE keeps our chrome OUT of the MediaProjection capture —
+            // without it the viewer literally sees the host's floating bubble
+            // + menu baked into the remote video. Touches still work.
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                or WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START; this.x = x; this.y = y }
 
@@ -220,10 +230,78 @@ class SessionBubbleService : Service() {
         }
     }
 
+    // ── Mini live preview — while the VIEWER is minimized the remote screen
+    //    shrinks into a small floating window; tap = back to full-screen.
+    //    The track is live the whole time (peer keeps decoding), so this is a
+    //    real video, not a snapshot. ✕ collapses it back to just the dot. ──
+    fun refreshMini() {
+        val t = miniTrack; val e = miniEgl
+        if (t == null || e == null || !Settings.canDrawOverlays(this) || bubble == null) {
+            hideMini(); return
+        }
+        // a reconnect mints a NEW track — rebind or the window would keep a
+        // sink on a dead producer
+        if (mini != null && miniBoundTrack !== t) hideMini()
+        if (mini != null) return
+        val w = wm ?: return
+        val d = resources.displayMetrics.density
+        val mw = (176 * d).toInt(); val mh = (110 * d).toInt()
+        val lp = overlayLp(mw, mh,
+            resources.displayMetrics.widthPixels - mw - (8 * d).toInt(),
+            (resources.displayMetrics.heightPixels * 0.35f - mh - 14 * d).toInt().coerceAtLeast((24 * d).toInt()))
+
+        val frame = android.widget.FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = 12 * d
+                setColor(Color.parseColor("#0b1120"))
+                setStroke((1.5f * d).toInt(), Color.parseColor("#e11d48"))
+            }
+            clipToOutline = true
+            elevation = 13 * d
+        }
+        val r = org.webrtc.SurfaceViewRenderer(this).apply { setZOrderMediaOverlay(true) }
+        runCatching { r.init(e, null) }
+        frame.addView(r, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT).apply {
+            setMargins((3 * d).toInt(), (3 * d).toInt(), (3 * d).toInt(), (3 * d).toInt())
+        })
+        frame.addView(TextView(this).apply {
+            text = "✕"; textSize = 11f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL; setColor(Color.parseColor("#b00f172a")) }
+            elevation = 16 * d
+            setOnClickListener { hideMini() }
+        }, android.widget.FrameLayout.LayoutParams((20 * d).toInt(), (20 * d).toInt(),
+            Gravity.TOP or Gravity.END).apply { setMargins(0, (2 * d).toInt(), (2 * d).toInt(), 0) })
+
+        var dx = 0f; var dy = 0f; var moved = false
+        frame.setOnTouchListener { _, ev ->
+            when (ev.action) {
+                MotionEvent.ACTION_DOWN -> { dx = ev.rawX - lp.x; dy = ev.rawY - lp.y; moved = false; true }
+                MotionEvent.ACTION_MOVE -> {
+                    if (Math.abs(ev.rawX - lp.x - dx) > 6 || Math.abs(ev.rawY - lp.y - dy) > 6) moved = true
+                    lp.x = (ev.rawX - dx).toInt(); lp.y = (ev.rawY - dy).toInt()
+                    runCatching { wm?.updateViewLayout(frame, lp) }; true
+                }
+                MotionEvent.ACTION_UP -> { if (!moved) runCatching { resumeIntent().send() }; true }
+                else -> false
+            }
+        }
+        runCatching { w.addView(frame, lp); mini = frame; miniRenderer = r; t.addSink(r); miniBoundTrack = t }
+    }
+
+    fun hideMini() {
+        miniRenderer?.let { r -> runCatching { miniBoundTrack?.removeSink(r) }; runCatching { r.release() } }
+        mini?.let { runCatching { wm?.removeView(it) } }
+        mini = null; miniRenderer = null; miniBoundTrack = null
+    }
+
     override fun onDestroy() {
+        hideMini()
         menu?.let { runCatching { wm?.removeView(it) } }
         bubble?.let { runCatching { wm?.removeView(it) } }
-        menu = null; bubble = null; wm = null
+        menu = null; bubble = null; wm = null; instance = null
         super.onDestroy()
     }
 
@@ -236,5 +314,16 @@ class SessionBubbleService : Service() {
         @Volatile var micState = false
         @Volatile var camState = false
         @Volatile var viewOnlyState = false
+        @Volatile var instance: SessionBubbleService? = null
+        /** viewer-side live feed for the floating mini window — set while
+            minimized, cleared on restore/exit */
+        @Volatile var miniTrack: org.webrtc.VideoTrack? = null
+        @Volatile var miniEgl: org.webrtc.EglBase.Context? = null
+        /** set the mini feed + (re)apply on the running service, if any */
+        fun setMini(track: org.webrtc.VideoTrack?, egl: org.webrtc.EglBase.Context?) {
+            miniTrack = track; miniEgl = egl
+            val s = instance ?: return
+            if (track != null) s.refreshMini() else s.hideMini()
+        }
     }
 }

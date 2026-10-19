@@ -759,10 +759,12 @@ class MainActivity : Activity() {
         chkViewOnly = android.widget.CheckBox(this).apply {
             text = "View only — watch but can't control\n(unticked = full control — they can tap & type)"
             setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
+            buttonTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#fb7185"))
         }
         chkTrust = android.widget.CheckBox(this).apply {
             text = "Always trust this device — skip approval next time"
             setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
+            buttonTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#22c55e"))
         }
         reqBox.addView(chkViewOnly)
         reqBox.addView(chkTrust)
@@ -1036,6 +1038,9 @@ class MainActivity : Activity() {
         }, lpGap(6))
         // 🔓 ask the host for control — the host sees an Allow/deny dialog
         vSessRow.addView(mbtn("🔓", Color.parseColor("#1e293b"), 12f) { requestCtl() }, lpGap(6))
+        // minimize OUR window into the floating mini-view — Back now drives
+        // the remote device, so the only way off the remote screen is here
+        vSessRow.addView(mbtn("⬇ Min", Color.parseColor("#334155"), 10f) { minimizeViewer() }, lpGap(6))
         // session buttons overflow on narrow phones — scroll them so the
         // Disconnect button is ALWAYS visible at the right edge
         val vSessScroll = android.widget.HorizontalScrollView(this).apply {
@@ -1306,6 +1311,7 @@ class MainActivity : Activity() {
     private var micOn = false; private var camOn = false
     private var pipView: org.webrtc.SurfaceViewRenderer? = null
     private var lastPipTrack: org.webrtc.VideoTrack? = null
+    private var screenTrack: org.webrtc.VideoTrack? = null // live remote feed — powers the minimized mini-view
     private var rootFrame: android.widget.FrameLayout? = null
     private var vQuality = "auto"
     private var fillMode = false
@@ -2558,6 +2564,7 @@ class MainActivity : Activity() {
                     // Fresh renderer each session — a released
                     // SurfaceViewRenderer can't be init()ed again, which is
                     // what made every 2nd+ connect render a black screen.
+                    screenTrack = track
                     remoteSurface?.let { old ->
                         viewerPane.removeView(old)
                         runCatching { old.release() }
@@ -2921,10 +2928,13 @@ class MainActivity : Activity() {
         if (pipView == null) pipBox?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); pipBox = null }
     }
 
-    // the host peer's egl is private — the PIP needs SOME egl context; if the
-    // viewer isn't up (we're hosting), spin a tiny one for the pip sink.
+    // The PIP must render on the SAME egl shared group the peer decodes into —
+    // a fresh EglBase can't read the other context's texture buffers, which is
+    // why the host's call PIP used to draw solid black. Only fall back to a
+    // throwaway context if the host peer isn't up yet (nothing to draw anyway).
     private var hostEgl: org.webrtc.EglBase? = null
     private fun serviceEglContext(): org.webrtc.EglBase.Context? {
+        service?.peer()?.let { return it.eglContext() }
         if (hostEgl == null) hostEgl = org.webrtc.EglBase.create()
         return hostEgl?.eglBaseContext
     }
@@ -3120,6 +3130,9 @@ class MainActivity : Activity() {
         viewerPane.visibility = View.GONE
         chatPanel.visibility = View.GONE
         exitImmersive()
+        // hand the live remote track to the bubble service — while minimized
+        // the user gets a small floating video instead of a dead icon
+        SessionBubbleService.setMini(screenTrack, remoteViewer?.egl?.eglBaseContext)
         // foreground service keeps the process (and the peer) warm + shows
         // the overlay bubble / persistent "return" notification
         startService(Intent(this, SessionBubbleService::class.java))
@@ -3129,6 +3142,7 @@ class MainActivity : Activity() {
     private fun restoreViewer() {
         if (remoteViewer == null && vJoin == null && service == null) { viewerMinimized = false; return }
         viewerMinimized = false
+        SessionBubbleService.setMini(null, null)
         stopService(Intent(this, SessionBubbleService::class.java))
         if (remoteViewer != null || vJoin != null) { viewerPane.visibility = View.VISIBLE; enterImmersive() }
     }
@@ -3234,6 +3248,7 @@ class MainActivity : Activity() {
         // clean exit — a later crash must not resurrect a finished session
         getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().remove("resume_code").apply()
         remoteViewer?.stop(); remoteViewer = null
+        screenTrack = null; SessionBubbleService.setMini(null, null)
         signaling.disconnectViewer()
         remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }
         remoteSurface = null
@@ -3257,13 +3272,39 @@ class MainActivity : Activity() {
         vProgReset()
     }
 
-    // Back NEVER kills a remote session — it minimizes to the floating
-    // bubble so the user can keep using the phone while connected.
-    // Disconnect only happens via the explicit Yes/No confirm.
+    // While VIEWING, hardware Back is sent to the REMOTE device (it drives
+    // B's screen, not ours) — our own window only minimizes via the floating
+    // menu's ⬇ Min button. Back NEVER kills a session; disconnect only
+    // happens via the explicit Yes/No confirm.
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (viewerPane.visibility == View.VISIBLE) { minimizeViewer(); return }
+        if (viewerPane.visibility == View.VISIBLE) {
+            // close our own chrome first — back pops local UI, THEN remote
+            if (viewerMenuScroll.visibility == View.VISIBLE) { closeViewerMenu(); return }
+            if (keysRow.visibility == View.VISIBLE) { keysRow.visibility = View.GONE; return }
+            if (chatPanel.visibility == View.VISIBLE) { chatPanel.visibility = View.GONE; return }
+            sendKey("Escape") // host maps Escape → GLOBAL_ACTION_BACK
+            return
+        }
         maybeRateThenExit()
+    }
+
+    // Physical volume keys control the REMOTE device's media volume while a
+    // session is live — matches what the ⌨ row's Vol+/Vol−/Mute send.
+    override fun dispatchKeyEvent(ev: android.view.KeyEvent): Boolean {
+        if (viewerPane.visibility == View.VISIBLE && remoteViewer != null) {
+            val dir = when (ev.keyCode) {
+                android.view.KeyEvent.KEYCODE_VOLUME_UP -> "up"
+                android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> "down"
+                android.view.KeyEvent.KEYCODE_VOLUME_MUTE -> "mute"
+                else -> null
+            }
+            if (dir != null) {
+                if (ev.action == android.view.KeyEvent.ACTION_DOWN) activeCtl()?.sendVol(dir)
+                return true // swallowed locally — remote only
+            }
+        }
+        return super.dispatchKeyEvent(ev)
     }
 
     private fun maybeRateThenExit() {
