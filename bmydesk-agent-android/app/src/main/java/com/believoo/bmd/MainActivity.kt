@@ -2170,6 +2170,9 @@ class MainActivity : Activity() {
         }
         if (!ok) { toast("Peer doesn't support calls — update the other app"); return }
         if (isMic) micOn = next else camOn = next
+        // self-preview PIP while our own camera is on (Zoom-style self view)
+        if (!isMic) showSelfCam(
+            if (next) (if (viewer) remoteViewer?.camVideoTrack() else service?.peer()?.camVideoTrack()) else null)
         paintCallBtn()
         chatAppend("System", (if (isMic) "Microphone " else "Camera ") + (if (next) "on — the other side can " +
             (if (isMic) "hear you" else "see you") else "off"), false)
@@ -2184,24 +2187,94 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Remote camera arrived → small picture-in-picture in the corner. Goes on
-        the ROOT frame so it also floats over the host home screen. */
+    /** Remote camera arrived → draggable picture-in-picture. tap = maximize. */
+    private var selfView: org.webrtc.SurfaceViewRenderer? = null
+    private var pipBox: LinearLayout? = null
+    private var pipBig = false
+
+    private fun pipContainer(): LinearLayout? {
+        val parent = rootFrame ?: return null
+        if (pipBox == null) {
+            pipBox = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat()
+                    setColor(Color.parseColor("#0b1220"))
+                    setStroke(dp(1), Color.parseColor("#334155"))
+                }
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+            }
+            parent.addView(pipBox, android.widget.FrameLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.END).apply { marginEnd = dp(14); bottomMargin = dp(90) })
+            attachPipTouch(pipBox!!)
+        }
+        return pipBox
+    }
+
+    // free-drag anywhere; a short tap toggles the remote feed small↔big
+    private fun attachPipTouch(box: View) {
+        var ox = 0f; var oy = 0f; var moved = false
+        box.setOnTouchListener { v, e ->
+            when (e.action) {
+                android.view.MotionEvent.ACTION_DOWN -> { ox = e.rawX - v.translationX; oy = e.rawY - v.translationY; moved = false; true }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val nx = e.rawX - ox; val ny = e.rawY - oy
+                    if (kotlin.math.abs(nx - v.translationX) > 3 || kotlin.math.abs(ny - v.translationY) > 3) moved = true
+                    v.translationX = nx; v.translationY = ny; true
+                }
+                android.view.MotionEvent.ACTION_UP -> { if (!moved) togglePipSize(); true }
+                else -> false
+            }
+        }
+    }
+
+    private fun togglePipSize() {
+        pipBig = !pipBig
+        val w = dp(if (pipBig) 240 else 110)
+        pipView?.layoutParams?.let { it.width = w; it.height = w * 3 / 4; pipView?.layoutParams = it }
+    }
+
     private fun showPip(track: org.webrtc.VideoTrack) {
         ui {
-            val parent = rootFrame ?: return@ui
+            val box = pipContainer() ?: return@ui
             val eglCtx = remoteViewer?.egl?.eglBaseContext ?: serviceEglContext() ?: return@ui
             if (pipView == null) {
                 pipView = org.webrtc.SurfaceViewRenderer(this)
                 pipView!!.init(eglCtx, null)
                 pipView!!.setZOrderMediaOverlay(true)
-                val sz = dp(110)
-                parent.addView(pipView, android.widget.FrameLayout.LayoutParams(
-                    sz, (sz * 4 / 3), Gravity.BOTTOM or Gravity.END).apply {
-                    marginEnd = dp(16); bottomMargin = dp(80) })
+                val w = dp(110)
+                box.addView(pipView, LinearLayout.LayoutParams(w, w * 3 / 4))
             }
             pipView!!.visibility = View.VISIBLE
             track.addSink(pipView)
         }
+    }
+
+    // our own camera → tiny self-preview next to the remote feed
+    private fun showSelfCam(track: org.webrtc.VideoTrack?) {
+        ui {
+            if (track == null) { hideSelfCam(); return@ui }
+            val box = pipContainer() ?: return@ui
+            val eglCtx = remoteViewer?.egl?.eglBaseContext ?: serviceEglContext() ?: return@ui
+            if (selfView == null) {
+                selfView = org.webrtc.SurfaceViewRenderer(this)
+                selfView!!.init(eglCtx, null)
+                selfView!!.setZOrderMediaOverlay(true)
+                selfView!!.setMirror(true) // selfie camera looks natural mirrored
+                val w = dp(56)
+                box.addView(selfView, 0, LinearLayout.LayoutParams(w, w * 3 / 4).apply { marginEnd = dp(4) })
+            }
+            selfView!!.visibility = View.VISIBLE
+            track.addSink(selfView)
+        }
+    }
+
+    private fun hideSelfCam() {
+        selfView?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); runCatching { it.release() } }
+        selfView = null
+        // remote pip alone doesn't need the box chrome if nothing is in it
+        if (pipView == null) pipBox?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); pipBox = null }
     }
 
     // the host peer's egl is private — the PIP needs SOME egl context; if the
@@ -2217,6 +2290,9 @@ class MainActivity : Activity() {
         if (::vMicBtn.isInitialized) paintCallBtn()
         pipView?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); runCatching { it.release() } }
         pipView = null
+        hideSelfCam()
+        pipBox?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); pipBox = null }
+        pipBig = false
     }
 
     private fun setPadMode(on: Boolean) {

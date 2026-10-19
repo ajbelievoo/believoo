@@ -164,7 +164,11 @@ async function handleOffer(m) {
         // viewer's call media — mic → audio element, camera → PIP window
         pc.ontrack = (e) => {
             if (e.track.kind === 'audio') { const a = document.getElementById('callAudio'); a.srcObject = new MediaStream([e.track]); a.play().catch(() => {}); }
-            else { const p = document.getElementById('pipVideo'); p.srcObject = new MediaStream([e.track]); p.classList.remove('hidden'); p.play().catch(() => {}); }
+            else {
+                const show = () => { const p = document.getElementById('pipVideo'); p.srcObject = new MediaStream([e.track]); p.classList.remove('hidden'); p.play().catch(() => {}); };
+                if (e.track.muted) e.track.onunmute = () => { e.track.onunmute = null; show(); }; // wait for real frames
+                else show();
+            }
         };
         pc.ondatachannel = (e) => {
             const dcIn = e.channel;

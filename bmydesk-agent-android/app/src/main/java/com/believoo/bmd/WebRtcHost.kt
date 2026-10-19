@@ -132,7 +132,20 @@ class WebRtcHost(context: Context) {
                 val tr = t?.receiver?.track() ?: return
                 // viewer mic → auto-played by the audio device module;
                 // viewer camera → PIP surface on the host side
-                if (tr.kind() == "video" && tr !== localTrack) (tr as? VideoTrack)?.let { listener?.onPipTrack(it) }
+                // gate on the first real frame — the viewer's sendrecv cam
+                // slot creates a pending track that draws nothing until they
+                // actually enable their camera
+                if (tr.kind() == "video" && tr !== localTrack) (tr as? VideoTrack)?.let { vt ->
+                    vt.addSink(object : org.webrtc.VideoSink {
+                        private var fired = false
+                        override fun onFrame(f: org.webrtc.VideoFrame) {
+                            if (fired) return
+                            fired = true
+                            vt.removeSink(this)
+                            listener?.onPipTrack(vt)
+                        }
+                    })
+                }
             }
         }) ?: run { listener?.onError("peer create failed"); return }
 
@@ -258,6 +271,9 @@ class WebRtcHost(context: Context) {
         ctl.sendCallState("camera", on)
         return true
     }
+
+    /** Our own camera track — for the local self-preview PIP. */
+    fun camVideoTrack(): VideoTrack? = camTrack
 
     fun stop() {
         ctl.close()

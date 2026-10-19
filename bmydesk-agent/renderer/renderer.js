@@ -924,7 +924,11 @@ function attachRemoteTrack(e) {
     if (t.kind === 'audio') {
         const a = $('callAudio'); a.srcObject = new MediaStream([t]); a.play().catch(() => {});
     } else if (t.kind === 'video') {
-        const pv = $('pipVideo'); pv.srcObject = new MediaStream([t]); pv.style.display = 'block'; pv.play().catch(() => {});
+        // empty cam slot stays muted until the peer really enables their
+        // camera — show the PIP only when frames flow, not a black box
+        const show = () => { const pv = $('pipVideo'); pv.srcObject = new MediaStream([t]); pv.style.display = 'block'; pv.play().catch(() => {}); };
+        if (t.muted) t.onunmute = () => { t.onunmute = null; show(); };
+        else show();
     }
 }
 $('fsBtn').onclick = () => {

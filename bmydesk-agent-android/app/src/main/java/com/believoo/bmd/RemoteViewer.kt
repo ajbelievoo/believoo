@@ -101,7 +101,20 @@ class RemoteViewer(context: Context) {
                 when {
                     isScreen -> (tr as? VideoTrack)?.let { listener?.onTrack(it) }
                     tr.kind() == "audio" -> tr.setEnabled(true) // call audio plays via the audio device module
-                    tr.kind() == "video" -> (tr as? VideoTrack)?.let { listener?.onPipTrack(it) }
+                    // the empty sendrecv cam slot fires onTrack with a pending
+                    // track that NEVER draws — gate on the first real frame or
+                    // the PIP shows as a dead black box on every connect
+                    tr.kind() == "video" -> (tr as? VideoTrack)?.let { vt ->
+                        vt.addSink(object : org.webrtc.VideoSink {
+                            private var fired = false
+                            override fun onFrame(f: VideoFrame) {
+                                if (fired) return
+                                fired = true
+                                vt.removeSink(this)
+                                listener?.onPipTrack(vt)
+                            }
+                        })
+                    }
                 }
             }
         }) ?: run { listener?.onError("peer create failed"); return }
@@ -228,6 +241,9 @@ class RemoteViewer(context: Context) {
     }
 
     fun callActive(): Boolean = micTrack?.enabled() == true || camTrack?.enabled() == true
+
+    /** Our own camera track — for the local self-preview PIP. */
+    fun camVideoTrack(): VideoTrack? = camTrack
 
     fun stop() {
         ctl.close()

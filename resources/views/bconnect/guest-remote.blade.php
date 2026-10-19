@@ -699,7 +699,11 @@ $('chatBtn').onclick = () => { const p = $('chatPanel'); p.style.display = p.sty
 let micStream = null, camStream = null, micOn = false, camOn = false;
 function attachCallTrack(e) {
     if (e.track.kind === 'audio') { const a = $('callAudio'); a.srcObject = new MediaStream([e.track]); a.play().catch(() => {}); }
-    else { const p = $('pipVideo'); p.srcObject = new MediaStream([e.track]); p.style.display = 'block'; p.play().catch(() => {}); }
+    else {
+        const show = () => { const p = $('pipVideo'); p.srcObject = new MediaStream([e.track]); p.style.display = 'block'; p.play().catch(() => {}); };
+        if (e.track.muted) e.track.onunmute = () => { e.track.onunmute = null; show(); }; // wait for real frames
+        else show();
+    }
 }
 async function callToggle(kind) {
     if (!pc || pc.connectionState !== 'connected') { addChat('System', 'Connect first — then start the call', false); return; }
