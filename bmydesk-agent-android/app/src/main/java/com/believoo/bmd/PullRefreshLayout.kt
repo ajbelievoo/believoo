@@ -22,9 +22,19 @@ class PullRefreshLayout(context: Context) : FrameLayout(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val d = resources.displayMetrics.density
     private val trigger = (d * 68).toInt()
+    // branded spinner — rose ring on a dark chip instead of the stock gray dot
     private val bar = ProgressBar(context).apply {
         visibility = GONE
         elevation = d * 6
+        indeterminateTintList = android.content.res.ColorStateList.valueOf(
+            android.graphics.Color.parseColor("#fb7185"))
+        background = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(android.graphics.Color.parseColor("#e0101526"))
+            setStroke((d * 1).toInt(), android.graphics.Color.parseColor("#2a3752"))
+        }
+        val p = (d * 7).toInt()
+        setPadding(p, p, p, p)
     }
     private var downY = 0f
     private var pulling = false

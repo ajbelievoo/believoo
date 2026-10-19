@@ -67,18 +67,49 @@ class WebRtcHost(context: Context) {
     }
 
     fun startCapture(resultData: Intent, width: Int, height: Int, fps: Int = 15) {
-        capturer = ScreenCapturerAndroid(resultData, object : android.media.projection.MediaProjection.Callback() {
-            override fun onStop() { listener?.onError("Screen capture stopped") }
-        })
-        surfaceHelper = SurfaceTextureHelper.create("CaptureThread", egl.eglBaseContext)
-        videoSource = factory.createVideoSource(true)
-        capturer!!.initialize(surfaceHelper, appContext, videoSource!!.capturerObserver)
-        capturer!!.startCapture(width, height, fps)
+        try {
+            capturer = ScreenCapturerAndroid(resultData, object : android.media.projection.MediaProjection.Callback() {
+                override fun onStop() { listener?.onError("Screen capture stopped") }
+            })
+            surfaceHelper = SurfaceTextureHelper.create("CaptureThread", egl.eglBaseContext)
+            videoSource = factory.createVideoSource(true)
+            capturer!!.initialize(surfaceHelper, appContext, videoSource!!.capturerObserver)
+            // stale/reused projection tokens + dead virtual displays throw
+            // here — without this catch the host looks "connected" while the
+            // viewer watches black
+            capturer!!.startCapture(width, height, fps)
+        } catch (e: Exception) {
+            listener?.onError("Screen capture failed: ${e.message}")
+            return
+        }
         capW = width; capH = height
         localTrack = factory.createVideoTrack("screen", videoSource)
     }
 
+    // Post-connect sanity: is the encoder actually emitting? A dead
+    // MediaProjection/virtual-display produces ZERO encoded frames while the
+    // link itself stays green — the classic "connected but black" state.
+    fun watchEncoding() {
+        val p = peer ?: return
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            runCatching {
+                p.getStats { report ->
+                    val encoded = report?.statsMap?.values
+                        ?.filter { it.type == "outbound-rtp" }
+                        ?.mapNotNull { (it.members["framesEncoded"] as? Number)?.toLong() }
+                        ?.sum() ?: 0L
+                    android.util.Log.d("BMyDesk", "host framesEncoded=$encoded")
+                    if (encoded == 0L)
+                        listener?.onError("Screen capture produced no frames — end the session and accept again")
+                }
+            }
+        }, 12000)
+    }
+
     fun handleOffer(offerSdp: String, ice: List<PeerConnection.IceServer>) {
+        // answering with no screen track = the viewer connects to silence
+        // (black forever). Surface it instead of pretending we're streaming.
+        if (localTrack == null) { listener?.onError("Screen capture isn't running — accept again and tap 'Start now'"); return }
         val constraints = MediaConstraints()
         // A reconnecting viewer sends a FRESH offer — the old peer (probably a
         // dead/failed ICE) must be disposed or two peers leak and fight over
@@ -222,11 +253,13 @@ class WebRtcHost(context: Context) {
     /** Viewer quality toggle — retune the capture instead of leaving it hot. */
     fun setQuality(mode: String) {
         if (capW == 0 || capH == 0) return
+        // capture cap is 1440px — 'auto' rides it at 20fps; 'fhd' upscales
+        // the virtual display past the cap for sharpness when the link allows
         val (scale, fps, kbps) = when (mode) {
-            "sd" -> Triple(0.5f, 8, 1500)
-            "hd" -> Triple(1.0f, 20, 9000)
-            "fhd" -> Triple(1.0f, 30, 14000)
-            else -> Triple(1.0f, 15, 8000) // auto
+            "sd" -> Triple(0.5f, 8, 1200)
+            "hd" -> Triple(1.0f, 24, 8000)
+            "fhd" -> Triple(1.5f, 30, 14000)
+            else -> Triple(1.0f, 20, 5000) // auto — light enough to stay fluid
         }
         runCatching {
             capturer?.changeCaptureFormat(

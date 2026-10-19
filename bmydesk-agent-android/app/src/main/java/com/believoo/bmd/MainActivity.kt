@@ -42,6 +42,10 @@ class MainActivity : Activity() {
     private lateinit var spinner: ProgressBar
     private lateinit var reqBox: LinearLayout
     private lateinit var reqName: TextView
+    private var reqAvatar: TextView? = null
+    private var reqNote: TextView? = null
+    private var reqTimer: TextView? = null
+    private var reqShownAt = 0L
     private lateinit var endBtn: Button
 
     private var pendingProjection = false
@@ -212,6 +216,17 @@ class MainActivity : Activity() {
         }
     }
 
+    // fills the request card: avatar initial, name title, optional note quote
+    private fun showReq(name: String, note: String?) {
+        reqAvatar?.text = name.trim().firstOrNull()?.uppercase() ?: "?"
+        reqName.text = "$name wants to view this device"
+        reqNote?.let {
+            it.text = "“$note”"
+            it.visibility = if (note.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
+        reqBox.visibility = View.VISIBLE
+    }
+
     private fun handleHostSignal(p: JsonObject) {
         when (p.get("kind").s()) {
             // queued by the server on join() so relay-mode viewers still reach us
@@ -219,9 +234,8 @@ class MainActivity : Activity() {
                 val nm = p.get("name").s() ?: "Someone"
                 val nt = p.get("note").s()
                 resetAcceptOptions()
-                pendingVDevice = p.get("vdevice").s(); pendingVName = nm
-                reqName.text = "$nm wants to view this device" + (if (nt.isNullOrBlank()) "" else "\n“$nt”")
-                reqBox.visibility = View.VISIBLE
+                pendingVDevice = p.get("vdevice").s()
+                showReq(nm, nt)
             }
             "offer" -> {
                 val sdp = p.get("sdp").asString
@@ -739,6 +753,16 @@ class MainActivity : Activity() {
             .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
     }
 
+    // toggle-state paint for session buttons — keeps the rounded/brand look
+    // (setBackgroundColor() nukes the GradientDrawable + leaves square corners)
+    private fun btnActive(b: android.widget.Button, on: Boolean, col: Int = Color.parseColor("#166534")) {
+        b.background = GradientDrawable().apply {
+            setColor(if (on) col else Color.parseColor("#1e293b"))
+            cornerRadius = dp(14).toFloat()
+            setStroke(dp(1), Color.argb(if (on) 90 else 26, 255, 255, 255))
+        }
+    }
+
     // slim rounded progress track with the brand gradient fill — used by
     // the toolbar mini-bar and the connecting overlay's bar
     private fun progBarDrawable(): android.graphics.drawable.LayerDrawable {
@@ -781,7 +805,14 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(48, 60, 48, 40)
         }
-        scroll.addView(col)
+        // wide screens (landscape / tablet / Chromebook): cap the column so
+        // cards don't rubber-band edge to edge — centred iPad-style column
+        val centerWrap = android.widget.FrameLayout(this)
+        centerWrap.addView(col, android.widget.FrameLayout.LayoutParams(
+            minOf(resources.displayMetrics.widthPixels, dp(500)),
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER_HORIZONTAL))
+        scroll.addView(centerWrap)
         // pull down from the top = reload (re-register + reconnect realtime)
         val pull = PullRefreshLayout(this).apply { onRefresh = { refreshAll() } }
         pull.addView(scroll)
@@ -817,7 +848,12 @@ class MainActivity : Activity() {
         col.addView(TextView(this).apply {
             text = "R E M O T E   A C C E S S   A G E N T"
             setTextColor(txtDim); textSize = 10f; gravity = Gravity.CENTER; letterSpacing = 0.28f
-            setPadding(0, dp(8), 0, dp(24))
+            setPadding(0, dp(8), 0, dp(2))
+        })
+        col.addView(TextView(this).apply {
+            text = "BMyDesk Agent · v${BuildConfig.VERSION_NAME}"
+            setTextColor(Color.parseColor("#3d4c63")); textSize = 9.5f; gravity = Gravity.CENTER
+            letterSpacing = 0.06f; setPadding(0, 0, 0, dp(22))
         })
 
         fun cardBg() = GradientDrawable().apply {
@@ -886,6 +922,37 @@ class MainActivity : Activity() {
         }
         statusRow.addView(statusView)
         card.addView(statusRow)
+        card.addView(TextView(this).apply {
+            text = "v${BuildConfig.VERSION_NAME} · device ${deviceId().take(8)}…"
+            setTextColor(txtDim); textSize = 10f; gravity = Gravity.CENTER
+            letterSpacing = 0.05f; setPadding(0, dp(6), 0, 0)
+        })
+
+        // quick actions under the code — copy / share / mint a fresh code
+        // (the share sheet text link already existed at the page bottom;
+        //  burying it there meant nobody found it)
+        fun freshCode() {
+            getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().remove("device_id").apply()
+            reg = null
+            ui { codeView.text = "…"; setStatus("Registering…", "#f59e0b") }
+            register()
+        }
+        val codeActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setPadding(0, dp(14), 0, 0)
+        }
+        codeActions.addView(mbtn("⧉ Copy code", Color.parseColor("#1e293b"), 11f) {
+            reg?.code?.let { clipSet(it); toast("Code copied") } ?: toast("Not registered yet")
+        })
+        codeActions.addView(mbtn("↗ Share", Color.parseColor("#1e293b"), 11f) {
+            val c = reg?.code ?: run { toast("Not registered yet"); return@mbtn }
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "Connect to my device on BMyDesk: https://bmydesk.believoo.com/remote/guest/$c")
+            }, "Share invite link"))
+        }, lpGap(8))
+        codeActions.addView(mbtn("↻ New code", Color.parseColor("#1e293b"), 11f) { freshCode() }, lpGap(8))
+        card.addView(codeActions)
 
         // Accept / reject — amber glass prompt, springs in when shown
         reqBox = object : LinearLayout(this) {
@@ -896,6 +963,18 @@ class MainActivity : Activity() {
                     alpha = 0f; scaleX = 0.9f; scaleY = 0.9f
                     animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(240)
                         .setInterpolator(android.view.animation.OvershootInterpolator(1.3f)).start()
+                    // live "waiting" ticker — a request stays open while the
+                    // server says 'connecting'; the elapsed clock keeps the
+                    // prompt feeling alive instead of a dead modal
+                    reqShownAt = System.currentTimeMillis()
+                    sessTicker.postDelayed(object : Runnable {
+                        override fun run() {
+                            if (visibility != View.VISIBLE) return
+                            val w = ((System.currentTimeMillis() - reqShownAt) / 1000).toInt()
+                            reqTimer?.text = "⏱ waiting ${w / 60}:${"%02d".format(w % 60)} — responds even if you step away"
+                            sessTicker.postDelayed(this, 1000)
+                        }
+                    }, 0)
                 }
             }
         }.apply {
@@ -908,18 +987,58 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18) }
         }
+        // requester header — avatar tile with their initial + name, reads
+        // like a proper incoming-call card instead of bare text
+        val reqHead = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        }
+        reqAvatar = TextView(this).apply {
+            text = "?"; textSize = 17f; gravity = Gravity.CENTER
+            setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, gradBrand)
+                .apply { shape = GradientDrawable.OVAL }
+        }
+        reqHead.addView(reqAvatar, LinearLayout.LayoutParams(dp(42), dp(42)))
+        val reqTitles = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0)
+        }
+        reqTitles.addView(TextView(this).apply {
+            text = "INCOMING REQUEST"; setTextColor(Color.parseColor("#f59e0b"))
+            textSize = 9.5f; letterSpacing = 0.16f
+        })
         reqName = TextView(this).apply {
-            setTextColor(Color.parseColor("#fbbf24")); textSize = 14f; gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#fde68a")); textSize = 14.5f
             typeface = Typeface.DEFAULT_BOLD
         }
-        reqBox.addView(reqName)
+        reqTitles.addView(reqName)
+        reqHead.addView(reqTitles)
+        reqBox.addView(reqHead)
+        // their note/purpose — quote-styled so it stands out from the title
+        reqNote = TextView(this).apply {
+            setTextColor(Color.parseColor("#d8e0ee")); textSize = 12.5f
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#2e2410")); cornerRadius = dp(8).toFloat()
+            }
+            visibility = View.GONE
+        }
+        reqBox.addView(reqNote, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+        // live countdown — requests expire server-side after ~2 min; show the
+        // timer so the prompt feels alive, not a modal that hangs forever
+        reqTimer = TextView(this).apply {
+            setTextColor(Color.parseColor("#92610f")); textSize = 10.5f
+            setPadding(0, dp(6), 0, 0)
+        }
+        reqBox.addView(reqTimer)
         chkViewOnly = android.widget.CheckBox(this).apply {
-            text = "View only — watch but can't control\n(unticked = full control — they can tap & type)"
+            text = "👁 View only — they watch, can't touch"
             setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
             buttonTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#fb7185"))
         }
         chkTrust = android.widget.CheckBox(this).apply {
-            text = "Always trust this device — skip approval next time"
+            text = "🤝 Always trust — skip approval next time"
             setTextColor(Color.parseColor("#cbd5e1")); textSize = 13f
             buttonTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#22c55e"))
         }
@@ -1008,6 +1127,41 @@ class MainActivity : Activity() {
         })
         col.addView(remoteCard)
         fadeIn(remoteCard, 150)
+
+        // ── How it works — 3-step strip, fills the idle dead space and
+        // teaches the flow to anyone opening the app for the first time ──
+        val guide = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(10), dp(14), dp(10), dp(14))
+            background = cardBg()
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(14) }
+        }
+        listOf(
+            "1" to "Share your\ncode",
+            "2" to "Partner\nconnects",
+            "3" to "You tap\nAccept",
+        ).forEachIndexed { i, (n, label) ->
+            guide.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+                addView(TextView(this@MainActivity).apply {
+                    text = n; textSize = 13f; gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
+                    background = GradientDrawable(GradientDrawable.Orientation.TL_BR, gradBrand)
+                        .apply { shape = GradientDrawable.OVAL }
+                }, LinearLayout.LayoutParams(dp(26), dp(26)))
+                addView(TextView(this@MainActivity).apply {
+                    text = label; setTextColor(txtSub); textSize = 10.5f
+                    gravity = Gravity.CENTER; setPadding(0, dp(6), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            if (i < 2) guide.addView(TextView(this).apply {
+                text = "→"; setTextColor(txtDim); textSize = 14f
+                setPadding(dp(2), dp(4), dp(2), 0)
+            })
+        }
+        col.addView(guide)
+        fadeIn(guide, 195)
 
         // ── Account: sign in with BMyDesk workspace credentials ──
         val acct = LinearLayout(this).apply {
@@ -1147,13 +1301,38 @@ class MainActivity : Activity() {
                 // mirror every status write onto the branded connecting
                 // overlay — minus the "— N%" tail, the overlay shows a
                 // proper progress bar + big percent readout instead
-                vConnText?.text = text?.replace(Regex("\\s*—\\s*\\d+%$"), "")
+                val t = text?.replace(Regex("\\s*—\\s*\\d+%$"), "")
+                vConnText?.text = t
+                // error-ish messages get the amber tint + a retry shortcut
+                val err = t?.let { s -> listOf("fail", "lost", "declin", "ended", "isn't", "offline",
+                    "didn't respond", "can't", "not sending", "own code", "closed")
+                    .any { s.contains(it, true) } } == true
+                vConnText?.setTextColor(Color.parseColor(if (err) "#fbbf24" else "#9db0cc"))
+                vConnRetry?.visibility = if (err) View.VISIBLE else View.GONE
             }
         }.apply {
             text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 11.5f
             maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
         }
-        vLeft.addView(viewerStatus)
+        // red "LIVE" beacon next to the status while the stream is up
+        val liveRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        }
+        vLiveDot = View(this).apply {
+            visibility = View.GONE
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL; setColor(Color.parseColor("#ef4444"))
+            }
+        }
+        android.animation.ValueAnimator.ofFloat(1f, 0.25f).apply {
+            duration = 800; repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            addUpdateListener { vLiveDot?.alpha = it.animatedValue as Float }
+            start()
+        }
+        liveRow.addView(vLiveDot, LinearLayout.LayoutParams(dp(7), dp(7)).apply { marginEnd = dp(6) })
+        liveRow.addView(viewerStatus)
+        vLeft.addView(liveRow)
         vProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100; progress = 0; isIndeterminate = false
             progressDrawable = progBarDrawable()
@@ -1246,13 +1425,23 @@ class MainActivity : Activity() {
         viewerMenu.addView(menuHead)
         val menuGrid = android.widget.GridLayout(this).apply { columnCount = 4 }
         // steal every session button off the toolbar strip into the grid —
-        // the remote screen stays the whole display; controls live in the
-        // floating menu only
-        (0 until vSessRow.childCount).map { vSessRow.getChildAt(it) }.forEach { b ->
+        // each cell gets a tiny caption so emoji glyphs aren't guesswork
+        val menuCaps = listOf("Chat", "File", "Keys", "Scrn", "Files", "Rst",
+            "Qual", "Fit", "Pad", "Mic", "Cam", "Zm+", "Zm−", "Shot", "Lock", "Ctrl", "Min")
+        (0 until vSessRow.childCount).map { vSessRow.getChildAt(it) }.forEachIndexed { i, b ->
             vSessRow.removeView(b)
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+                addView(b)
+                addView(TextView(this@MainActivity).apply {
+                    text = menuCaps.getOrElse(i) { "" }
+                    setTextColor(Color.parseColor("#5a6b8c")); textSize = 8.5f
+                    gravity = Gravity.CENTER; setPadding(0, dp(1), 0, 0)
+                })
+            }
             val gp = android.widget.GridLayout.LayoutParams()
-            gp.setMargins(dp(3), dp(3), dp(3), dp(3))
-            menuGrid.addView(b, gp)
+            gp.setMargins(dp(2), dp(2), dp(2), dp(2))
+            menuGrid.addView(cell, gp)
         }
         viewerMenu.addView(menuGrid)
         viewerMenu.addView(gbtn("⛔ Disconnect", gradRed, 12f) { confirmExitViewer() },
@@ -1371,6 +1560,41 @@ class MainActivity : Activity() {
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM))
 
+        // center flash chips — zoom level, one-time gesture hints
+        zoomFlash = TextView(this).apply {
+            textSize = 14f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#cc0f172a")); cornerRadius = dp(12).toFloat()
+                setStroke(dp(1), Color.parseColor("#33415c"))
+            }
+            visibility = View.GONE
+        }
+        viewerPane.addView(zoomFlash, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        vHint = TextView(this).apply {
+            text = "pinch = zoom · two-finger drag = scroll · long-press = right-click"
+            textSize = 11f; setTextColor(Color.parseColor("#cbd5e1"))
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#e0101526")); cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.parseColor("#33415c"))
+            }
+            visibility = View.GONE
+        }
+        viewerPane.addView(vHint, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(92) })
+        // 📸 screenshot flash — quick white blink so a capture feels captured
+        vShotFlash = View(this).apply {
+            setBackgroundColor(Color.WHITE); alpha = 0f; visibility = View.GONE
+        }
+        viewerPane.addView(vShotFlash, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
+
         // ── Connecting overlay — branded full-screen "waiting" surface so
         // approval/negotiation doesn't look like a dead black panel. Sits
         // above every viewer layer until the first remote frame lands.
@@ -1425,33 +1649,83 @@ class MainActivity : Activity() {
             setPadding(dp(32), 0, dp(32), dp(24))
         }
         vConnCol.addView(logoStage, LinearLayout.LayoutParams(dp(190), dp(190)))
+        vConnTitle = TextView(this).apply {
+            text = "Connecting…"; setTextColor(Color.WHITE); textSize = 17f
+            typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+        }
+        vConnCol.addView(vConnTitle, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(26) })
         vConnText = TextView(this).apply {
-            text = "Connecting…"; setTextColor(Color.parseColor("#e8edf5")); textSize = 16f
+            text = "Opening secure channel…"; setTextColor(Color.parseColor("#9db0cc")); textSize = 13.5f
             gravity = Gravity.CENTER; maxLines = 2
         }
         vConnCol.addView(vConnText, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(30) })
+        ).apply { topMargin = dp(6) })
         vConnBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100; progress = 0; progressDrawable = progBarDrawable()
         }
-        vConnCol.addView(vConnBar, LinearLayout.LayoutParams(dp(230), dp(8)).apply { topMargin = dp(18) })
+        vConnCol.addView(vConnBar, LinearLayout.LayoutParams(dp(230), dp(8)).apply { topMargin = dp(20) })
         vConnPct = TextView(this).apply {
             setTextColor(Color.parseColor("#fb7185")); textSize = 13f; typeface = Typeface.DEFAULT_BOLD
         }
         vConnCol.addView(vConnPct, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(10) })
+        // 4-step journey — join → approval → secure link → live
+        val stepRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+        }
+        vConnDots.clear()
+        listOf("Join", "Approve", "Secure", "Live").forEachIndexed { i, s ->
+            val dot = TextView(this).apply {
+                text = "●"; textSize = 10f; setTextColor(Color.parseColor("#33415c"))
+            }
+            stepRow.addView(dot)
+            vConnDots.add(dot)
+            if (i < 3) stepRow.addView(TextView(this).apply {
+                text = "——"; textSize = 8f; setTextColor(Color.parseColor("#26314b"))
+                setPadding(dp(3), 0, dp(3), 0)
+            })
+        }
+        vConnCol.addView(stepRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(16) })
         vConnCol.addView(TextView(this).apply {
-            text = "E N D - T O - E N D   E N C R Y P T E D"
-            setTextColor(Color.parseColor("#4c5c78")); textSize = 9.5f; letterSpacing = 0.24f
+            text = "Join → Approve → Secure → Live"
+            setTextColor(Color.parseColor("#4c5c78")); textSize = 9f; letterSpacing = 0.14f
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(34) })
-        vConnCol.addView(mbtn("Cancel", Color.parseColor("#1e293b"), 13f) { exitViewer() },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(16) })
+        ).apply { topMargin = dp(5) })
+        vConnCol.addView(TextView(this).apply {
+            text = "usually connects in a few seconds — sit tight"
+            setTextColor(Color.parseColor("#4c5c78")); textSize = 11f
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(26) })
+        val vConnBtns = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+        }
+        vConnBtns.addView(mbtn("⬇ Minimize", Color.parseColor("#1e293b"), 12f) { minimizeViewer() })
+        vConnBtns.addView(mbtn("Cancel", Color.parseColor("#1e293b"), 12f) { exitViewer() }, lpGap(10))
+        vConnCol.addView(vConnBtns, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(16) })
+        // shows only on error states — one-tap retry instead of dead-end
+        vConnRetry = gbtn("⟳ Try again", gradBrand, 13f) {
+            val c = vJoinCode; exitViewer(); if (c.isNotBlank()) connectRemote(c)
+        }
+        vConnRetry!!.visibility = View.GONE
+        vConnCol.addView(vConnRetry, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(12) })
+        vConnCol.addView(TextView(this).apply {
+            text = "E N D - T O - E N D   E N C R Y P T E D"
+            setTextColor(Color.parseColor("#3d4c63")); textSize = 9.5f; letterSpacing = 0.24f
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(26) })
         vConnOverlay!!.addView(vConnCol, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
@@ -1555,8 +1829,15 @@ class MainActivity : Activity() {
     // branded connecting overlay — logo + pulse rings + gradient progress
     private var vConnOverlay: android.widget.FrameLayout? = null
     private var vConnText: TextView? = null
+    private var vConnTitle: TextView? = null
     private var vConnPct: TextView? = null
     private var vConnBar: ProgressBar? = null
+    private var vConnRetry: android.widget.Button? = null
+    private var zoomFlash: TextView? = null
+    private var vHint: TextView? = null
+    private var vShotFlash: View? = null
+    private var vLiveDot: View? = null
+    private val vConnDots = mutableListOf<TextView>()
     private val vConnAnims = mutableListOf<android.animation.Animator>()
     private var vConnPlaying = false
     private lateinit var viewerFab: ImageView
@@ -1594,6 +1875,16 @@ class MainActivity : Activity() {
     }
 
     /** Button-driven zoom steps — same transform the pinch gesture applies. */
+    // "🔍 2.5×" center flash — every zoom path (buttons, pinch, dbl-tap)
+    private fun flashZoom() {
+        zoomFlash?.let { z ->
+            z.text = "🔍 ${"%.1f".format(vScale)}×"
+            z.animate().cancel(); z.alpha = 1f; z.visibility = View.VISIBLE
+            z.animate().alpha(0f).setStartDelay(700).setDuration(320)
+                .withEndAction { z.visibility = View.GONE }.start()
+        }
+    }
+
     private fun zoomStep(d: Float) {
         vScale = (vScale + d).coerceIn(1f, 5f)
         if (vScale <= 1.01f) { panX = 0f; panY = 0f } else clampPan()
@@ -1602,6 +1893,7 @@ class MainActivity : Activity() {
             it.translationX = panX; it.translationY = panY
         }
         updatePadCursor()
+        flashZoom()
     }
 
     // 📸 latest decoded remote frame — the sink retains it between compositor
@@ -1612,6 +1904,14 @@ class MainActivity : Activity() {
     /** Save the newest remote frame as a JPEG into Pictures/BMyDesk. */
     private fun shotRemote() {
         val f = synchronized(frameLock) { lastRemoteFrame } ?: run { toast("No frame yet — wait for video"); return }
+        // shutter blink — the capture feels instant instead of "did it work?"
+        vShotFlash?.let { fl ->
+            fl.animate().cancel(); fl.alpha = 0f; fl.visibility = View.VISIBLE
+            fl.animate().alpha(0.75f).setDuration(70).withEndAction {
+                fl.animate().alpha(0f).setDuration(280)
+                    .withEndAction { fl.visibility = View.GONE }.start()
+            }.start()
+        }
         thread {
             runCatching {
                 val rot = f.rotation
@@ -2429,9 +2729,8 @@ class MainActivity : Activity() {
                     }
                 ui {
                     resetAcceptOptions()
-                    pendingVDevice = vdevice; pendingVName = name
-                    reqName.text = "$name wants to view this device" + (if (note.isNullOrBlank()) "" else "\n“$note”")
-                    reqBox.visibility = View.VISIBLE
+                    pendingVDevice = vdevice
+                    showReq(name, note)
                 }
             }
             override fun onSignal(p: JsonObject) { if (sigNew(p)) handleHostSignal(p) }
@@ -2472,8 +2771,7 @@ class MainActivity : Activity() {
                             val joinMs = java.time.Instant.parse(vj).toEpochMilli()
                             if (joinMs > respondedAtMs && reqBox.visibility != View.VISIBLE) {
                                 ui {
-                                    reqName.text = "Someone wants to view this device"
-                                    reqBox.visibility = View.VISIBLE
+                                    showReq("Someone", null)
                                     setStatus("Connection request…", "#f59e0b")
                                 }
                             }
@@ -2627,8 +2925,34 @@ class MainActivity : Activity() {
             viewerStatus.text = "$text — $vProgPct%"
             vConnBar?.progress = vProgPct
             vConnPct?.text = "$vProgPct%"
+            // step dots: passed = green, current = rose, waiting = dim
+            val marks = intArrayOf(15, 45, 72, 100)
+            var curFound = false
+            vConnDots.forEachIndexed { i, d ->
+                d.setTextColor(Color.parseColor(when {
+                    vProgPct >= marks[i] -> "#34d399"
+                    !curFound -> { curFound = true; "#fb7185" }
+                    else -> "#33415c"
+                }))
+            }
             if (viewerPane.visibility == View.VISIBLE) {
-                if (vProgPct >= 100) vConnHide() else vConnShow()
+                if (vProgPct >= 100) {
+                    vConnHide()
+                    vLiveDot?.visibility = View.VISIBLE
+                    // first-live gesture cheatsheet — once per install
+                    val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+                    if (!sp.getBoolean("vhint", false)) {
+                        sp.edit().putBoolean("vhint", true).apply()
+                        vHint?.let { h ->
+                            h.alpha = 0f; h.visibility = View.VISIBLE
+                            h.animate().alpha(1f).setDuration(300).setStartDelay(500)
+                                .withEndAction {
+                                    h.animate().alpha(0f).setStartDelay(4200).setDuration(400)
+                                        .withEndAction { h.visibility = View.GONE }.start()
+                                }.start()
+                        }
+                    }
+                } else { vConnShow(); vLiveDot?.visibility = View.GONE }
             }
         }
     }
@@ -2723,6 +3047,8 @@ class MainActivity : Activity() {
             enterImmersive()
             vProgReset()
             viewerStatus.text = "Joining $code…"
+            vConnTitle?.text = "Connecting to $code"
+            vConnRetry?.visibility = View.GONE
             vConnShow()
         }
         // joining your own code just hangs — the request prompt lands behind
@@ -2745,6 +3071,7 @@ class MainActivity : Activity() {
                     viewerDeviceId(),
                 )
                 vJoin = j
+                ui { j.hostLabel?.let { vConnTitle?.text = "Connecting to $it" } }
                 // crash-restart resumes here — cleared in exitViewer()
                 getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
                     .edit().putString("resume_code", code).apply()
@@ -3159,12 +3486,8 @@ class MainActivity : Activity() {
     }
 
     private fun paintCallBtn() {
-        vMicBtn.setBackgroundColor(Color.parseColor(if (micOn) "#15803d" else "#1e293b"))
-        vCamBtn.setBackgroundColor(Color.parseColor(if (camOn) "#15803d" else "#1e293b"))
-        if (::hostMicBtn.isInitialized) {
-            hostMicBtn.setBackgroundColor(Color.parseColor(if (micOn) "#15803d" else "#1e293b"))
-            hostCamBtn.setBackgroundColor(Color.parseColor(if (camOn) "#15803d" else "#1e293b"))
-        }
+        btnActive(vMicBtn, micOn); btnActive(vCamBtn, camOn)
+        if (::hostMicBtn.isInitialized) { btnActive(hostMicBtn, micOn); btnActive(hostCamBtn, camOn) }
     }
 
     /** Remote camera arrived → draggable picture-in-picture. tap = maximize. */
@@ -3282,7 +3605,7 @@ class MainActivity : Activity() {
         padMode = on
         getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().putBoolean("pad_mode", on).apply()
         vPadBtn.text = if (on) "👆 Touch" else "🖱 Pad"
-        vPadBtn.setBackgroundColor(Color.parseColor(if (on) "#b45309" else "#1e293b"))
+        btnActive(vPadBtn, on, Color.parseColor("#b45309"))
         padCursor?.visibility = if (on) View.VISIBLE else View.GONE
         if (on) updatePadCursor()
         if (chatPanel.visibility == View.VISIBLE) chatAppend("System",
@@ -3298,6 +3621,7 @@ class MainActivity : Activity() {
                 remoteSurface?.let { it.scaleX = vScale; it.scaleY = vScale }
                 clampPan()
                 updatePadCursor()
+                flashZoom()
                 return true
             }
         })
@@ -3306,6 +3630,7 @@ class MainActivity : Activity() {
                 vScale = 1f; panX = 0f; panY = 0f
                 remoteSurface?.let { it.scaleX = 1f; it.scaleY = 1f; it.translationX = 0f; it.translationY = 0f }
                 updatePadCursor()
+                flashZoom()
                 return true
             }
             override fun onLongPress(e: android.view.MotionEvent) {

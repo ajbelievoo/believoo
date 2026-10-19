@@ -113,17 +113,18 @@ class ScreenShareService : Service() {
         }
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val m = DisplayMetrics(); @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m)
-        // keep aspect ratio, cap long side at 1920 — mid-range SoCs stall the
-        // encoder at 2560-class sizes and the viewer's decoder re-configures
-        // (MediaCodec BAD_VALUE) on every resize, freezing the picture.
-        // 'fhd' quality mode still scales back up through setQuality().
+        // keep aspect ratio, cap long side at 1440 — ~1MP streams decode on
+        // EVERY hardware codec (some budget decoders reject 1920-class H.264
+        // outright → black screen no matter how healthy the link is). The
+        // encoder load halves too, so 'auto' actually stays fluid on
+        // mid-range phones. 'hd'/'fhd' still scale back up via setQuality().
         val longSide = maxOf(m.widthPixels, m.heightPixels).toFloat()
-        val k = if (longSide > 1920f) 1920f / longSide else 1f
+        val k = if (longSide > 1440f) 1440f / longSide else 1f
         val cw = ((m.widthPixels * k).toInt() / 2) * 2
         val ch = ((m.heightPixels * k).toInt() / 2) * 2
         Thread {
             val h = ensureHost()
-            h.startCapture(resultData, cw, ch, 24)
+            h.startCapture(resultData, cw, ch, 20)
             pendingOffer?.let { pendingOffer = null; h.handleOffer(it, iceServers) }
         }.start()
     }
@@ -137,7 +138,7 @@ class ScreenShareService : Service() {
         val h = WebRtcHost(this)
         h.listener = object : WebRtcHost.Listener {
                 override fun sendSignal(payload: JsonObject) { signaling?.send("signal", payload) }
-                override fun onPeerConnected() { events?.onConnected() }
+                override fun onPeerConnected() { events?.onConnected(); h.watchEncoding() }
                 override fun onPeerDisconnected() { events?.onDisconnected() }
                 override fun onPipTrack(track: org.webrtc.VideoTrack) { events?.onPipTrack(track) }
                 override fun onError(message: String) { events?.onError(message) }
