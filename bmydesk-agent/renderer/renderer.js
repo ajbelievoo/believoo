@@ -4,7 +4,7 @@
  * incoming input events to the Electron main process for OS injection.
  */
 
-const APP_VERSION = '1.3.18';
+const APP_VERSION = '1.3.19';
 const API = 'https://bmydesk.believoo.com/api/v1/bmydesk/agent';
 const REVERB_KEY = 'zenjc9spcwqz8nzdzvtn'; // public app key (safe — auth is server-side)
 const REVERB_HOST = 'believoo.com';
@@ -1525,6 +1525,14 @@ window.agent.onAuth?.(({ token, name }) => {
     $('signedAs').classList.remove('hidden');
     $('loginCard').classList.add('hidden'); $('loginToggle').classList.add('hidden');
     register(); // re-register so the active session links to this account
+});
+
+// bmydesk://connect/<CODE> — shared invite link dropped straight into the
+// Remote Desk viewer (guest page hands desktop users here).
+window.agent.onConnect?.(({ code }) => {
+    if (!code) return;
+    $('remoteCode').value = String(code).toUpperCase();
+    connectToPartner();
 });
 
 register();

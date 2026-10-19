@@ -862,5 +862,61 @@ function renderRecent() {
 renderRecent();
 if ($('codeInput').value) dbg('code prefilled — press Connect');
 </script>
+
+{{-- Shared-link handoff: a /remote/guest/<CODE> invite should open the native
+     BMyDesk app where it's installed — Android agent via intent/App Link,
+     desktop agent via the bmydesk:// protocol. The web viewer stays as the
+     fallback so the link is never a dead end. --}}
+<div id="appHandoff" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(15,23,42,.97);border-top:1px solid var(--border);padding:12px 16px;">
+    <div id="handoffMsg" style="font-size:13px;color:#cbd5e1;margin-bottom:9px;">Open this session in the BMyDesk app</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn" id="openAppBtn" style="margin:0;padding:9px 20px;font-size:13px;">Open in app</button>
+        <button class="btn" id="contWebBtn" style="margin:0;padding:9px 20px;font-size:13px;background:#334155;">Continue in browser</button>
+        <a id="getAppLink" href="/dl/agent.apk" style="align-self:center;color:#64748b;font-size:12px;text-decoration:none;">Get the app →</a>
+    </div>
+</div>
+<script>
+(function () {
+    var code = @json($prefillCode ?? '');
+    if (!code) return;
+    code = code.toUpperCase();
+    var ua = navigator.userAgent || '';
+    var isAndroid = /Android/i.test(ua);
+    var isIos = /iPhone|iPad|iPod/i.test(ua);
+    if (isIos) return; // no iOS agent yet — the web viewer is the client there
+    var box = document.getElementById('appHandoff');
+    var flag = 'bmd_handoff_' + code;
+    var tried = sessionStorage.getItem(flag);
+
+    function openApp() {
+        // set BEFORE navigating — a fallback reload or a return from the app
+        // must not fire this again (no loops, no traps).
+        sessionStorage.setItem(flag, '1');
+        if (isAndroid) {
+            // intent:// resolves the installed agent; otherwise the browser
+            // bounces back here via browser_fallback_url (flag now stops a retry).
+            window.location.href = 'intent://bmydesk.believoo.com/remote/guest/' + encodeURIComponent(code) +
+                '#Intent;scheme=https;package=com.believoo.bmd;S.browser_fallback_url=' +
+                encodeURIComponent(location.href) + ';end';
+        } else {
+            // desktop: hidden-iframe protocol attempt — silently no-ops when
+            // the agent isn't installed (top-nav would show an error page).
+            var f = document.createElement('iframe');
+            f.style.display = 'none';
+            f.src = 'bmydesk://connect/' + encodeURIComponent(code);
+            document.body.appendChild(f);
+            setTimeout(function () { f.remove(); }, 4000);
+        }
+    }
+    document.getElementById('openAppBtn').onclick = openApp;
+    document.getElementById('contWebBtn').onclick = function () { box.style.display = 'none'; };
+    document.getElementById('getAppLink').href = isAndroid ? '/dl/agent.apk' : '/dl/agent.exe';
+    document.getElementById('handoffMsg').textContent = isAndroid
+        ? 'This invite opens in the BMyDesk app — or continue in the browser'
+        : 'This invite opens the BMyDesk desktop app — or continue in the browser';
+    box.style.display = 'block';
+    if (!tried) setTimeout(openApp, 500);
+})();
+</script>
 </body>
 </html>

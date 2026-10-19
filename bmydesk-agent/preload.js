@@ -25,5 +25,6 @@ contextBridge.exposeInMainWorld('agent', {
     onUpdate: (cb) => ipcRenderer.on('agent-update', (_e, d) => cb(d)),
     installUpdate: () => ipcRenderer.send('update-install'),
     onAuth: (cb) => ipcRenderer.on('agent-auth', (_e, d) => cb(d)),
+    onConnect: (cb) => ipcRenderer.on('agent-connect', (_e, d) => cb(d)),
     platform: process.platform,
 });

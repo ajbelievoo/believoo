@@ -206,6 +206,16 @@ Examples:
 - Bump the version on every publish — Cloudflare caches `/downloads/*` aggressively (immutable-ish), and stale-file bugs have bitten twice already.
 - Disk on this box is ~97GB and nearly full — delete old-version artifacts after publishing.
 
+### BMyDesk app UX + deep links (added 2026-10-19, agent v1.3.26 / desktop v1.3.19)
+
+- **App Links**: `bmydesk-agent-android` declares an `autoVerify` intent filter for `https://bmydesk.believoo.com/remote/guest*`; verification file at `public/.well-known/assetlinks.json` (release-cert SHA-256 of `app/bmydesk-release.keystore`). Tapping a shared invite link opens the app straight into the Remote Desk viewer. `bmydesk://connect/<CODE>` (and `/view`, `/remote`) do the same unverified.
+- **Guest page handoff**: `guest-remote.blade.php` auto-attempts app launch once per link (Android `intent://` + `browser_fallback_url`; desktop `bmydesk://connect/` via hidden iframe — silent no-op when the agent isn't installed). `sessionStorage bmd_handoff_<code>` prevents loops.
+- **Electron `bmydesk://connect/<CODE>`** → `main.js deliverDeepLink` → `agent-connect` IPC → `onConnect` in preload → `renderer.js` fills `#remoteCode` + `connectToPartner()`.
+- **Android fast path**: `register()` no longer awaits the FCM token (was up to 8s) — it warms in parallel and re-registers only on rotation (never while a host session is live). Cached `session_code` renders instantly. The ws watchdog in the status-poll loop resubscribes a dead socket after ~9s. `connectRemote()` has no ws-readiness gate — join + signaling fully work over the HTTP signal queue.
+- **Pull-to-refresh**: `PullRefreshLayout.kt` (dependency-free SwipeRefreshLayout) wraps the home `ScrollView` → `refreshAll()` re-registers (same permanent code), reconnects ws if down, drains queued signals.
+- **Crash auto-resume**: uncaught exception → `crashed` pref + `setAlarmClock` relaunch (~0.6s). `resume_code` is stored while a viewer session is live → `resumeAfterCrash()` rejoins it. No more dead crash dialog.
+- **First-run permissions**: `ensureRuntimePermissions()` asks once for notifications, camera, mic, location, files/media (`perms_asked_v1` pref).
+
 ## PlayGame site (added 2026-10-07)
 
 - `playgame.believoo.com` = new Laravel+React gaming site. Backend `/www/wwwroot/playgame-app`,

@@ -1,0 +1,10 @@
+[{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+        "namespace": "android_app",
+        "package_name": "com.believoo.bmd",
+        "sha256_cert_fingerprints": [
+            "89:B5:B7:D2:14:2B:49:24:71:D1:03:8E:C5:DB:C2:4D:FE:EF:2F:6F:07:92:77:D0:B8:26:8C:93:D9:2C:40:14"
+        ]
+    }
+}]

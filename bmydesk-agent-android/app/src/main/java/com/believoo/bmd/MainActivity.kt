@@ -29,7 +29,7 @@ import kotlin.concurrent.thread
 class MainActivity : Activity() {
 
     private val api = AgentApi()
-    private var reg: AgentApi.Registration? = null
+    @Volatile private var reg: AgentApi.Registration? = null
     private var service: ScreenShareService? = null
     private var bound = false
 
@@ -42,6 +42,7 @@ class MainActivity : Activity() {
 
     private var pendingProjection = false
     private var waitingOfferSdp: String? = null
+    private var pullRef: PullRefreshLayout? = null
 
     // Viewer mode (Remote Desk — connect to another code)
     private var remoteViewer: RemoteViewer? = null
@@ -181,21 +182,23 @@ class MainActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Show the real crash instead of silently dying — screenshot it and share.
-        Thread.setDefaultUncaughtExceptionHandler { t, e ->
-            val trace = android.util.Log.getStackTraceString(e)
+        // Crash → record it and auto-relaunch within ~1s. resume_code (kept in
+        // prefs while a viewer session is live) puts the user right back where
+        // they were — no dead dialog, no manual app restart.
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
             android.util.Log.e("BMyDesk", "crash", e)
             runCatching { com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().recordException(e) }
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                runCatching {
-                    android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-                        .setTitle("BMyDesk crashed")
-                        .setMessage("${e.javaClass.simpleName}: ${e.message}\n\n${trace.take(1200)}")
-                        .setPositiveButton("Close") { _, _ -> android.os.Process.killProcess(android.os.Process.myPid()) }
-                        .setCancelable(false)
-                        .show()
-                }
+            runCatching {
+                getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().putBoolean("crashed", true).apply()
+                val relaunch = Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                val pi = android.app.PendingIntent.getActivity(this, 991, relaunch,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_CANCEL_CURRENT)
+                (getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager)
+                    .setAlarmClock(android.app.AlarmManager.AlarmClockInfo(System.currentTimeMillis() + 600, null), pi)
             }
+            android.os.Process.killProcess(android.os.Process.myPid())
+            kotlin.system.exitProcess(10)
         }
         super.onCreate(savedInstanceState)
         buildUi()
@@ -203,18 +206,19 @@ class MainActivity : Activity() {
         // even after the user swipes the activity away, and re-surfaces join
         // requests as heads-up notifications.
         runCatching { startForegroundService(Intent(this, AgentService::class.java)) }
-        // Android 13+ needs runtime permission or FCM wake notifications never show
-        if (android.os.Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1003)
-        }
         // load libwebrtc natives off the UI thread so the first connect can't ANR
         thread { runCatching {
             org.webrtc.PeerConnectionFactory.initialize(
                 org.webrtc.PeerConnectionFactory.InitializationOptions.builder(applicationContext)
                     .setEnableInternalTracer(false).createInitializationOptions())
         } }
-        if (!handleAuthIntent(intent)) register()
+        // First launch asks for every runtime permission in one go (notifications,
+        // camera, mic, location, files/media) — then never again.
+        ensureRuntimePermissions()
+        // Deep links (bmydesk://auth, bmydesk://connect/<code>, shared
+        // https invite links) run their own startup path; a normal launch
+        // registers and rejoins whatever session a crash interrupted.
+        if (!handleDeepLink(intent)) { register(); resumeAfterCrash() }
         checkUpdate()
         promptBatteryOnce()
     }
@@ -234,21 +238,93 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        if (intent != null && handleAuthIntent(intent)) return
+        if (intent != null && handleDeepLink(intent)) return
     }
 
-    // bmydesk://auth?token=…&name=… — signed-in handoff from the website /
-    // Google OAuth flow. Stores the member token and re-registers linked.
-    private fun handleAuthIntent(i: Intent?): Boolean {
+    /**
+     * Deep links:
+     *   bmydesk://auth?token=…&name=…        — sign-in handoff (web / Google OAuth)
+     *   bmydesk://connect/<CODE>             — open the Remote Desk viewer on CODE
+     *   bmydesk://view/<CODE>                — same
+     *   https://bmydesk.believoo.com/remote/guest/<CODE> — shared invite link (App Link)
+     * Returns true when the intent carried a deep link (it owns startup —
+     * register() is called from inside where needed).
+     */
+    private fun handleDeepLink(i: Intent?): Boolean {
         val u = i?.data ?: return false
-        if (u.scheme != "bmydesk" || u.host != "auth") return false
-        val token = u.getQueryParameter("token") ?: return false
-        val name = u.getQueryParameter("name") ?: ""
-        getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit()
-            .putString("member_token", token).putString("member_name", name).apply()
-        ui { setStatus("Signed in as $name", "#22c55e") }
-        register()
+        if (u.scheme == "bmydesk" && u.host == "auth") {
+            val token = u.getQueryParameter("token") ?: return false
+            val name = u.getQueryParameter("name") ?: ""
+            getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit()
+                .putString("member_token", token).putString("member_name", name).apply()
+            ui { setStatus("Signed in as $name", "#22c55e") }
+            register()
+            return true
+        }
+        val code: String? = when {
+            u.scheme == "bmydesk" && u.host in listOf("connect", "view", "remote") ->
+                u.pathSegments?.firstOrNull() ?: u.getQueryParameter("code")
+            u.scheme == "https" && u.host == "bmydesk.believoo.com" -> {
+                val segs = u.pathSegments ?: emptyList()
+                if (segs.size >= 3 && segs[0] == "remote" && segs[1] == "guest") segs[2]
+                else u.getQueryParameter("code")
+            }
+            else -> null
+        }
+        val clean = code?.uppercase()?.replace(Regex("[^A-Z0-9]"), "").orEmpty()
+        if (clean.length < 6) return false
+        remoteCodeInput.setText(clean)
+        if (service == null) register() // keep our own host code alive too
+        // auto-connect — a shared link means intent; don't make the user tap again
+        viewerPane.postDelayed({ connectRemote(clean) }, 700)
         return true
+    }
+
+    // If the last run crashed mid-session, jump straight back into it —
+    // "reload" restores the position instead of dumping the user on the home card.
+    private fun resumeAfterCrash() {
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("crashed", false)) return
+        prefs.edit().remove("crashed").apply()
+        val code = prefs.getString("resume_code", null) ?: return
+        prefs.edit().remove("resume_code").apply()
+        if (code.length < 6) return
+        toast("Restarted — rejoining session")
+        viewerPane.postDelayed({ remoteCodeInput.setText(code); connectRemote(code) }, 1200)
+    }
+
+    // First-run permission primer — explain once, then fire the system prompts
+    // for every access the session tools can use. Skippable; asked only once.
+    private fun ensureRuntimePermissions() {
+        val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("perms_asked_v1", false)) return
+        val wanted = mutableListOf(
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            wanted += android.Manifest.permission.POST_NOTIFICATIONS
+            wanted += android.Manifest.permission.READ_MEDIA_IMAGES
+            wanted += android.Manifest.permission.READ_MEDIA_VIDEO
+            wanted += android.Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            wanted += android.Manifest.permission.READ_EXTERNAL_STORAGE
+            if (android.os.Build.VERSION.SDK_INT <= 28) wanted += android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+        }
+        val missing = wanted.filter {
+            checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) { prefs.edit().putBoolean("perms_asked_v1", true).apply(); return }
+        val dlg = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Allow BMyDesk access")
+            .setMessage("BMyDesk needs a few permissions so every tool works during a remote session:\n\n• Notifications — incoming connection alerts\n• Camera & microphone — stream/call tools\n• Location — device check-in\n• Files & media — send and receive files\n\nYou can change them anytime in Android Settings.")
+            .setPositiveButton("Continue") { _, _ -> requestPermissions(missing.toTypedArray(), 1004) }
+            .setNegativeButton("Skip", null)
+            .create()
+        dlg.setOnDismissListener { prefs.edit().putBoolean("perms_asked_v1", true).apply() }
+        dlg.show()
     }
 
     // If a newer build exists on the server, offer to open the download page.
@@ -386,7 +462,11 @@ class MainActivity : Activity() {
             setPadding(48, 60, 48, 40)
         }
         scroll.addView(col)
-        frame.addView(scroll)
+        // pull down from the top = reload (re-register + reconnect realtime)
+        val pull = PullRefreshLayout(this).apply { onRefresh = { refreshAll() } }
+        pull.addView(scroll)
+        pullRef = pull
+        frame.addView(pull)
 
         // settings + theme toggle (top row)
         col.addView(LinearLayout(this).apply {
@@ -1116,6 +1196,42 @@ class MainActivity : Activity() {
     }
 
     private fun ui(block: () -> Unit) = runOnUiThread(block)
+
+    // Pull-to-refresh target — a soft "reload": fresh registration (keeps the
+    // permanent code), ws reconnect if down, queued signals drained. Never
+    // tears down a live host session — a re-register would reset it server-side.
+    private fun refreshAll() {
+        ui { setStatus("Refreshing…", "#f59e0b") }
+        thread {
+            try {
+                val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+                if (service == null) {
+                    val r = api.register(
+                        android.os.Build.MODEL ?: "android-device", "android",
+                        prefs.getString("member_token", null), deviceId(),
+                        prefs.getString("fcm_token", null))
+                    reg = r
+                    prefs.edit().putString("session_code", r.code)
+                        .putString("agent_token", r.agentToken).apply()
+                }
+                reg?.let { rr ->
+                    if (!signaling.isConnected || !signaling.hostSubscribed)
+                        runCatching { signaling.connect(rr.channel, rr.agentToken) }
+                    api.drainSignals(rr.code, rr.agentToken)
+                        .forEach { p -> if (sigNew(p) && sigFresh(p)) handleHostSignal(p) }
+                }
+                ui {
+                    codeView.text = reg?.code ?: "…"
+                    setStatus("Ready — share your code", "#22c55e")
+                }
+            } catch (e: Exception) {
+                ui { setStatus("Refresh failed: ${e.message}", "#ef4444") }
+            } finally {
+                ui { pullRef?.stopRefresh() }
+            }
+        }
+    }
+
     private fun setStatus(t: String, color: String = "#94a3b8") {
         statusView.text = t; statusView.setTextColor(Color.parseColor(color))
     }
@@ -1137,33 +1253,50 @@ class MainActivity : Activity() {
     private fun register() {
         thread {
             try {
-                // warm the FCM token into prefs so register() can attach it —
-                // onNewToken also re-registers on refresh, so this only matters
-                // on first launch / after token rotation.
-                runCatching {
-                    val tok = com.google.android.gms.tasks.Tasks.await(
-                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token,
-                        8, java.util.concurrent.TimeUnit.SECONDS
-                    )
-                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
-                        .edit().putString("fcm_token", tok).apply()
+                val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+                // show the permanent code instantly from cache — register() only
+                // rotates the token; the code itself is stable per device_id.
+                if (reg == null) prefs.getString("session_code", null)?.let { c ->
+                    ui { if (codeView.text == "…" || codeView.text == "ERROR") codeView.text = c }
                 }
                 val r = api.register(
                     android.os.Build.MODEL ?: "android-device", "android",
-                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("member_token", null),
+                    prefs.getString("member_token", null),
                     deviceId(),
-                    getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getString("fcm_token", null)
+                    prefs.getString("fcm_token", null)
                 )
                 reg = r
                 // AgentService reads these to heartbeat + surface requests
                 // while the UI is closed.
-                getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit()
+                prefs.edit()
                     .putString("session_code", r.code).putString("agent_token", r.agentToken).apply()
                 ui { codeView.text = r.code; setStatus("Connecting realtime…", "#f59e0b"); spinner.visibility = View.GONE }
                 connectSignaling(r)
             } catch (e: Exception) {
                 ui { codeView.text = "ERROR"; setStatus("Cannot reach server — retrying…", "#ef4444") }
                 Thread.sleep(5000); register()
+            }
+        }
+        // FCM token warm-up runs BESIDE register — awaiting it inline used to
+        // add up to 8s to every cold start. When it rotates we re-register so
+        // the server keeps a live push token (never while a session is live —
+        // a re-register resets the session row server-side).
+        thread {
+            runCatching {
+                val tok = com.google.android.gms.tasks.Tasks.await(
+                    com.google.firebase.messaging.FirebaseMessaging.getInstance().token,
+                    8, java.util.concurrent.TimeUnit.SECONDS
+                )
+                val prefs = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+                if (!tok.isNullOrBlank() && tok != prefs.getString("fcm_token", null) && service == null) {
+                    prefs.edit().putString("fcm_token", tok).apply()
+                    val r2 = api.register(
+                        android.os.Build.MODEL ?: "android-device", "android",
+                        prefs.getString("member_token", null), deviceId(), tok)
+                    reg = r2
+                    prefs.edit()
+                        .putString("session_code", r2.code).putString("agent_token", r2.agentToken).apply()
+                }
             }
         }
     }
@@ -1197,17 +1330,21 @@ class MainActivity : Activity() {
         // peer whose ws is dead) and, while our own ws is unsubscribed,
         // polls /status so join requests still surface. Requests the host
         // already answered are never re-shown (respondedAtMs dedupe).
+        // The ws watchdog resubscribes a dead socket — a dropped realtime
+        // connection used to leave the device deaf until manual reopen.
         if (statusPollRunning) return
         statusPollRunning = true
         thread {
             Thread.sleep(4000)
+            var wsDown = 0
             while (reg != null) {
                 try {
-                    api.drainSignals(r.code, r.agentToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleHostSignal(p) }
+                    val rr = reg ?: break
+                    api.drainSignals(rr.code, rr.agentToken).forEach { p -> if (sigNew(p) && sigFresh(p)) handleHostSignal(p) }
                     // /status runs ALWAYS — an FCM-woken host may have a live ws
                     // yet still need this path to surface a request that was
                     // queued while the process was dead.
-                    val s = api.status(r.code, r.agentToken)
+                    val s = api.status(rr.code, rr.agentToken)
                     if (s?.get("ok")?.asBoolean == true) {
                         val st = s.get("status").s()
                         val vj = s.get("viewer_joined_at").s()
@@ -1226,6 +1363,14 @@ class MainActivity : Activity() {
                             ui { reqBox.visibility = View.GONE }
                         }
                     }
+                    // realtime watchdog — ~9s of dead socket triggers a
+                    // reconnect+resubscribe with the CURRENT agent token.
+                    if (!signaling.isConnected || !signaling.hostSubscribed) {
+                        if (++wsDown >= 3) {
+                            wsDown = 0
+                            runCatching { signaling.connect(rr.channel, rr.agentToken) }
+                        }
+                    } else wsDown = 0
                 } catch (e: Exception) {}
                 Thread.sleep(3000)
             }
@@ -1401,8 +1546,8 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun connectRemote() {
-        val code = remoteCodeInput.text.toString().trim().uppercase()
+    private fun connectRemote(codeOverride: String? = null) {
+        val code = (codeOverride ?: remoteCodeInput.text.toString()).trim().uppercase()
         if (code.length < 6) { remoteCodeInput.requestFocus(); return }
         ui {
             viewerPane.visibility = View.VISIBLE
@@ -1417,11 +1562,8 @@ class MainActivity : Activity() {
             thread { Thread.sleep(2000); ui { exitViewer() } }
             return
         }
-        if (!signaling.isConnected) {
-            ui { viewerStatus.text = "Agent channel not ready yet — wait for \"Ready\" then retry" }
-            thread { Thread.sleep(2500); ui { exitViewer() } }
-            return
-        }
+        // NOTE: no ws-readiness gate — join + the whole signal flow also run
+        // over the HTTP queue, so a dead socket must not block connecting.
         thread {
             try {
                 val j = api.join(
@@ -1432,6 +1574,9 @@ class MainActivity : Activity() {
                     viewerDeviceId(),
                 )
                 vJoin = j
+                // crash-restart resumes here — cleared in exitViewer()
+                getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
+                    .edit().putString("resume_code", code).apply()
                 vJoinedAtMs = System.currentTimeMillis()
                 vConnTries = 0
                 vStage(15, "Joined — opening channel…")
@@ -1758,6 +1903,8 @@ class MainActivity : Activity() {
     private fun exitViewer() {
         runCatching { signaling.sendViewer("end", JsonObject()) }
         vJoin = null // stops the viewer poll loop
+        // clean exit — a later crash must not resurrect a finished session
+        getSharedPreferences("bmydesk", Context.MODE_PRIVATE).edit().remove("resume_code").apply()
         remoteViewer?.stop(); remoteViewer = null
         signaling.disconnectViewer()
         remoteSurface?.let { viewerPane.removeView(it); runCatching { it.release() } }

@@ -42,7 +42,7 @@ function wireAutoUpdate() {
 }
 app.whenReady().then(() => { if (gotLock) wireAutoUpdate(); });
 
-// ── bmydesk:// deep links (Google sign-in token handoff, etc.) ────
+// ── bmydesk:// deep links (Google sign-in token handoff, connect codes) ────
 function deliverDeepLink(url) {
     try {
         const u = new URL(url);
@@ -50,6 +50,16 @@ function deliverDeepLink(url) {
             const token = u.searchParams.get('token');
             const name = u.searchParams.get('name') || '';
             if (token && win) win.webContents.send('agent-auth', { token, name });
+        } else if (['connect', 'view', 'remote'].includes(u.hostname)) {
+            // bmydesk://connect/<CODE> — shared invite links drop straight into
+            // the Remote Desk viewer instead of making the user paste the code.
+            const code = (u.pathname.split('/').filter(Boolean)[0] || u.searchParams.get('code') || '')
+                .toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (code.length >= 6 && win) {
+                if (win.isMinimized()) win.restore();
+                win.show(); win.focus();
+                win.webContents.send('agent-connect', { code });
+            }
         }
     } catch (e) { /* malformed link — ignore */ }
 }
