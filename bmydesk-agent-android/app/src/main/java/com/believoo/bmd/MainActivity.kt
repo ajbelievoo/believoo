@@ -116,15 +116,24 @@ class MainActivity : Activity() {
                         chatAppend("System", "View-only session — remote control is locked", false)
                     }
                     // without the accessibility service the viewer can only
-                    // WATCH — surface that clearly on both ends. Check the
-                    // settings list (bind can lag a beat behind the toggle)
-                    // and re-check once more after a short delay.
+                    // WATCH — surface that clearly on both ends. Three states:
+                    //   bound        → fine, nothing shown
+                    //   in settings but unbound → the OEM killed it (Vivo/ColorOS
+                    //     do this constantly) — tell the user to toggle OFF→ON
+                    //   off entirely → guide to enable it
                     fun accessibilityWarn() {
-                        if (RemoteControlService.enabled() || RemoteControlService.enabledInSettings(this@MainActivity)) return
-                        setStatus("⚠ Remote control OFF — enable Accessibility for input", "#f59e0b")
-                        chatAppend("System", "Viewer can't control: enable BMyDesk in Settings → Accessibility. " +
-                            "Tap the bubble → 🔓 to unlock after enabling.", false)
-                        service?.ctl()?.sendChat("system", "⚠ Host hasn't enabled remote-control (Accessibility off) — you can only watch. Ask them to enable BMyDesk in Settings → Accessibility.")
+                        if (RemoteControlService.enabled()) return
+                        val inSettings = RemoteControlService.enabledInSettings(this@MainActivity)
+                        if (inSettings) {
+                            setStatus("⚠ Remote-control service died — toggle BMyDesk OFF→ON in Accessibility", "#f59e0b")
+                            chatAppend("System", "Your phone killed the control service (battery/OEM). Settings → Accessibility → BMyDesk → OFF then ON.", false)
+                            service?.ctl()?.sendChat("system", "⚠ Host's control service was killed by their phone — viewer can only watch until they toggle Accessibility OFF→ON.")
+                        } else {
+                            setStatus("⚠ Remote control OFF — tap here to enable Accessibility", "#f59e0b")
+                            chatAppend("System", "Viewer can't control: enable BMyDesk in Settings → Accessibility. " +
+                                "Tap the bubble → 🔓 to unlock after enabling.", false)
+                            service?.ctl()?.sendChat("system", "⚠ Host hasn't enabled remote-control (Accessibility off) — you can only watch. Ask them to enable BMyDesk in Settings → Accessibility.")
+                        }
                     }
                     sessTicker.postDelayed({ if (peerLive) accessibilityWarn() }, 3000)
                 }
@@ -466,6 +475,7 @@ class MainActivity : Activity() {
                 respondedAtMs = System.currentTimeMillis()
                 pendingProjection = true
                 setStatus("Requesting screen capture permission…", "#f59e0b")
+                startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_WARM))
                 val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 startActivityForResult(mpm.createScreenCaptureIntent(), 1001)
             }
@@ -490,55 +500,144 @@ class MainActivity : Activity() {
     private fun showSettings() {
         val sp = getSharedPreferences("bmydesk", Context.MODE_PRIVATE)
         val dark = sp.getBoolean("dark", true)
-        val fg = Color.parseColor(if (dark) "#e2e8f0" else "#0f172a")
-        val sub = Color.parseColor(if (dark) "#94a3b8" else "#64748b")
-        val bgc = Color.parseColor(if (dark) "#0b1220" else "#f1f5f9")
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(14), dp(18), dp(24)); setBackgroundColor(bgc) }
-        fun head(t: String) = root.addView(TextView(this).apply { text = t.uppercase(); setTextColor(Color.parseColor("#fb7185")); textSize = 11f; setPadding(0, dp(18), 0, dp(4)); letterSpacing = 0.1f })
-        fun sw(key: String, def: Boolean, title: String, desc: String) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+        val fg = Color.parseColor(if (dark) "#e8edf5" else "#0f172a")
+        val sub = Color.parseColor(if (dark) "#8fa0b8" else "#64748b")
+        val bgc = Color.parseColor(if (dark) "#0b1220" else "#eef2f7")
+        val cardCol = Color.parseColor(if (dark) "#131c30" else "#ffffff")
+        val sepCol = Color.parseColor(if (dark) "#22ffffff" else "#14000000")
+        val rose = Color.parseColor("#fb7185")
+        var dlg: android.app.AlertDialog? = null
+
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(10), dp(16), dp(26)) }
+
+        // iOS-style icon tile — rounded colored square holding the glyph
+        fun tile(emoji: String, tint: Int) = TextView(this).apply {
+            text = emoji; textSize = 15f; gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                setColor(Color.argb(if (dark) 38 else 26, Color.red(tint), Color.green(tint), Color.blue(tint)))
+                cornerRadius = dp(10).toFloat()
+            }
+        }
+        val tileLp = LinearLayout.LayoutParams(dp(34), dp(34)).apply { marginEnd = dp(12) }
+
+        // each section head starts a new rounded card; rows stack inside it
+        // with hairline separators — the iOS "grouped list" look
+        var card: LinearLayout? = null
+        fun head(t: String) {
+            root.addView(TextView(this).apply {
+                text = t.uppercase(); setTextColor(rose); textSize = 11f
+                letterSpacing = 0.12f; setPadding(dp(6), dp(20), 0, dp(6))
+            })
+            card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = GradientDrawable().apply {
+                    setColor(cardCol); cornerRadius = dp(16).toFloat()
+                    setStroke(dp(1), sepCol)
+                }
+            }
+            root.addView(card)
+        }
+        fun addToCard(row: android.view.View) {
+            val c = card ?: root.also { head("") }
+            if (c.childCount > 0) c.addView(android.view.View(this).apply {
+                setBackgroundColor(sepCol)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply { marginStart = dp(58) })
+            c.addView(row)
+        }
+        fun sw(emoji: String, tint: Int, key: String, def: Boolean, title: String, desc: String) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(11), dp(12), dp(11))
+            }
+            row.addView(tile(emoji, tint), tileLp)
             val tv = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             tv.addView(TextView(this).apply { text = title; setTextColor(fg); textSize = 14f })
-            tv.addView(TextView(this).apply { text = desc; setTextColor(sub); textSize = 11f })
+            tv.addView(TextView(this).apply { text = desc; setTextColor(sub); textSize = 11f; setPadding(0, dp(2), 0, 0) })
             row.addView(tv, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            row.addView(android.widget.Switch(this).apply { isChecked = sp.getBoolean(key, def); setOnCheckedChangeListener { _, v -> sp.edit().putBoolean(key, v).apply() } })
-            root.addView(row)
+            row.addView(mswitch(sp.getBoolean(key, def), dark) { v -> sp.edit().putBoolean(key, v).apply() })
+            addToCard(row)
         }
-        fun act(title: String, desc: String, onClick: () -> Unit) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(10), 0, dp(10)); setOnClickListener { onClick() } }
-            row.addView(TextView(this).apply { text = title; setTextColor(fg); textSize = 14f })
-            row.addView(TextView(this).apply { text = desc; setTextColor(sub); textSize = 11f })
-            root.addView(row)
+        fun act(emoji: String, tint: Int, title: String, desc: String, value: String? = null, warn: Boolean = false, onClick: () -> Unit) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(11), dp(12), dp(11))
+                // iOS-ish touch feedback — row foreground ripple
+                val ta = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+                foreground = ta.getDrawable(0); ta.recycle()
+                setOnClickListener { onClick() }
+            }
+            row.addView(tile(emoji, tint), tileLp)
+            val tv = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tv.addView(TextView(this).apply { text = title; setTextColor(fg); textSize = 14f })
+            tv.addView(TextView(this).apply {
+                text = desc; textSize = 11f; setPadding(0, dp(2), 0, 0)
+                setTextColor(if (warn) Color.parseColor("#fbbf24") else sub)
+            })
+            row.addView(tv, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            if (value != null) row.addView(TextView(this).apply {
+                text = value; setTextColor(sub); textSize = 12f; setPadding(dp(8), 0, dp(4), 0)
+            })
+            row.addView(TextView(this).apply { text = "›"; setTextColor(sub); textSize = 20f })
+            addToCard(row)
         }
-        root.addView(TextView(this).apply { text = "⚙ Settings"; setTextColor(fg); textSize = 20f; typeface = Typeface.DEFAULT_BOLD })
+
+        // header — title + Done pill (replaces the ugly system CLOSE bar)
+        val hdr = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(6), dp(8), 0, dp(6))
+        }
+        hdr.addView(TextView(this).apply {
+            text = "Settings"; setTextColor(fg); textSize = 24f; typeface = Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        hdr.addView(mbtn("Done", Color.parseColor("#e11d48"), 13f) { dlg?.dismiss() })
+        root.addView(hdr)
+
+        val amber = Color.parseColor("#f59e0b"); val blue = Color.parseColor("#38bdf8")
+        val violet = Color.parseColor("#a78bfa"); val green = Color.parseColor("#34d399")
+
         head("Incoming requests (host)")
-        sw("vibrate_req", true, "Vibrate on request", "Buzz when someone asks to connect")
-        sw("def_viewonly", true, "Accept as view-only by default", "Viewer can watch but not touch — untick to default to full control")
-        sw("def_trust", false, "Always trust by default", "Skip approval for known devices next time")
-        sw("keep_awake", false, "Keep screen awake", "Prevent sleep while BMyDesk is open")
+        sw("🔔", amber, "vibrate_req", true, "Vibrate on request", "Buzz when someone asks to connect")
+        sw("👁", blue, "def_viewonly", true, "Accept as view-only by default", "Viewer can watch but not touch — untick for full control")
+        sw("🤝", violet, "def_trust", false, "Always trust by default", "Skip approval for known devices next time")
+        sw("☀️", green, "keep_awake", false, "Keep screen awake", "Prevent sleep while BMyDesk is open")
         head("When I connect to another device")
-        sw("auto_landscape", true, "Auto-rotate for wide screens", "Landscape for PC desktops, portrait for phones")
-        sw("clip_sync", true, "Clipboard sync", "Copy here, paste there (and back)")
-        act("Default quality: " + qLabel(sp.getString("def_quality", "auto") ?: "auto"), "Tap to cycle Auto → HD → Full HD → SD") {
+        sw("🔄", blue, "auto_landscape", true, "Auto-rotate for wide screens", "Landscape for PC desktops, portrait for phones")
+        sw("📋", green, "clip_sync", true, "Clipboard sync", "Copy here, paste there (and back)")
+        act("🎞", violet, "Default quality", "Tap to cycle Auto → HD → Full HD → SD",
+            value = qLabel(sp.getString("def_quality", "auto") ?: "auto")) {
             val n = when (sp.getString("def_quality", "auto")) { "auto" -> "hd"; "hd" -> "fhd"; "fhd" -> "sd"; else -> "auto" }
             sp.edit().putString("def_quality", n).apply(); toast("Default quality: ${qLabel(n)}")
+            dlg?.dismiss(); showSettings()
         }
         head("Permissions & reliability")
-        act("Remote-control access", if (RemoteControlService.enabledInSettings(this)) "ON ✓ — viewers can control this device" else "OFF — viewers can only watch (tap to fix)") { showAccessibilityGuide() }
-        act("Battery optimisation", "Keep BMyDesk reachable in background — tap to fix") { checkBatteryExemption(true) }
-        act("Notifications", "Manage alert settings") {
+        val ctlOn = RemoteControlService.enabledInSettings(this)
+        act("🕹", if (ctlOn) green else Color.parseColor("#f43f5e"), "Remote-control access",
+            if (ctlOn) "ON ✓ — viewers can control this device" else "OFF — viewers can only watch (tap to fix)",
+            warn = !ctlOn) { showAccessibilityGuide() }
+        act("🔋", amber, "Battery optimisation", "Keep BMyDesk reachable in background — tap to fix") { checkBatteryExemption(true) }
+        act("🔔", blue, "Notifications", "Manage alert settings") {
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)) }
         }
         head("Device")
-        act("Session history", "Who connected and when — last 50 sessions") { showHistory() }
-        act("Copy my session code", reg?.code ?: "not registered yet") { reg?.code?.let { clipSet(it); toast("Copied") } }
-        act("Copy device ID", deviceId()) { clipSet(deviceId()); toast("Copied") }
-        act("Check for updates", "Current version v${BuildConfig.VERSION_NAME}") { checkUpdate(); toast("Checking…") }
-        act("Open web workspace", "bmydesk.believoo.com") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com"))) }
-        act("Help & support", "Guides and contact") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/help"))) }
-        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_NoActionBar_Fullscreen)
-            .setView(ScrollView(this).apply { setBackgroundColor(bgc); addView(root) })
-            .setPositiveButton("Close", null).show()
+        act("🕘", violet, "Session history", "Who connected and when — last 50 sessions") { showHistory() }
+        act("🔑", amber, "Copy my session code", reg?.code ?: "not registered yet") { reg?.code?.let { clipSet(it); toast("Copied") } }
+        act("🆔", blue, "Copy device ID", deviceId()) { clipSet(deviceId()); toast("Copied") }
+        act("⬆️", green, "Check for updates", "Current version v${BuildConfig.VERSION_NAME}", value = "v${BuildConfig.VERSION_NAME}") { checkUpdate(); toast("Checking…") }
+        act("🌐", blue, "Open web workspace", "bmydesk.believoo.com") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com"))) }
+        act("❓", violet, "Help & support", "Guides and contact") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://bmydesk.believoo.com/help"))) }
+
+        dlg = android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_NoActionBar_Fullscreen)
+            .setView(ScrollView(this).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(Color.parseColor(if (dark) "#0e1830" else "#f8fafc"), bgc))
+                addView(root)
+            }).show()
+        // animate cards in — staggered rise like the main screen
+        var d = 40L
+        for (i in 0 until root.childCount) {
+            val ch = root.getChildAt(i)
+            if (ch is LinearLayout && ch.background is GradientDrawable) { fadeIn(ch, d); d += 55 }
+        }
     }
 
     // ── UI ─────────────────────────────────────────────────────────
@@ -594,11 +693,64 @@ class MainActivity : Activity() {
     private val gradGreen = intArrayOf(Color.parseColor("#22c55e"), Color.parseColor("#15803d"))
     private val gradRed   = intArrayOf(Color.parseColor("#ef4444"), Color.parseColor("#991b1b"))
 
+    // iOS-style animated toggle — sliding thumb + color-morphing track.
+    // The stock Switch renders tiny/gray in plain themes; this looks designed.
+    private fun mswitch(checked: Boolean, dark: Boolean, onChange: (Boolean) -> Unit): android.view.View {
+        val w = dp(48); val h = dp(28); val pad = dp(3); val th = h - pad * 2
+        var on = checked
+        val offCol = Color.parseColor(if (dark) "#3d4c63" else "#cbd5e1")
+        val onCol = Color.parseColor("#22c55e")
+        val track = GradientDrawable().apply { cornerRadius = h / 2f }
+        val thumb = android.view.View(this).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
+            elevation = dp(2).toFloat()
+        }
+        val holder = android.widget.FrameLayout(this).apply {
+            background = track
+            layoutParams = android.view.ViewGroup.LayoutParams(w, h)
+            addView(thumb, android.widget.FrameLayout.LayoutParams(th, th).apply {
+                gravity = Gravity.CENTER_VERTICAL; leftMargin = pad })
+        }
+        var trackCol = if (on) onCol else offCol
+        fun applyState(anim: Boolean) {
+            val tx = if (on) (w - pad - th - pad).toFloat() else 0f
+            val to = if (on) onCol else offCol
+            if (anim) {
+                thumb.animate().translationX(tx).setDuration(170)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(2f)).start()
+                android.animation.ValueAnimator.ofArgb(trackCol, to).apply {
+                    duration = 200
+                    addUpdateListener { trackCol = it.animatedValue as Int; track.setColor(trackCol) }
+                    start()
+                }
+            } else { thumb.translationX = tx; trackCol = to; track.setColor(to) }
+        }
+        applyState(false)
+        holder.setOnClickListener {
+            on = !on; applyState(true); onChange(on)
+        }
+        return holder
+    }
+
     // staggered card entrance — fade + rise, like a real product
     private fun fadeIn(v: View, delayMs: Long) {
         v.alpha = 0f; v.translationY = dp(14).toFloat()
         v.animate().alpha(1f).translationY(0f).setDuration(430).setStartDelay(delayMs)
             .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+    }
+
+    // slim rounded progress track with the brand gradient fill — used by
+    // the toolbar mini-bar and the connecting overlay's bar
+    private fun progBarDrawable(): android.graphics.drawable.LayerDrawable {
+        val track = GradientDrawable().apply {
+            setColor(Color.parseColor("#1e293b")); cornerRadius = dp(5).toFloat() }
+        val fill = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, gradBrand)
+            .apply { cornerRadius = dp(5).toFloat() }
+        val clip = android.graphics.drawable.ClipDrawable(fill, Gravity.START,
+            android.graphics.drawable.ClipDrawable.HORIZONTAL)
+        return android.graphics.drawable.LayerDrawable(arrayOf(track, clip)).apply {
+            setId(0, android.R.id.background); setId(1, android.R.id.progress)
+        }
     }
 
     private fun lpGap(v: Int = 10) = LinearLayout.LayoutParams(
@@ -726,6 +878,11 @@ class MainActivity : Activity() {
         statusRow.addView(statusDot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { marginEnd = dp(8) })
         statusView = TextView(this).apply {
             text = "Registering…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 13f
+            // a warning about accessibility/control is actionable — tap it to
+            // jump straight at the fix instead of hunting through Settings
+            setOnClickListener {
+                if (text.contains("ccessib") || text.contains("control", true)) showAccessibilityGuide()
+            }
         }
         statusRow.addView(statusView)
         card.addView(statusRow)
@@ -984,12 +1141,24 @@ class MainActivity : Activity() {
             }
         }
         val vLeft = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        viewerStatus = TextView(this).apply { text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 12f }
+        viewerStatus = object : TextView(this) {
+            override fun setText(text: CharSequence?, type: android.widget.TextView.BufferType) {
+                super.setText(text, type)
+                // mirror every status write onto the branded connecting
+                // overlay — minus the "— N%" tail, the overlay shows a
+                // proper progress bar + big percent readout instead
+                vConnText?.text = text?.replace(Regex("\\s*—\\s*\\d+%$"), "")
+            }
+        }.apply {
+            text = "Connecting…"; setTextColor(Color.parseColor("#94a3b8")); textSize = 11.5f
+            maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+        }
         vLeft.addView(viewerStatus)
         vProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100; progress = 0; isIndeterminate = false
+            progressDrawable = progBarDrawable()
         }
-        vLeft.addView(vProgress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 6 })
+        vLeft.addView(vProgress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(5)).apply { topMargin = dp(5) })
         vBar.addView(vLeft, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         vSessRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
         vSessRow.addView(mbtn("💬", Color.parseColor("#1e293b"), 12f) { toggleChat() })
@@ -1201,6 +1370,94 @@ class MainActivity : Activity() {
         viewerPane.addView(keysScroll, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM))
+
+        // ── Connecting overlay — branded full-screen "waiting" surface so
+        // approval/negotiation doesn't look like a dead black panel. Sits
+        // above every viewer layer until the first remote frame lands.
+        vConnOverlay = android.widget.FrameLayout(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#101c38"), Color.parseColor("#0b1220")))
+            visibility = View.GONE
+        }
+        val logoStage = android.widget.FrameLayout(this)
+        // two staggered pulse rings radiating out of the logomark
+        listOf(0L, 700L).forEach { delay ->
+            val ring = View(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setStroke(dp(2), Color.parseColor("#e11d48"))
+                }
+            }
+            logoStage.addView(ring, android.widget.FrameLayout.LayoutParams(
+                dp(128), dp(128), Gravity.CENTER))
+            vConnAnims += android.animation.AnimatorSet().apply {
+                playTogether(
+                    android.animation.ObjectAnimator.ofFloat(ring, "scaleX", 1f, 1.9f),
+                    android.animation.ObjectAnimator.ofFloat(ring, "scaleY", 1f, 1.9f),
+                    android.animation.ObjectAnimator.ofFloat(ring, "alpha", 0.55f, 0f))
+                childAnimations.forEach {
+                    (it as android.animation.ObjectAnimator).apply {
+                        repeatCount = android.animation.ValueAnimator.INFINITE
+                        repeatMode = android.animation.ValueAnimator.RESTART
+                        startDelay = delay
+                    }
+                }
+                duration = 2000
+                interpolator = android.view.animation.DecelerateInterpolator()
+            }
+        }
+        val connLogo = ImageView(this).apply {
+            setImageResource(R.drawable.logo_mark)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        logoStage.addView(connLogo, android.widget.FrameLayout.LayoutParams(
+            dp(112), dp(112), Gravity.CENTER))
+        // soft breathing on the logo itself
+        vConnAnims += android.animation.ObjectAnimator.ofPropertyValuesHolder(connLogo,
+            android.animation.PropertyValuesHolder.ofFloat("scaleX", 1f, 1.07f),
+            android.animation.PropertyValuesHolder.ofFloat("scaleY", 1f, 1.07f)).apply {
+            duration = 1150
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            repeatMode = android.animation.ValueAnimator.REVERSE
+        }
+        val vConnCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(32), 0, dp(32), dp(24))
+        }
+        vConnCol.addView(logoStage, LinearLayout.LayoutParams(dp(190), dp(190)))
+        vConnText = TextView(this).apply {
+            text = "Connecting…"; setTextColor(Color.parseColor("#e8edf5")); textSize = 16f
+            gravity = Gravity.CENTER; maxLines = 2
+        }
+        vConnCol.addView(vConnText, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(30) })
+        vConnBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100; progress = 0; progressDrawable = progBarDrawable()
+        }
+        vConnCol.addView(vConnBar, LinearLayout.LayoutParams(dp(230), dp(8)).apply { topMargin = dp(18) })
+        vConnPct = TextView(this).apply {
+            setTextColor(Color.parseColor("#fb7185")); textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+        }
+        vConnCol.addView(vConnPct, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+        vConnCol.addView(TextView(this).apply {
+            text = "E N D - T O - E N D   E N C R Y P T E D"
+            setTextColor(Color.parseColor("#4c5c78")); textSize = 9.5f; letterSpacing = 0.24f
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(34) })
+        vConnCol.addView(mbtn("Cancel", Color.parseColor("#1e293b"), 13f) { exitViewer() },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(16) })
+        vConnOverlay!!.addView(vConnCol, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        viewerPane.addView(vConnOverlay, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
         frame.addView(viewerPane)
 
         // Session chat panel — overlays bottom of whichever screen is up
@@ -1295,6 +1552,13 @@ class MainActivity : Activity() {
     }
 
     private lateinit var vBar: LinearLayout
+    // branded connecting overlay — logo + pulse rings + gradient progress
+    private var vConnOverlay: android.widget.FrameLayout? = null
+    private var vConnText: TextView? = null
+    private var vConnPct: TextView? = null
+    private var vConnBar: ProgressBar? = null
+    private val vConnAnims = mutableListOf<android.animation.Animator>()
+    private var vConnPlaying = false
     private lateinit var viewerFab: ImageView
     private lateinit var viewerMenu: LinearLayout
     private lateinit var viewerMenuScroll: ScrollView
@@ -2250,6 +2514,9 @@ class MainActivity : Activity() {
         pendingTrust = chkTrust.isChecked && !pendingVDevice.isNullOrBlank()
         pendingProjection = true
         setStatus("Requesting screen capture permission…", "#f59e0b")
+        // the consent dialog is dead time — pre-build the WebRTC factory
+        // behind it so capture starts ~instantly after the user taps Allow
+        startService(Intent(this, ScreenShareService::class.java).setAction(ScreenShareService.ACTION_WARM))
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         startActivityForResult(mpm.createScreenCaptureIntent(), 1001)
     }
@@ -2358,11 +2625,38 @@ class MainActivity : Activity() {
         ui {
             if (::vProgress.isInitialized) vProgress.progress = vProgPct
             viewerStatus.text = "$text — $vProgPct%"
+            vConnBar?.progress = vProgPct
+            vConnPct?.text = "$vProgPct%"
+            if (viewerPane.visibility == View.VISIBLE) {
+                if (vProgPct >= 100) vConnHide() else vConnShow()
+            }
         }
     }
+
+    // connecting overlay show/hide — pulse rings + logo breathe only run
+    // while the overlay is actually on screen
+    private fun vConnShow() {
+        val o = vConnOverlay ?: return
+        if (o.visibility != View.VISIBLE) {
+            o.visibility = View.VISIBLE
+            o.alpha = 0f; o.animate().alpha(1f).setDuration(280).start()
+        }
+        if (!vConnPlaying) { vConnPlaying = true; vConnAnims.forEach { it.start() } }
+    }
+    private fun vConnHide() {
+        vConnOverlay?.let { o ->
+            if (o.visibility == View.VISIBLE) o.animate().alpha(0f).setDuration(320)
+                .withEndAction { o.visibility = View.GONE; o.alpha = 1f }.start()
+        }
+        if (vConnPlaying) { vConnPlaying = false; vConnAnims.forEach { it.cancel() } }
+    }
+
     private fun vProgReset() {
         vProgPct = 0; vJoinedAtMs = 0
-        ui { if (::vProgress.isInitialized) vProgress.progress = 0 }
+        ui {
+            if (::vProgress.isInitialized) vProgress.progress = 0
+            vConnBar?.progress = 0; vConnPct?.text = ""
+        }
     }
 
     private fun handleViewerSignal(j: AgentApi.JoinResult, p: JsonObject) {
@@ -2429,6 +2723,7 @@ class MainActivity : Activity() {
             enterImmersive()
             vProgReset()
             viewerStatus.text = "Joining $code…"
+            vConnShow()
         }
         // joining your own code just hangs — the request prompt lands behind
         // the viewer pane; refuse it up front instead of "waiting" forever.
@@ -2574,7 +2869,22 @@ class MainActivity : Activity() {
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
                     remoteSurface!!.init(remoteViewer!!.egl.eglBaseContext, object : org.webrtc.RendererCommon.RendererEvents {
-                        override fun onFirstFrameRendered() {}
+                        // "Live" only counts once REAL pixels hit the surface —
+                        // a track arriving ≠ a decodable stream (wedged codecs
+                        // hand us a track then produce nothing but black).
+                        override fun onFirstFrameRendered() {
+                            streaming = true
+                            frameWatch?.let { sessTicker.removeCallbacks(it) }; frameWatch = null
+                            frameWatchFires = 0
+                            vStage(100, "Live — touch to control")
+                            startSessTimer()
+                            // once live, fold the toolbar into the floating button —
+                            // the remote screen gets the whole display
+                            vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }
+                            val hide = Runnable { collapseVBar() }
+                            vBarHideRunnable = hide
+                            sessTicker.postDelayed(hide, 3000)
+                        }
                         override fun onFrameResolutionChanged(w: Int, h: Int, rot: Int) {
                             vidW = w; vidH = h; vidRot = rot
                             updatePadCursor()
@@ -2605,14 +2915,7 @@ class MainActivity : Activity() {
                         val pm = getSharedPreferences("bmydesk", Context.MODE_PRIVATE).getBoolean("pad_mode", false)
                         if (pm != padMode) setPadMode(pm) else updatePadCursor()
                     }
-                    vStage(100, "Live — touch to control")
-                    startSessTimer()
-                    // once live, fold the toolbar into the floating button —
-                    // the remote screen gets the whole display
-                    vBarHideRunnable?.let { sessTicker.removeCallbacks(it) }
-                    val hide = Runnable { collapseVBar() }
-                    vBarHideRunnable = hide
-                    sessTicker.postDelayed(hide, 3000)
+                    vStage(96, "Rendering…")
                 }
                 override fun onError(message: String) = ui { viewerStatus.text = message }
             }
@@ -2653,6 +2956,7 @@ class MainActivity : Activity() {
         // if the host never answers this offer (lost in dead-channel land),
         // rebuild the peer every 25s instead of hanging on 'Negotiating…'
         val v = remoteViewer!!
+        armFrameWatchdog(v)
         offerTimeout?.let { sessTicker.removeCallbacks(it) }
         val rt = Runnable { if (remoteViewer === v && vJoin != null) viewerReconnect(v) }
         offerTimeout = rt
@@ -2714,8 +3018,33 @@ class MainActivity : Activity() {
     @Volatile private var streaming = false
     @Volatile private var lastRttMs = 0
     @Volatile private var vLocked = false // host put this session in view-only
+    private var frameWatch: Runnable? = null
+    private var frameWatchFires = 0
+
+    // The "stuck on black forever" killer: a peer can hand us a track object
+    // whose decoder never produces a frame (codec wedge, dead encoder on the
+    // host). 12s of silence after onTrack → rebuild the whole peer. Only the
+    // FIRST frame gates this — a static screen legitimately emits nothing.
+    // Capped: if 3 rebuilds still yield no pixels the HOST is producing nothing
+    // (their encoder/capture died) — rebuilding again won't help, say so.
+    private fun armFrameWatchdog(v: RemoteViewer) {
+        frameWatch?.let { sessTicker.removeCallbacks(it) }
+        val r = Runnable {
+            frameWatch = null
+            if (remoteViewer !== v || vJoin == null || streaming) return@Runnable
+            android.util.Log.w("BMyDesk", "track arrived but no frame in 12s (try $frameWatchFires)")
+            if (frameWatchFires++ >= 3) {
+                viewerStatus.text = "Remote device isn't sending video — ask them to stop and re-share"
+                return@Runnable
+            }
+            viewerStatus.text = "Still black — rebuilding the link…"
+            viewerReconnect(v)
+        }
+        frameWatch = r
+        sessTicker.postDelayed(r, 12000)
+    }
+
     private fun startSessTimer() {
-        streaming = true
         if (liveSince != 0L) return
         liveSince = System.currentTimeMillis()
         sessTicker.postDelayed(object : Runnable {
@@ -3137,6 +3466,7 @@ class MainActivity : Activity() {
         // the overlay bubble / persistent "return" notification
         startService(Intent(this, SessionBubbleService::class.java))
         moveTaskToBack(true)
+        if (vConnPlaying) { vConnPlaying = false; vConnAnims.forEach { it.cancel() } }
     }
 
     private fun restoreViewer() {
@@ -3145,6 +3475,8 @@ class MainActivity : Activity() {
         SessionBubbleService.setMini(null, null)
         stopService(Intent(this, SessionBubbleService::class.java))
         if (remoteViewer != null || vJoin != null) { viewerPane.visibility = View.VISIBLE; enterImmersive() }
+        // restored mid-handshake — bring the connecting overlay back up
+        if (remoteViewer == null && vJoin != null) vConnShow()
     }
 
     // ── viewer toolbar ↔ floating button — full-screen remote, controls on tap ──
@@ -3254,6 +3586,7 @@ class MainActivity : Activity() {
         remoteSurface = null
         synchronized(frameLock) { lastRemoteFrame?.release(); lastRemoteFrame = null }
         offerTimeout?.let { sessTicker.removeCallbacks(it) }
+        frameWatch?.let { sessTicker.removeCallbacks(it) }; frameWatch = null; frameWatchFires = 0
         streaming = false; liveSince = 0L; lastFilePct = -1; lastRttMs = 0; vLocked = false
         padCursor?.visibility = View.GONE; padDrag = false; padTwoTap = false
         stopCallMedia()
@@ -3270,6 +3603,10 @@ class MainActivity : Activity() {
         vSessRow.visibility = View.GONE; chatPanel.visibility = View.GONE
         chatLog.removeAllViews(); chatTickRows.clear(); unseenChatIds.clear()
         vProgReset()
+        // connecting overlay — kill it outright (no fade; pane is gone) and
+        // stop the ring/breathe animators so they don't idle-loop forever
+        vConnOverlay?.let { it.animate().cancel(); it.alpha = 1f; it.visibility = View.GONE }
+        if (vConnPlaying) { vConnPlaying = false; vConnAnims.forEach { it.cancel() } }
     }
 
     // While VIEWING, hardware Back is sent to the REMOTE device (it drives

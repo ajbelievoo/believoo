@@ -55,6 +55,9 @@ class ScreenShareService : Service() {
         active = this
         when (intent?.action) {
             ACTION_START -> startForegroundNotif()
+            // pre-build the PeerConnectionFactory/ADM while the user reads the
+            // projection consent dialog — that dead time hides the ~1-3s init
+            ACTION_WARM -> Thread { ensureHost() }.start()
             ACTION_CAPTURE -> {
                 val data = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
                     ?: run { events?.onError("No projection data"); return START_NOT_STICKY }
@@ -119,35 +122,45 @@ class ScreenShareService : Service() {
         val cw = ((m.widthPixels * k).toInt() / 2) * 2
         val ch = ((m.heightPixels * k).toInt() / 2) * 2
         Thread {
-            val h = WebRtcHost(this)
-            h.listener = object : WebRtcHost.Listener {
+            val h = ensureHost()
+            h.startCapture(resultData, cw, ch, 24)
+            pendingOffer?.let { pendingOffer = null; h.handleOffer(it, iceServers) }
+        }.start()
+    }
+
+    // Built once, on a background thread — PeerConnectionFactory + codec/ADM
+    // init is the single biggest chunk of accept→picture latency. WARM'd
+    // during the consent dialog so capture starts instantly after Allow.
+    @Synchronized
+    private fun ensureHost(): WebRtcHost {
+        host?.let { return it }
+        val h = WebRtcHost(this)
+        h.listener = object : WebRtcHost.Listener {
                 override fun sendSignal(payload: JsonObject) { signaling?.send("signal", payload) }
                 override fun onPeerConnected() { events?.onConnected() }
                 override fun onPeerDisconnected() { events?.onDisconnected() }
                 override fun onPipTrack(track: org.webrtc.VideoTrack) { events?.onPipTrack(track) }
                 override fun onError(message: String) { events?.onError(message) }
             }
-            h.ctl.sink = object : CtlChannel.Sink {
-                override fun onCtlOpen() { events?.onCtlReady() }
-                override fun onChat(from: String, text: String) { events?.onChat(from, text) }
-                override fun onChatMsg(id: String, from: String, text: String) { events?.onChatMsg(id, from, text) }
-                override fun onChatAck(id: String) { events?.onChatAck(id) }
-                override fun onChatSeen(id: String) { events?.onChatSeen(id) }
-                override fun onCallState(kind: String, on: Boolean) { events?.onCallState(kind, on) }
-                override fun onClip(text: String) { events?.onClip(text) }
-                override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
-                override fun onFileProgress(r: Int, t: Int) { events?.onFileProgress(r, t) }
-                override fun onTyping(from: String) { events?.onTyping(from) }
-                override fun onWantCtl() { events?.onWantCtl() }
-                override fun onLock() { events?.onLock() }
-                override fun onVol(dir: String) { events?.onVol(dir) }
-                // viewer's quality toggle actually retunes this capture
-                override fun onQuality(mode: String) { h.setQuality(mode) }
-            }
-            h.startCapture(resultData, cw, ch, 24)
-            host = h
-            pendingOffer?.let { pendingOffer = null; h.handleOffer(it, iceServers) }
-        }.start()
+        h.ctl.sink = object : CtlChannel.Sink {
+            override fun onCtlOpen() { events?.onCtlReady() }
+            override fun onChat(from: String, text: String) { events?.onChat(from, text) }
+            override fun onChatMsg(id: String, from: String, text: String) { events?.onChatMsg(id, from, text) }
+            override fun onChatAck(id: String) { events?.onChatAck(id) }
+            override fun onChatSeen(id: String) { events?.onChatSeen(id) }
+            override fun onCallState(kind: String, on: Boolean) { events?.onCallState(kind, on) }
+            override fun onClip(text: String) { events?.onClip(text) }
+            override fun onFile(name: String, data: ByteArray) { events?.onFile(name, data) }
+            override fun onFileProgress(r: Int, t: Int) { events?.onFileProgress(r, t) }
+            override fun onTyping(from: String) { events?.onTyping(from) }
+            override fun onWantCtl() { events?.onWantCtl() }
+            override fun onLock() { events?.onLock() }
+            override fun onVol(dir: String) { events?.onVol(dir) }
+            // viewer's quality toggle actually retunes this capture
+            override fun onQuality(mode: String) { h.setQuality(mode) }
+        }
+        host = h
+        return h
     }
 
     fun answerOffer(offerSdp: String) {
@@ -165,6 +178,7 @@ class ScreenShareService : Service() {
 
     companion object {
         const val ACTION_START = "com.believoo.bmd.START"
+        const val ACTION_WARM = "com.believoo.bmd.WARM"
         const val ACTION_CAPTURE = "com.believoo.bmd.CAPTURE"
         const val ACTION_STOP = "com.believoo.bmd.STOP"
         const val EXTRA_RESULT_DATA = "result_data"
