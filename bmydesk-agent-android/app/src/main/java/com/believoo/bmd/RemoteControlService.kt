@@ -79,41 +79,66 @@ class RemoteControlService : AccessibilityService() {
         skipUp = false
         lastX = x; lastY = y; moved = false
         downAt = SystemClock.uptimeMillis()
-        strokeT0 = downAt
-        val p = Path().apply { moveTo(x, y) }
-        strokeDesc = GestureDescription.StrokeDescription(p, 0, 10, true)
-        dispatch(strokeDesc!!)
+        // Do NOT dispatch a willContinue stroke here — a never-ended open
+        // stroke jams the gesture pipeline: the later tap collides with the
+        // still-held "finger" and every subsequent gesture is cancelled.
+        // The stroke only opens on the first real move (drag), or onUp ends
+        // it as a plain tap/press.
+        strokeDesc = null
     }
 
     private fun onMove(x: Float, y: Float) {
-        val sd = strokeDesc ?: return
         if (Math.abs(x - lastX) + Math.abs(y - lastY) < 3) return
         moved = true
         // throttle stroke continuation ~20ms so the gesture queue stays small
         val now = SystemClock.uptimeMillis()
         if (now - lastMoveAt < 20) return
         lastMoveAt = now
-        val seg = Path().apply { moveTo(lastX, lastY); lineTo(x, y) }
-        strokeDesc = sd.continueStroke(seg, now - strokeT0, 40, true)
+        val sd = strokeDesc
+        val next: GestureDescription.StrokeDescription? = if (sd == null) {
+            // drag begins — open a continuing stroke AT THE DOWN POINT so the
+            // press starts where the finger actually landed
+            strokeT0 = now
+            GestureDescription.StrokeDescription(
+                Path().apply { moveTo(lastX, lastY) }, 0, 100, true)
+        } else {
+            // generous 100ms segments: the framework only allows continuing a
+            // still-drawing stroke, and touch streams pause on slow networks
+            runCatching {
+                sd.continueStroke(
+                    Path().apply { moveTo(lastX, lastY); lineTo(x, y) },
+                    now - strokeT0, 100, true)
+            }.getOrElse {
+                // stroke already finished (long pause) — re-press at the
+                // current point instead of dropping the whole drag
+                strokeT0 = now
+                GestureDescription.StrokeDescription(
+                    Path().apply { moveTo(x, y) }, 0, 100, true)
+            }
+        }
+        strokeDesc = next
         lastX = x; lastY = y
-        dispatch(strokeDesc!!)
+        next?.let { dispatch(it) }
     }
 
     private fun onUp(x: Float, y: Float) {
         if (skipUp) { skipUp = false; return }
         val sd = strokeDesc
-        if (sd == null) { tap(x, y); return }
-        val dur = SystemClock.uptimeMillis() - downAt
-        if (!moved && dur < 250) {
-            // quick touch at one point → simple tap
-            strokeDesc = null
-            tap(x, y)
+        strokeDesc = null
+        if (sd == null) {
+            // finger never dragged → a single point press of `dur` length:
+            // short = tap, long = long-press (context menu, select, etc.)
+            val dur = (SystemClock.uptimeMillis() - downAt).coerceIn(30, 10_000)
+            dispatch(GestureDescription.StrokeDescription(
+                Path().apply { moveTo(x, y) }, 0, dur))
             return
         }
-        val seg = Path().apply { moveTo(lastX, lastY); lineTo(x, y) }
-        strokeDesc = sd.continueStroke(seg, SystemClock.uptimeMillis() - strokeT0, 20, false)
-        dispatch(strokeDesc!!)
-        strokeDesc = null
+        // end the drag at the release point
+        runCatching {
+            sd.continueStroke(
+                Path().apply { moveTo(lastX, lastY); lineTo(x, y) },
+                SystemClock.uptimeMillis() - strokeT0, 20, false)
+        }.getOrNull()?.let { dispatch(it) }
     }
 
     /** Wheel → swipe. dy>0 (wheel down) scrolls content down = finger goes up. */
@@ -123,11 +148,6 @@ class RemoteControlService : AccessibilityService() {
         val y2 = (y - d).coerceIn(1f, scrH.toFloat() - 1f)
         val p = Path().apply { moveTo(x, y); lineTo(x, y2) }
         dispatch(GestureDescription.StrokeDescription(p, 0, 320))
-    }
-
-    private fun tap(x: Float, y: Float) {
-        val p = Path().apply { moveTo(x, y) }
-        dispatch(GestureDescription.StrokeDescription(p, 0, 60))
     }
 
     private fun longPress(x: Float, y: Float) {
