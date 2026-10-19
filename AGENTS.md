@@ -279,3 +279,11 @@ Updated 2026-10-09. These need the owner's accounts/credentials:
 - Test data: user `e2e-test@ghc.local` + order `0b3964ae` (PROVISIONING_FAILED,
   ₹453.12 PAID invoice `GHC-INV-202610-D2EB1142`) are synthetic E2E artifacts —
   safe to delete from admin.
+
+## Disk space (cleaned 2026-10-19 — was 96%, now ~60%)
+
+- **Devin CLI `sessions.db`** at `~/.local/share/devin/cli/sessions.db` grows unbounded (was 13GB). Purge old sessions then `VACUUM` to reclaim: `sqlite3 sessions.db "DELETE FROM message_nodes WHERE session_id != '<current>'; ..."` — keep current session rows.
+- **`composer install --prefer-source` bloat**: playgame-app/playgame-staging vendors had full `.git` per package (~200M each, 11.4GB total). Deleted via `find vendor -name .git -type d -exec rm -rf {} +`. Use `--prefer-dist` going forward.
+- **journald capped**: `SystemMaxUse=500M` set in `/etc/systemd/journald.conf` (was 2.6GB).
+- Composer cache (`/home/www/.cache/composer`, was 5.6GB) and `/tmp/bmd*` build artifacts purged.
+- `believoo/vendor_new` (937MB stale leftover) deleted — real `vendor/` intact.
