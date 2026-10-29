@@ -113,6 +113,36 @@ class BrandPanelsController extends Controller
         @chmod($f, 0664);
     }
 
+
+    private function slotInventory(array $leads): array
+    {
+        $slots = [
+            ['id' => 'sponsor-top', 'name' => 'Sponsored Listing — top of results', 'placement' => 'Search results (all queries, keyword matched)', 'capacity' => 4, 'shared' => true, 'priceShared' => 4999, 'priceDedicated' => 14999],
+            ['id' => 'speeddial', 'name' => 'Speed Dial tile — browser new tab', 'placement' => 'BelieVoo Browser new tab (all users)', 'capacity' => 6, 'shared' => true, 'priceShared' => 9999, 'priceDedicated' => 0],
+            ['id' => 'banner-home', 'name' => 'Banner — search home page', 'placement' => 'search.believoo.com home', 'capacity' => 2, 'shared' => true, 'priceShared' => 7999, 'priceDedicated' => 19999],
+            ['id' => 'banner-results', 'name' => 'Banner — results pages', 'placement' => 'All search result pages', 'capacity' => 2, 'shared' => true, 'priceShared' => 5999, 'priceDedicated' => 15999],
+        ];
+        foreach (($this->jread('slots')['slots'] ?? []) as $cs) {
+            $found = false;
+            foreach ($slots as &$sl) if ($sl['id'] === ($cs['id'] ?? '')) { $sl = array_merge($sl, $cs); $found = true; }
+            unset($sl);
+            if (!$found && !empty($cs['id'])) $slots[] = $cs;
+        }
+        $occ = $wait = [];
+        foreach ($leads as $l) {
+            $sid = $l['slotId'] ?? '';
+            if (!$sid) continue;
+            if (in_array($l['status'] ?? '', ['awaiting_payment', 'paid', 'live'], true)) $occ[$sid] = ($occ[$sid] ?? 0) + 1;
+            if (($l['status'] ?? '') === 'waitlist') $wait[$sid] = ($wait[$sid] ?? 0) + 1;
+        }
+        return array_map(function ($sl) use ($occ, $wait) {
+            $sl['used'] = $occ[$sl['id']] ?? 0;
+            $sl['free'] = max(0, (int)($sl['capacity'] ?? 1) - $sl['used']);
+            $sl['waitlist'] = $wait[$sl['id']] ?? 0;
+            return $sl;
+        }, $slots);
+    }
+
     public function search(\Illuminate\Http\Request $request)
     {
         $tab = $request->get('tab', 'dashboard');
@@ -127,6 +157,27 @@ class BrandPanelsController extends Controller
         $rewards = $this->jread('rewards');
         $browser = $this->jread('browser');
         $adStats = $this->jread('ad-stats');
+        $adverts = $this->jread('adverts');
+        $payments = $this->jread('payments')['payments'] ?? [];
+        $crashes = $this->jread('crashes');
+        $sync = $this->jread('sync');
+        $geo = $stats['geo'] ?? [];
+        $cities = $stats['cities'] ?? [];
+        $browsers = $stats['browsers'] ?? [];
+        $norm = function ($map) {
+            $out = [];
+            foreach ((array) $map as $k => $v) {
+                if (is_int($k) && is_array($v)) $out[] = ['name' => $v['country'] ?? $v['city'] ?? $v['version'] ?? $v['name'] ?? '?', 'hits' => (int)($v['hits'] ?? $v['count'] ?? $v['installs'] ?? 0)];
+                elseif (is_numeric($v)) $out[] = ['name' => (string) $k, 'hits' => (int) $v];
+            }
+            usort($out, fn($a, $b) => $b['hits'] <=> $a['hits']);
+            return $out;
+        };
+        $geoList = $norm($geo);
+        $cityList = $norm($cities);
+        $browserList = $norm($browsers);
+        $slots = $this->slotInventory(is_array($adverts) ? $adverts : []);
+        $freshLeads = is_array($adverts) ? count(array_filter($adverts, fn($l) => ($l['status'] ?? '') === 'new')) : 0;
 
         $days = $stats['days'] ?? [];
         $searches30 = 0; $suggest30 = 0;
@@ -147,7 +198,9 @@ class BrandPanelsController extends Controller
         return view('admin.brandpanels.search', compact(
             'tab', 'stats', 'popular', 'sponsored', 'pages', 'banner', 'site', 'monetize',
             'speeddial', 'rewards', 'browser', 'adStats', 'searches30', 'suggest30',
-            'today', 'providers', 'queries', 'nodes', 'siteStatus'
+            'today', 'providers', 'queries', 'nodes', 'siteStatus',
+            'adverts', 'payments', 'crashes', 'sync', 'geoList', 'cityList', 'browserList',
+            'slots', 'freshLeads'
         ));
     }
 
@@ -250,7 +303,106 @@ class BrandPanelsController extends Controller
                 $this->jwrite('rewards', $r);
                 $msg = 'Rewards config saved.';
                 break;
-            default:
+                        case 'lead_approve':
+                $leads = $this->jread('adverts');
+                $i = (int) $request->input('idx');
+                if (!isset($leads[$i])) throw new \RuntimeException('Lead not found.');
+                $price = (int) preg_replace('/[^\d]/', '', (string) $request->input('price', '')) ?: 4999;
+                $leads[$i]['status'] = 'awaiting_payment';
+                $leads[$i]['price'] = $price;
+                $this->jwrite('adverts', $leads);
+                $msg = 'Lead approved — awaiting payment ₹' . number_format($price) . '.'; $tab = 'sponsored';
+                break;
+            case 'lead_reject':
+                $leads = $this->jread('adverts');
+                $i = (int) $request->input('idx');
+                if (!isset($leads[$i])) throw new \RuntimeException('Lead not found.');
+                $leads[$i]['status'] = 'rejected';
+                $leads[$i]['reason'] = (string) $request->input('reason', 'Not a fit right now');
+                $this->jwrite('adverts', $leads);
+                $msg = 'Lead rejected.'; $tab = 'sponsored';
+                break;
+            case 'lead_live':
+                $leads = $this->jread('adverts');
+                $i = (int) $request->input('idx');
+                if (!isset($leads[$i])) throw new \RuntimeException('Lead not found.');
+                $lead = $leads[$i];
+                $leads[$i]['status'] = 'live';
+                $this->jwrite('adverts', $leads);
+                if (($lead['format'] ?? '') === 'sponsored' && !empty($lead['keywords'])) {
+                    $d = $this->jread('sponsored');
+                    $d['ads'] = $d['ads'] ?? [];
+                    $exists = false;
+                    foreach ($d['ads'] as $a) if (($a['leadRef'] ?? null) === $i) $exists = true;
+                    if (!$exists) {
+                        $host = preg_replace('/^www\./', '', (string) parse_url($lead['url'] ?? '', PHP_URL_HOST));
+                        $d['ads'][] = [
+                            'id' => 'lead-' . $i . '-' . substr(preg_replace('/[^a-z0-9]+/', '-', strtolower($lead['product'] ?? 'ad')), 0, 30),
+                            'title' => $lead['product'] ?? '',
+                            'text' => substr(($lead['msg'] ?? '') ?: ('Sponsored: ' . ($lead['product'] ?? '')), 0, 140),
+                            'url' => ($lead['url'] ?? '') ?: ('mailto:' . ($lead['email'] ?? '')),
+                            'display' => $host ?: 'partner.believoo.com',
+                            'keywords' => array_slice(array_values(array_filter(array_map('trim', explode(',', (string) $lead['keywords'])))), 0, 20),
+                            'intents' => [], 'bid' => 1, 'active' => true,
+                            'slotId' => $lead['slotId'] ?? 'sponsor-top', 'leadRef' => $i,
+                        ];
+                        $this->jwrite('sponsored', $d);
+                    }
+                }
+                $msg = 'Lead is live.'; $tab = 'sponsored';
+                break;
+            case 'lead_promote':
+                $leads = $this->jread('adverts');
+                $i = (int) $request->input('idx');
+                if (!isset($leads[$i])) throw new \RuntimeException('Lead not found.');
+                $leads[$i]['status'] = 'awaiting_payment';
+                $this->jwrite('adverts', $leads);
+                $msg = 'Waitlist lead promoted.'; $tab = 'sponsored';
+                break;
+            case 'lead_close':
+                $leads = $this->jread('adverts');
+                $i = (int) $request->input('idx');
+                if (!isset($leads[$i])) throw new \RuntimeException('Lead not found.');
+                $leads[$i]['status'] = 'closed';
+                $this->jwrite('adverts', $leads);
+                $msg = 'Lead closed.'; $tab = 'sponsored';
+                break;
+            case 'lead_delete':
+                $leads = $this->jread('adverts');
+                $i = (int) $request->input('idx');
+                if (!isset($leads[$i])) throw new \RuntimeException('Lead not found.');
+                array_splice($leads, $i, 1);
+                $this->jwrite('adverts', array_values($leads));
+                $msg = 'Lead deleted.'; $tab = 'sponsored';
+                break;
+            case 'browser_save':
+                $b = $this->jread('browser');
+                $b['announcement'] = ['active' => (bool) $request->input('annActive'), 'text' => (string) $request->input('annText', ''), 'url' => (string) $request->input('annUrl', '')];
+                $b['homepage'] = (string) $request->input('homepage', '');
+                $b['updateUrl'] = (string) $request->input('updateUrl', '');
+                $b['features'] = ['suggestions' => (bool) $request->input('fSug'), 'speedDial' => (bool) $request->input('fSd'), 'adblock' => (bool) $request->input('fAd')];
+                $b['minVersion'] = (string) $request->input('minVersion', '');
+                $b['kidsMode'] = (bool) $request->input('kids');
+                $bm = [];
+                foreach (preg_split('/\r?\n/', (string) $request->input('managedBm', '')) as $line) {
+                    if (strpos($line, '|') !== false) { [$t, $u2] = array_map('trim', explode('|', $line, 2)); if ($t && $u2) $bm[] = ['title' => $t, 'url' => $u2]; }
+                }
+                $b['managedBookmarks'] = $bm;
+                $b['blockedHosts'] = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', (string) $request->input('blockedHosts', '')))));
+                $fl = json_decode((string) $request->input('flags', ''), true);
+                $b['flags'] = is_array($fl) ? $fl : [];
+                $b['whatsNew'] = (string) $request->input('whatsNew', '');
+                $this->jwrite('browser', $b);
+                $msg = 'Browser config saved.'; $tab = 'browser';
+                break;
+            case 'site_controls':
+                $sdata = $this->jread('site');
+                $sdata['maintenance'] = (bool) $request->input('maintenance');
+                $sdata['blockedWords'] = (string) $request->input('blockedWords', '');
+                $this->jwrite('site', $sdata);
+                $msg = 'Site controls saved.'; $tab = 'settings';
+                break;
+default:
                 return redirect()->route('admin.brandpanels.search')->with('error', 'Unknown section.');
         }
         return redirect()->route('admin.brandpanels.search', ['tab' => $request->input('tab', 'dashboard')])->with('success', $msg);
@@ -955,6 +1107,7 @@ class BrandPanelsController extends Controller
         $tab = $request->get('tab', 'dashboard');
         $dbError = null;
         $stats = $users = $plays = $subs = $payments = $withdrawals = $submissions = $reports = [];
+        $storyStats = $storyPeople = [];
         try {
             $db = $this->htDb();
             $stats = [
@@ -975,13 +1128,47 @@ class BrandPanelsController extends Controller
             $submissions = $db->query("SELECT s.*, u.username, u.email FROM `_dist_submissions` s LEFT JOIN `_u_list` u ON u.ID=s.user_id ORDER BY s.id DESC LIMIT 100")->fetchAll();
             $reports = $db->query("SELECT * FROM `_u_reports` ORDER BY time_add DESC LIMIT 50")->fetchAll();
             $stories = $db->query("SELECT * FROM `_ht_admin_stories` ORDER BY ID DESC LIMIT 60")->fetchAll();
+            if ($stories) {
+                $refs = array_map(fn($s) => 'a:' . $s['ID'], $stories);
+                $in = "'" . implode("','", $refs) . "'";
+                foreach (['_ht_story_views' => 'views', '_ht_story_likes' => 'likes', '_ht_story_replies' => 'replies'] as $t => $k) {
+                    $q = @$db->query("SELECT story_ref, COUNT(*) c FROM `$t` WHERE story_ref IN ($in) GROUP BY story_ref");
+                    foreach ($q ?: [] as $r) $storyStats[$r['story_ref']][$k] = (int) $r['c'];
+                }
+                // Viewers + replies detail (latest first, capped)
+                $q = @$db->query("SELECT v.story_ref, u.username, v.time_add FROM `_ht_story_views` v LEFT JOIN `_u_list` u ON u.ID=v.user_id WHERE v.story_ref IN ($in) ORDER BY v.ID DESC LIMIT 400");
+                foreach ($q ?: [] as $r) $storyPeople[$r['story_ref']]['viewers'][] = ['u' => $r['username'] ?: 'guest', 't' => $r['time_add']];
+                $q = @$db->query("SELECT r.story_ref, u.username, r.message, r.time_add FROM `_ht_story_replies` r LEFT JOIN `_u_list` u ON u.ID=r.user_id WHERE r.story_ref IN ($in) ORDER BY r.ID DESC LIMIT 300");
+                foreach ($q ?: [] as $r) $storyPeople[$r['story_ref']]['replies'][] = ['u' => $r['username'] ?: '?', 'm' => $r['message'], 't' => $r['time_add']];
+                // IyolMe-side engagement on mirrored stories
+                $idb = $this->iyolDb();
+                if ($idb) {
+                    $imap = [];
+                    foreach ($stories as $s) if (!empty($s['iyol_story_id'])) $imap[(int) $s['iyol_story_id']] = 'a:' . $s['ID'];
+                    if ($imap) {
+                        $qin = implode(',', array_keys($imap));
+                        foreach ($idb->query("SELECT id, view_by_user_ids FROM stories WHERE id IN ($qin)") as $r) {
+                            $storyStats[$imap[$r['id']]]['iyol_views'] = count(array_filter(explode(',', (string) $r['view_by_user_ids'])));
+                        }
+                        foreach ($idb->query("SELECT story_id, sticker, COUNT(*) c FROM tbl_story_interactions WHERE story_id IN ($qin) GROUP BY story_id, sticker") as $r) {
+                            $k = $r['sticker'] === 'reaction' ? 'iyol_likes' : ($r['sticker'] === 'reply' ? 'iyol_replies' : 'iyol_other');
+                            $storyStats[$imap[$r['story_id']]][$k] = ($storyStats[$imap[$r['story_id']]][$k] ?? 0) + (int) $r['c'];
+                        }
+                        foreach ($idb->query("SELECT i.story_id, u.username, i.note, i.created_at FROM tbl_story_interactions i LEFT JOIN tbl_users u ON u.id=i.user_id WHERE i.story_id IN ($qin) AND i.sticker='reply' ORDER BY i.id DESC LIMIT 300") as $r) {
+                            $storyPeople[$imap[$r['story_id']]]['iyol_replies'][] = ['u' => $r['username'] ?: '?', 'm' => $r['note'], 't' => $r['created_at']];
+                        }
+                    }
+                }
+            }
         } catch (\Throwable $e) {
             $dbError = $e->getMessage();
         }
         $siteStatus = $this->probe('https://music.hitune.in/');
         $mainStatus = $this->probe('https://hitune.in/');
         $stories = $stories ?? [];
-        return view('admin.brandpanels.hitune', compact('tab', 'stats', 'users', 'plays', 'subs', 'payments', 'withdrawals', 'submissions', 'reports', 'stories', 'siteStatus', 'mainStatus', 'dbError'));
+        $storyStats = $storyStats ?? [];
+        $storyPeople = $storyPeople ?? [];
+        return view('admin.brandpanels.hitune', compact('tab', 'stats', 'users', 'plays', 'subs', 'payments', 'withdrawals', 'submissions', 'reports', 'stories', 'storyStats', 'storyPeople', 'siteStatus', 'mainStatus', 'dbError'));
     }
 
     public function hituneSave(\Illuminate\Http\Request $request)

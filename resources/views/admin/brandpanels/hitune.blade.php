@@ -214,7 +214,30 @@
                 @if($s['iyol_story_id'])<span class="ghc-badge" style="background:#e0f2fe;color:#0369a1;">IYOLME</span>@endif
             </div>
             <div style="font-size:0.8rem;color:#334155;min-height:18px;margin-bottom:6px;">{{ $s['caption'] }}</div>
-            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:10px;">{{ $s['time_add'] }} &middot; {{ $s['s_views'] }} views &middot; {{ $s['duration'] }}s</div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:6px;">{{ $s['time_add'] }} &middot; {{ $s['duration'] }}s</div>
+            @php $st = $storyStats['a:' . $s['ID']] ?? []; $pp = $storyPeople['a:' . $s['ID']] ?? []; @endphp
+            <div style="font-size:0.78rem;font-weight:700;color:#334155;margin-bottom:8px;">
+                <i class="fas fa-eye" style="color:#0ea5e9;"></i> {{ ($st['views'] ?? 0) + ($st['iyol_views'] ?? 0) }}
+                &nbsp;<i class="fas fa-heart" style="color:#ef4444;"></i> {{ ($st['likes'] ?? 0) + ($st['iyol_likes'] ?? 0) }}
+                &nbsp;<i class="fas fa-comment" style="color:#8b5cf6;"></i> {{ ($st['replies'] ?? 0) + ($st['iyol_replies'] ?? 0) }}
+                @if(($st['iyol_views'] ?? 0) + ($st['iyol_likes'] ?? 0) + ($st['iyol_replies'] ?? 0) > 0)
+                    <span style="font-size:0.62rem;color:#94a3b8;font-weight:400;">(incl. IyolMe)</span>
+                @endif
+            </div>
+            @if(!empty($pp))
+            <details style="font-size:0.72rem;color:#475569;margin-bottom:8px;">
+                <summary style="cursor:pointer;font-weight:600;color:#64748b;">Viewers &amp; replies</summary>
+                @if(!empty($pp['viewers']))
+                    <div style="margin-top:6px;"><b>Seen by:</b> {{ collect($pp['viewers'])->pluck('u')->unique()->take(15)->implode(', ') }}</div>
+                @endif
+                @foreach(($pp['replies'] ?? []) as $rp)
+                    <div style="margin-top:4px;"><b>{{ $rp['u'] }}:</b> {{ $rp['m'] }} <span style="color:#94a3b8;">{{ $rp['t'] }}</span></div>
+                @endforeach
+                @foreach(($pp['iyol_replies'] ?? []) as $rp)
+                    <div style="margin-top:4px;"><b>{{ $rp['u'] }}</b> <span class="ghc-badge" style="background:#e0f2fe;color:#0369a1;font-size:0.6rem;">iyolme</span>: {{ $rp['m'] }}</div>
+                @endforeach
+            </details>
+            @endif
             <div style="display:flex;gap:6px;">
                 <form method="POST" action="{{ route('admin.brandpanels.hitune.save') }}" style="flex:1;">@csrf
                     <input type="hidden" name="op" value="story_toggle"><input type="hidden" name="tab" value="stories">
