@@ -21,6 +21,7 @@
     'withdrawals' => ['Withdrawals','fa-money-bill'],
     'dist' => ['Dist Submissions','fa-cloud-upload-alt'],
     'stories' => ['Stories','fa-history'],
+    'settings' => ['Settings','fa-cog'],
 ]; @endphp
 <div class="ghc-tabs" style="margin-bottom:20px;">
     @foreach($htabs as $key => $item)
@@ -262,4 +263,61 @@
     @endforelse
 </div>
 @endif
+
+@if($tab === 'settings')
+<div class="ghc-card" style="margin-bottom:20px;">
+    <div class="ghc-card-header"><h3><i class="fas fa-rectangle-ad" style="color:#f59e0b;margin-right:8px;"></i>AdMob — Ad Unit IDs</h3></div>
+    <div style="padding:18px;">
+        <p style="font-size:0.8rem;color:#64748b;margin:0 0 14px;">Production ad units the app receives live via <code>client_config &rarr; ad_units</code>. Format: <code>ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY</code>. Leave blank to keep current. New app installs get these instantly; the in-app compiled .env IDs are only a fallback.</p>
+        <form method="POST" action="{{ route('admin.brandpanels.hitune.save') }}">
+            @csrf
+            <input type="hidden" name="op" value="admob_save"><input type="hidden" name="tab" value="settings">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">ANDROID BANNER</label>
+                    <input name="android_banner" value="{{ $admob['android_banner'] ?? '' }}" placeholder="ca-app-pub-&hellip;/&hellip;" class="ghc-input"></div>
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">ANDROID INTERSTITIAL</label>
+                    <input name="android_interstitial" value="{{ $admob['android_interstitial'] ?? '' }}" placeholder="ca-app-pub-&hellip;/&hellip;" class="ghc-input"></div>
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">iOS BANNER</label>
+                    <input name="ios_banner" value="{{ $admob['ios_banner'] ?? '' }}" placeholder="ca-app-pub-&hellip;/&hellip;" class="ghc-input"></div>
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">iOS INTERSTITIAL</label>
+                    <input name="ios_interstitial" value="{{ $admob['ios_interstitial'] ?? '' }}" placeholder="ca-app-pub-&hellip;/&hellip;" class="ghc-input"></div>
+            </div>
+            <button type="submit" class="ghc-btn" style="margin-top:14px;"><i class="fas fa-save"></i> Save Ad Units</button>
+        </form>
+    </div>
+</div>
+
+<div class="ghc-card" style="margin-bottom:20px;">
+    <div class="ghc-card-header"><h3><i class="fas fa-key" style="color:#ef4444;margin-right:8px;"></i>Android Signing — Keystore</h3></div>
+    <div style="padding:18px;">
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#fca5a5;padding:10px 14px;border-radius:10px;font-size:0.78rem;margin-bottom:14px;">
+            <i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i><b>Read:</b> stored <b>outside the webroot</b> at <code>/www/keystore</code> (0600). This panel copy is your <b>backup</b> + source for the server build flow. Your <b>Windows machine still needs its own</b> <code>android/key.properties</code> pointing at the same .jks for <code>flutter build appbundle</code>. Passwords are never displayed back — blank fields keep existing values.
+        </div>
+        @if(!empty($keystoreFiles))
+        <div style="margin-bottom:14px;font-size:0.82rem;">
+            @foreach($keystoreFiles as $kf)
+            <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#22c55e;padding:5px 12px;border-radius:8px;margin-right:8px;"><i class="fas fa-file-shield"></i>{{ $kf }}{{ !empty($signing['uploaded']) ? ' · '.$signing['uploaded'] : '' }}</span>
+            @endforeach
+            @if(!empty($signing['alias']))<span style="font-size:0.76rem;color:#64748b;">alias: <code>{{ $signing['alias'] }}</code></span>@endif
+        </div>
+        @endif
+        <form method="POST" action="{{ route('admin.brandpanels.hitune.save') }}" enctype="multipart/form-data">
+            @csrf
+            <input type="hidden" name="op" value="keystore_save"><input type="hidden" name="tab" value="settings">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">KEYSTORE FILE (.jks / .keystore)</label>
+                    <input type="file" name="keystore" accept=".jks,.keystore" class="ghc-input" style="padding:8px;"></div>
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">KEY ALIAS</label>
+                    <input name="key_alias" value="{{ $signing['alias'] ?? '' }}" placeholder="hitune" class="ghc-input"></div>
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">STORE PASSWORD</label>
+                    <input type="password" name="store_password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull; (blank = keep)" class="ghc-input" autocomplete="new-password"></div>
+                <div><label style="font-size:0.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">KEY PASSWORD</label>
+                    <input type="password" name="key_password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull; (blank = keep)" class="ghc-input" autocomplete="new-password"></div>
+            </div>
+            <button type="submit" class="ghc-btn" style="margin-top:14px;"><i class="fas fa-upload"></i> Save Signing Config</button>
+        </form>
+    </div>
+</div>
+@endif
+
 @endsection

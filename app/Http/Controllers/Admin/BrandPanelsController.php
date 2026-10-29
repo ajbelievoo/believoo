@@ -1165,10 +1165,20 @@ default:
         }
         $siteStatus = $this->probe('https://music.hitune.in/');
         $mainStatus = $this->probe('https://hitune.in/');
+        // Settings tab — AdMob IDs + Android signing meta
+        $admob = $signing = $keystoreFiles = null;
+        try {
+            $row = $db->query("SELECT val FROM _bof_setting WHERE var='admob_unit_ids'")->fetch();
+            $admob = $row ? json_decode($row['val'], true) : [];
+            $row = $db->query("SELECT val FROM _bof_setting WHERE var='android_signing'")->fetch();
+            $signing = $row ? json_decode($row['val'], true) : [];
+            $ksDir = '/www/keystore';
+            $keystoreFiles = is_dir($ksDir) ? array_values(array_filter(array_diff(scandir($ksDir) ?: [], ['.','..','key.properties']), function($f) use ($ksDir){ return is_file($ksDir.'/'.$f); })) : [];
+        } catch (\Throwable $e) { $admob = $admob ?: []; $signing = $signing ?: []; $keystoreFiles = []; }
         $stories = $stories ?? [];
         $storyStats = $storyStats ?? [];
         $storyPeople = $storyPeople ?? [];
-        return view('admin.brandpanels.hitune', compact('tab', 'stats', 'users', 'plays', 'subs', 'payments', 'withdrawals', 'submissions', 'reports', 'stories', 'storyStats', 'storyPeople', 'siteStatus', 'mainStatus', 'dbError'));
+        return view('admin.brandpanels.hitune', compact('tab', 'stats', 'users', 'plays', 'subs', 'payments', 'withdrawals', 'submissions', 'reports', 'stories', 'storyStats', 'storyPeople', 'siteStatus', 'mainStatus', 'dbError', 'admob', 'signing', 'keystoreFiles'));
     }
 
     public function hituneSave(\Illuminate\Http\Request $request)
@@ -1194,6 +1204,46 @@ default:
                     $params[] = $id;
                     $db->prepare("UPDATE `_dist_submissions` SET " . implode(',', $fields) . ", time_update=NOW() WHERE id=?")->execute($params);
                     $msg = 'Submission updated.'; $tab = 'dist';
+                    break;
+                case 'admob_save':
+                    $ids = [
+                        'android_banner'       => preg_replace('/[^a-zA-Z0-9\\-\\/\\._]/', '', (string) $request->input('android_banner')),
+                        'android_interstitial' => preg_replace('/[^a-zA-Z0-9\\-\\/\\._]/', '', (string) $request->input('android_interstitial')),
+                        'ios_banner'           => preg_replace('/[^a-zA-Z0-9\\-\\/\\._]/', '', (string) $request->input('ios_banner')),
+                        'ios_interstitial'     => preg_replace('/[^a-zA-Z0-9\\-\\/\\._]/', '', (string) $request->input('ios_interstitial')),
+                    ];
+                    foreach ($ids as $k => $v)
+                        if ($v !== '' && !preg_match('/^ca-app-pub-\\d+\\/.+$/', $v))
+                            return redirect()->route('admin.brandpanels.hitune', ['tab' => 'settings'])->with('error', "$k: invalid unit id (expected ca-app-pub-XXXX/YYYY)");
+                    $db->prepare("INSERT INTO _bof_setting (var,val,type,time_add,time_update) VALUES ('admob_unit_ids',?,'json',NOW(),NOW()) ON DUPLICATE KEY UPDATE val=VALUES(val), time_update=NOW()")
+                        ->execute([json_encode($ids)]);
+                    $msg = 'AdMob unit IDs saved — live to app via client_config.'; $tab = 'settings';
+                    break;
+                case 'keystore_save':
+                    $ksDir = '/www/keystore';
+                    if (!is_dir($ksDir)) { mkdir($ksDir, 0700, true); }
+                    $old = $db->query("SELECT val FROM _bof_setting WHERE var='android_signing'")->fetch();
+                    $meta = $old ? (json_decode($old['val'], true) ?: []) : [];
+                    foreach (['key_alias' => 'alias', 'store_password' => 'store_pass', 'key_password' => 'key_pass'] as $in => $k) {
+                        $v = (string) $request->input($in, '');
+                        if ($v !== '') $meta[$k] = $v;
+                    }
+                    if ($request->hasFile('keystore')) {
+                        $file = $request->file('keystore');
+                        $ext = strtolower($file->getClientOriginalExtension());
+                        if (!in_array($ext, ['jks','keystore'])) return redirect()->route('admin.brandpanels.hitune', ['tab' => 'settings'])->with('error', 'Only .jks/.keystore allowed');
+                        if ($file->getSize() > 5 * 1024 * 1024) return redirect()->route('admin.brandpanels.hitune', ['tab' => 'settings'])->with('error', 'Keystore too large');
+                        $name = 'hitune-release.' . $ext;
+                        $file->move($ksDir, $name);
+                        @chmod($ksDir . '/' . $name, 0600);
+                        $meta['file'] = $name;
+                        $meta['uploaded'] = date('Y-m-d H:i');
+                    }
+                    $db->prepare("INSERT INTO _bof_setting (var,val,type,time_add,time_update) VALUES ('android_signing',?,'json',NOW(),NOW()) ON DUPLICATE KEY UPDATE val=VALUES(val), time_update=NOW()")
+                        ->execute([json_encode($meta)]);
+                    if (!empty($meta['file']) && !empty($meta['store_pass']) && !empty($meta['alias']))
+                        @file_put_contents($ksDir . '/key.properties', "storeFile={$meta['file']}\nstorePassword={$meta['store_pass']}\nkeyAlias={$meta['alias']}\nkeyPassword={$meta['key_pass']}\n") && @chmod($ksDir . '/key.properties', 0600);
+                    $msg = 'Signing config saved (keystore stored outside webroot: /www/keystore).'; $tab = 'settings';
                     break;
                 case 'story_save':
                     $content = trim((string) $request->input('content', ''));
