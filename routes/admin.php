@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\StreamingPlanController;
 use App\Http\Controllers\Admin\StreamAnalyticsController;
 use App\Http\Controllers\Admin\MailTestController;
 use App\Http\Controllers\Admin\GhcController;
+use App\Http\Controllers\Admin\BrandPanelsController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\AiChatController;
@@ -41,6 +42,27 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
     // Unified brand management hub
     Route::get('/brands', [BrandController::class, 'index'])->name('brands.index');
 
+    // Brand panels — direct DB/file reads, no separate logins
+    Route::get('/brand-panels/license', [BrandPanelsController::class, 'license'])->name('brandpanels.license');
+    Route::get('/brand-panels/rtc', [BrandPanelsController::class, 'rtc'])->name('brandpanels.rtc');
+    Route::get('/brand-panels/search', [BrandPanelsController::class, 'search'])->name('brandpanels.search');
+    Route::post('/brand-panels/search/save', [BrandPanelsController::class, 'searchSave'])->name('brandpanels.search.save');
+    Route::post('/brand-panels/license/save', [BrandPanelsController::class, 'licenseSave'])->name('brandpanels.license.save');
+    Route::post('/brand-panels/rtc/save', [BrandPanelsController::class, 'rtcSaveOp'])->name('brandpanels.rtc.save');
+    Route::get('/brand-panels/ar', [BrandPanelsController::class, 'ar'])->name('brandpanels.ar');
+    Route::post('/brand-panels/ar/save', [BrandPanelsController::class, 'arSaveOp'])->name('brandpanels.ar.save');
+    Route::get('/brand-panels/aistudio', [BrandPanelsController::class, 'aistudio'])->name('brandpanels.aistudio');
+    Route::post('/brand-panels/aistudio/save', [BrandPanelsController::class, 'aistudioSave'])->name('brandpanels.aistudio.save');
+    Route::get('/brand-panels/hitune', [BrandPanelsController::class, 'hitune'])->name('brandpanels.hitune');
+    Route::post('/brand-panels/hitune/save', [BrandPanelsController::class, 'hituneSave'])->name('brandpanels.hitune.save');
+        Route::get('/brand-panels/signing', [BrandPanelsController::class, 'signing'])->name('brandpanels.signing');
+    Route::post('/brand-panels/signing/save', [BrandPanelsController::class, 'signingSave'])->name('brandpanels.signing.save');
+    Route::get('/brand-panels/dist', [BrandPanelsController::class, 'dist'])->name('brandpanels.dist');
+    Route::post('/brand-panels/dist/save', [BrandPanelsController::class, 'distSave'])->name('brandpanels.dist.save');
+    Route::get('/brand-panels/vibe', [BrandPanelsController::class, 'vibe'])->name('brandpanels.vibe');
+    Route::post('/brand-panels/vibe/save', [BrandPanelsController::class, 'vibeSave'])->name('brandpanels.vibe.save');
+    Route::get('/brand-panels/aistudio/export/{kind}', [BrandPanelsController::class, 'aistudioExport'])->name('brandpanels.aistudio.export');
+
     // GHC (Go Host Cloud) unified admin
     Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
         ->prefix('ghc')->name('ghc.')->group(function () {
@@ -55,6 +77,8 @@ Route::middleware(['auth', 'admin', '2fa', 'log.admin'])->prefix('admin')->name(
         Route::post('/margin', [GhcController::class, 'updateMargin'])->name('margin.update');
         Route::post('/ticket/{id}', [GhcController::class, 'updateTicket'])->name('ticket.update');
         Route::post('/user/{id}', [GhcController::class, 'updateUser'])->name('user.update');
+        Route::post('/panel-licenses', [GhcController::class, 'createLicense'])->name('licenses.create');
+        Route::post('/panel-licenses/{id}', [GhcController::class, 'updateLicense'])->name('licenses.update');
     });
 
     // Users

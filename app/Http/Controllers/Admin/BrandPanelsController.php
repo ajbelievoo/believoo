@@ -178,6 +178,7 @@ class BrandPanelsController extends Controller
         $browserList = $norm($browsers);
         $slots = $this->slotInventory(is_array($adverts) ? $adverts : []);
         $freshLeads = is_array($adverts) ? count(array_filter($adverts, fn($l) => ($l['status'] ?? '') === 'new')) : 0;
+        $adaccts = $this->jread('adaccounts')['accounts'] ?? [];
 
         $days = $stats['days'] ?? [];
         $searches30 = 0; $suggest30 = 0;
@@ -200,7 +201,7 @@ class BrandPanelsController extends Controller
             'speeddial', 'rewards', 'browser', 'adStats', 'searches30', 'suggest30',
             'today', 'providers', 'queries', 'nodes', 'siteStatus',
             'adverts', 'payments', 'crashes', 'sync', 'geoList', 'cityList', 'browserList',
-            'slots', 'freshLeads'
+            'slots', 'freshLeads', 'adaccts'
         ));
     }
 
@@ -401,6 +402,39 @@ class BrandPanelsController extends Controller
                 $sdata['blockedWords'] = (string) $request->input('blockedWords', '');
                 $this->jwrite('site', $sdata);
                 $msg = 'Site controls saved.'; $tab = 'settings';
+                break;
+            case 'acct_verify':
+                $d = $this->jread('adaccounts');
+                $em = strtolower((string) $request->input('email'));
+                if (!isset($d['accounts'][$em])) throw new \RuntimeException('Account not found.');
+                $d['accounts'][$em]['verified'] = true;
+                unset($d['accounts'][$em]['verify']);
+                $this->jwrite('adaccounts', $d);
+                $msg = 'Advertiser verified.'; $tab = 'accounts';
+                break;
+            case 'acct_unverify':
+                $d = $this->jread('adaccounts');
+                $em = strtolower((string) $request->input('email'));
+                if (!isset($d['accounts'][$em])) throw new \RuntimeException('Account not found.');
+                $d['accounts'][$em]['verified'] = false;
+                $this->jwrite('adaccounts', $d);
+                $msg = 'Advertiser unverified (must verify email again).'; $tab = 'accounts';
+                break;
+            case 'acct_retoken':
+                $d = $this->jread('adaccounts');
+                $em = strtolower((string) $request->input('email'));
+                if (!isset($d['accounts'][$em])) throw new \RuntimeException('Account not found.');
+                $d['accounts'][$em]['token'] = bin2hex(random_bytes(18));
+                $this->jwrite('adaccounts', $d);
+                $msg = 'Session reset — advertiser logged out everywhere.'; $tab = 'accounts';
+                break;
+            case 'acct_delete':
+                $d = $this->jread('adaccounts');
+                $em = strtolower((string) $request->input('email'));
+                if (!isset($d['accounts'][$em])) throw new \RuntimeException('Account not found.');
+                unset($d['accounts'][$em]);
+                $this->jwrite('adaccounts', $d);
+                $msg = 'Advertiser account deleted.'; $tab = 'accounts';
                 break;
 default:
                 return redirect()->route('admin.brandpanels.search')->with('error', 'Unknown section.');
@@ -1598,6 +1632,86 @@ default:
             return redirect()->route('admin.brandpanels.vibe', ['tab' => $tab])->with('error', 'Save failed: ' . $e->getMessage());
         }
         return redirect()->route('admin.brandpanels.vibe', ['tab' => $tab])->with('success', $msg);
+    }
+
+
+    /** All BelieVoo apps that ship Android builds — signing config registry. */
+    private function signingApps(): array
+    {
+        return [
+            'hitune'    => ['HiTune Music',   'fa-music'],
+            'iyolme'    => ['IyolMe',         'fa-comments'],
+            'unilive'   => ['Unilive',        'fa-video'],
+            'browser'   => ['BelieVoo Browser','fa-globe'],
+            'bymydesk'  => ['ByMyDesk Agent', 'fa-headset'],
+            'search'    => ['BelieVoo Search','fa-search'],
+            'vibe'      => ['HiTune VIBE',    'fa-newspaper'],
+            'aistudio'  => ['AI Studio',      'fa-robot'],
+        ];
+    }
+
+    private function signingDir(string $app): string
+    {
+        $dir = '/www/keystore/' . preg_replace('/[^a-z0-9_]/', '', $app);
+        if (!is_dir($dir)) { @mkdir($dir, 0700, true); }
+        return $dir;
+    }
+
+    public function signing(\Illuminate\Http\Request $request)
+    {
+        $tab = 'signing';
+        $apps = [];
+        foreach ($this->signingApps() as $key => $meta) {
+            $dir = $this->signingDir($key);
+            $mfile = $dir . '/meta.json';
+            $m = is_file($mfile) ? (json_decode(@file_get_contents($mfile), true) ?: []) : [];
+            $files = is_dir($dir) ? array_values(array_filter(array_diff(scandir($dir) ?: [], ['.', '..', 'meta.json', 'key.properties']), function ($f) use ($dir) { return is_file($dir . '/' . $f); })) : [];
+            $apps[] = ['key' => $key, 'label' => $meta[0], 'icon' => $meta[1], 'meta' => $m, 'files' => $files];
+        }
+        $dbError = null;
+        return view('admin.brandpanels.signing', compact('tab', 'apps', 'dbError'));
+    }
+
+    public function signingSave(\Illuminate\Http\Request $request)
+    {
+        $app = preg_replace('/[^a-z0-9_]/', '', (string) $request->input('app'));
+        $all = $this->signingApps();
+        if (!isset($all[$app]))
+            return redirect()->route('admin.brandpanels.signing')->with('error', 'Unknown app.');
+
+        $dir = $this->signingDir($app);
+        $mfile = $dir . '/meta.json';
+        $meta = is_file($mfile) ? (json_decode(@file_get_contents($mfile), true) ?: []) : [];
+
+        foreach (['key_alias' => 'alias', 'store_password' => 'store_pass', 'key_password' => 'key_pass'] as $in => $k) {
+            $v = (string) $request->input($in, '');
+            if ($v !== '') $meta[$k] = $v;
+        }
+        if ($request->hasFile('keystore')) {
+            $file = $request->file('keystore');
+            $ext = strtolower($file->getClientOriginalExtension());
+            if (!in_array($ext, ['jks', 'keystore']))
+                return redirect()->route('admin.brandpanels.signing')->with('error', 'Only .jks/.keystore allowed');
+            if ($file->getSize() > 5 * 1024 * 1024)
+                return redirect()->route('admin.brandpanels.signing')->with('error', 'Keystore too large');
+            // clear previous keystore files for this app (keep only latest)
+            foreach (glob($dir . '/*.jks') + glob($dir . '/*.keystore') as $old) @unlink($old);
+            $name = $app . '-release.' . $ext;
+            $file->move($dir, $name);
+            @chmod($dir . '/' . $name, 0600);
+            $meta['file'] = $name;
+            $meta['uploaded'] = date('Y-m-d H:i');
+        }
+        $meta['updated_by'] = optional($request->user())->email ?? 'admin';
+        @file_put_contents($mfile, json_encode($meta, JSON_PRETTY_PRINT));
+        @chmod($mfile, 0600);
+
+        if (!empty($meta['file']) && !empty($meta['store_pass']) && !empty($meta['alias'])) {
+            @file_put_contents($dir . '/key.properties',
+                "storeFile={$meta['file']}\nstorePassword={$meta['store_pass']}\nkeyAlias={$meta['alias']}\nkeyPassword={$meta['key_pass']}\n");
+            @chmod($dir . '/key.properties', 0600);
+        }
+        return redirect()->route('admin.brandpanels.signing')->with('success', $all[$app][0] . ': signing config saved (/www/keystore/' . $app . ')');
     }
 
 }
